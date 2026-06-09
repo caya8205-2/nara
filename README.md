@@ -1,8 +1,8 @@
 # Nara
 
-Nara is a self-hosted agentic personal assistant platform designed to help manage tasks, schedules, reports, and business workflows through natural conversations.
+Nara is a self-hosted agentic personal assistant platform designed to help manage tasks, schedules, reports, and business workflows from a local office server.
 
-Built around a WhatsApp-first experience, Nara combines an AI agent layer with traditional backend services, allowing users to interact with business data, automate routine operations, and receive scheduled reports directly from messaging channels.
+Nara combines a local backend, desktop/mobile control surfaces, and an OpenClaw-powered agent layer. The backend stays on a trusted machine in the office, while desktop and mobile apps call its API for daily operations. Messaging channels such as WhatsApp can be added later as another input surface for the same backend tools.
 
 > Project status: Early Development / R&D
 
@@ -28,23 +28,23 @@ Nara is built around four primary layers:
 
 ### User Interfaces
 
-* WhatsApp (Primary Interface)
-* Telegram (Optional)
-* Web Dashboard (shadcn/ui + Tailwind CSS + TypeScript)
-* Flutter Mobile App (Optional)
-* Tauri Desktop App (Optional)
+* Tauri Desktop App (primary operational surface)
+* Flutter Mobile App (mobile companion)
+* Web Dashboard (local development and internal preview)
+* WhatsApp (later agent channel)
+* Telegram (optional later channel)
 
 ### Agent Layer
 
 Powered by OpenClaw Runtime:
 
 * OpenClaw Gateway
-* WhatsApp Integration
 * Agent Runtime
 * Tool Calling System
 * Session Memory & Context Storage
 * Scheduled Tasks & Cron Jobs
 * Reconnect Watchdog
+* WhatsApp Integration (later phase)
 
 ### Business Logic Layer
 
@@ -69,25 +69,39 @@ Backend services built with TypeScript:
 
 ---
 
+## Deployment Model
+
+Nara is intended to run on one office PC or local server:
+
+* Backend API runs locally on the server machine.
+* PostgreSQL + pgvector and Redis run on the same machine or local network.
+* Tauri desktop app can bundle or supervise the backend as a sidecar for local operation.
+* Flutter mobile app connects to the backend API over the office network or Cloudflare Tunnel.
+* Web dashboard stays useful for development and local diagnostics, but is not the main deployment target.
+* No public web domain is required for the dashboard surface.
+* Railway/VPS deployment remains a later option if the project outgrows the office-server model.
+
+---
+
 ## Core Workflow
 
-1. User sends a message through WhatsApp.
-2. OpenClaw receives and processes the request.
-3. The agent invokes backend tool endpoints.
-4. Backend services query databases and business systems.
-5. Structured data is returned to the agent.
-6. The agent generates a response.
-7. The response is delivered back through WhatsApp.
+1. User works from the desktop dashboard or mobile app.
+2. Client app calls the backend API.
+3. Backend services query databases and business systems.
+4. Backend returns structured operational data to the client.
+5. Agent workflows can invoke backend tool endpoints for automated work.
+6. Scheduled reports and reminders can run without direct user interaction.
+7. WhatsApp can be added later so user messages go through OpenClaw before invoking the same backend tools.
 
-Additionally, scheduled reports and automated workflows can be generated and delivered without direct user interaction.
+The backend remains the source of truth whether the request comes from desktop, mobile, scheduled jobs, or a future messaging channel.
 
 ---
 
 ## Key Principles
 
 * Self-hosted by default
-* WhatsApp-first user experience
-* Agent and backend services run on the same server
+* Local-first desktop and mobile experience
+* Agent and backend services can run on the same server
 * Clear separation between AI orchestration and business logic
 * Backend remains the source of truth
 * Extensible tool-based architecture
@@ -100,7 +114,7 @@ Additionally, scheduled reports and automated workflows can be generated and del
 ### Agent Layer
 
 * OpenClaw
-* WhatsApp Web / Baileys
+* WhatsApp Web / Baileys (later phase)
 
 ### Backend
 
@@ -112,6 +126,8 @@ Additionally, scheduled reports and automated workflows can be generated and del
 * TypeScript
 * shadcn/ui
 * Tailwind CSS
+* Tauri
+* Flutter
 
 ### Database & Infrastructure
 
@@ -198,18 +214,109 @@ docker compose stop postgres
 
 ---
 
+## Remote Access
+
+For access outside the office network, use Cloudflare Tunnel to expose only the backend API:
+
+```text
+Cloudflare Tunnel URL -> http://127.0.0.1:4000
+```
+
+Do not expose PostgreSQL or Redis. Keep them local to the server PC.
+
+Remote mobile and desktop apps should store a configurable server URL, for example:
+
+```text
+https://your-tunnel-hostname.example.com
+```
+
+See [Cloudflare Tunnel Deployment](docs/deployment/cloudflare-tunnel.md) for the deployment model and security checklist.
+
+---
+
 ## Roadmap
 
+### Implementation Plan
+
+1. Harden backend access before exposing it outside the office network:
+   operator auth, protected write endpoints, admin auth, rate limiting, and audit logs.
+2. Keep the office PC as the server:
+   PostgreSQL and Redis stay local, backend runs on the server PC, and Cloudflare Tunnel exposes only the backend API.
+3. Make every client configurable:
+   mobile and desktop apps must store a server URL instead of hardcoding `localhost`.
+4. Build the main user surfaces:
+   Flutter mobile first, then Tauri desktop with feature parity where practical, then local web admin for server operations.
+5. Add agent workflows after the core app is stable:
+   OpenClaw tool expansion, confirmation flow, memory/context storage, reports, and schedules.
+6. Add messaging channels last:
+   WhatsApp first when the assistant phone number is ready, Telegram only if useful later.
+
+### Phase 1: Local Backend Foundation
+
+* [x] Monorepo scaffold
+* [x] PostgreSQL + pgvector Docker setup
+* [x] Redis connection support
+* [x] Task schema and initial migration
+* [x] Protected agent tool endpoints
+* [x] Local agent smoke test without WhatsApp
+* [x] Backend readiness checks for database, Redis, and OpenClaw
+
+### Phase 2: Remote Access and Security
+
+* [ ] Backend operator authentication
+* [ ] Protect write endpoints
+* [ ] Admin/dashboard authentication
+* [ ] Server URL settings for mobile and desktop clients
+* [ ] Cloudflare Tunnel setup for backend API
+* [ ] Rate limiting for exposed endpoints
+* [ ] Document backup and recovery basics
+
+### Phase 3: Operational Core
+
+* [ ] Task management CRUD
+* [ ] Schedule management CRUD
+* [ ] Reminder worker with Redis/BullMQ
+* [ ] Reporting service
+* [ ] Client/contact management
+* [ ] Basic authentication and operator access control
+* [ ] Audit logs for agent-triggered actions
+
+### Phase 4: Mobile App
+
+* [ ] Flutter app scaffold
+* [ ] Backend API connection settings
+* [ ] Mobile task and reminder views
+* [ ] Push or local notification strategy
+* [ ] Approval screen for agent-triggered actions
+
+### Phase 5: Desktop App
+
+* [ ] Tauri desktop shell
+* [ ] Full feature parity with mobile where practical
+* [ ] Backend sidecar start/stop supervision for server PC usage
+* [ ] Local server settings and health screen
+* [ ] Desktop task and schedule screens
+* [ ] Local backup/export controls
+
+### Phase 6: Web Admin Panel
+
+* [ ] Local admin dashboard authentication
+* [ ] System health and logs
+* [ ] Tool endpoint debugging
+* [ ] Server configuration checks
+
+### Phase 7: Agent Automation
+
+* [ ] Expand OpenClaw tool definitions
+* [ ] Scheduled report generation
+* [ ] Agent-safe confirmation flow for destructive actions
+* [ ] Memory/context storage for business workflows
+
+### Phase 8: Messaging Channels
+
 * [ ] WhatsApp integration
-* [ ] Agent tool framework
-* [ ] Task management
-* [ ] Schedule management
-* [ ] Automated reminders
-* [ ] Reporting engine
-* [ ] Analytics dashboard
-* [ ] Web dashboard
-* [ ] Mobile application
-* [ ] Desktop application
+* [ ] Telegram integration (optional)
+* [ ] Messaging delivery for reminders and reports
 
 ---
 
