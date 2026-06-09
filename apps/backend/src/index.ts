@@ -3,9 +3,18 @@ import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import { env } from './config/env.js'
 
-const app = Fastify({ logger: true })
+const app = Fastify({
+  logger: true,
+  trustProxy: env.TRUST_PROXY,
+})
 
-app.register(cors)
+const corsOrigins = env.CORS_ORIGINS
+  ? env.CORS_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean)
+  : env.NODE_ENV === 'production'
+    ? false
+    : true
+
+app.register(cors, { origin: corsOrigins })
 app.register(jwt, { secret: env.JWT_SECRET })
 
 // Health check
@@ -17,13 +26,15 @@ app.get('/health', async () => ({
 
 // Routes
 app.register(import('./routes/readiness.js'), { prefix: '/api/readiness' })
+app.register(import('./routes/auth.js'), { prefix: '/api/auth' })
 app.register(import('./routes/tasks.js'), { prefix: '/api/tasks' })
+app.register(import('./routes/users.js'), { prefix: '/api/users' })
+app.register(import('./routes/agent-access.js'), { prefix: '/api/agent-access' })
 app.register(import('./routes/agent-tools.js'), { prefix: '/api/agent' })
 
-// Stubs — uncomment as implemented
+// Stubs - uncomment as implemented
 // app.register(import('./routes/schedules.js'), { prefix: '/api/schedules' })
 // app.register(import('./routes/reports.js'), { prefix: '/api/reports' })
-// app.register(import('./routes/auth.js'), { prefix: '/api/auth' })
 // app.register(import('./routes/clients.js'), { prefix: '/api/clients' })
 
 const start = async () => {

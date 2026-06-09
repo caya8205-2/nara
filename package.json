@@ -8,11 +8,14 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "turbo run dev --ui=tui",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "agent:smoke": "npm --workspace @nara/backend run agent:smoke",
+    "infra:up": "docker compose up -d postgres redis",
+    "infra:down": "docker compose stop postgres redis",
+    "infra:logs": "docker compose logs -f postgres redis",
     "db:generate": "npm --workspace @nara/backend run db:generate",
     "db:migrate": "npm --workspace @nara/backend run db:migrate",
     "db:push": "npm --workspace @nara/backend run db:push"

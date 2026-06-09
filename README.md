@@ -1,8 +1,18 @@
 # Nara
 
-Nara is a self-hosted agentic personal assistant platform designed to help manage tasks, schedules, reports, and business workflows through natural conversations.
+![TypeScript](https://img.shields.io/badge/TypeScript-5.4-3178c6?style=flat-square&logo=typescript&logoColor=white)
+![React](https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react&logoColor=0f172a)
+![Vite](https://img.shields.io/badge/Vite-5-646cff?style=flat-square&logo=vite&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-38bdf8?style=flat-square&logo=tailwindcss&logoColor=white)
+![Fastify](https://img.shields.io/badge/Fastify-4-111827?style=flat-square&logo=fastify&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-4169e1?style=flat-square&logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-7-dc382d?style=flat-square&logo=redis&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ed?style=flat-square&logo=docker&logoColor=white)
+![Turborepo](https://img.shields.io/badge/Turborepo-2-ef4444?style=flat-square&logo=turborepo&logoColor=white)
 
-Built around a WhatsApp-first experience, Nara combines an AI agent layer with traditional backend services, allowing users to interact with business data, automate routine operations, and receive scheduled reports directly from messaging channels.
+Nara is a self-hosted agentic personal assistant platform designed to help manage tasks, schedules, reports, and business workflows from a local office server.
+
+Nara combines a local backend, user-facing mobile/desktop apps, a local web admin dashboard, and an OpenClaw-powered WhatsApp agent layer. The backend stays on a trusted office PC, while the app frontends call its API for daily operations and the admin dashboard stays local to the server machine.
 
 > Project status: Early Development / R&D
 
@@ -10,8 +20,9 @@ Built around a WhatsApp-first experience, Nara combines an AI agent layer with t
 
 The goal of Nara is to provide a practical personal assistant that helps reduce operational overhead by combining:
 
-* Conversational interactions
+* WhatsApp-first conversational interactions through OpenClaw
 * Task and schedule management
+* Assistant personality and task setup controls
 * Automated reporting
 * Business workflow automation
 * Agent-driven actions and recommendations
@@ -28,23 +39,23 @@ Nara is built around four primary layers:
 
 ### User Interfaces
 
-* WhatsApp (Primary Interface)
-* Telegram (Optional)
-* Web Dashboard (shadcn/ui + Tailwind CSS + TypeScript)
-* Flutter Mobile App (Optional)
-* Tauri Desktop App (Optional)
+* Flutter Mobile App (main user-facing app)
+* Tauri Desktop App (desktop user-facing app)
+* Web Dashboard (local admin dashboard for the office server PC)
+* WhatsApp (primary agent conversation channel through OpenClaw)
+* Telegram (optional later channel)
 
 ### Agent Layer
 
 Powered by OpenClaw Runtime:
 
 * OpenClaw Gateway
-* WhatsApp Integration
 * Agent Runtime
 * Tool Calling System
 * Session Memory & Context Storage
 * Scheduled Tasks & Cron Jobs
 * Reconnect Watchdog
+* WhatsApp Integration (later phase)
 
 ### Business Logic Layer
 
@@ -69,25 +80,40 @@ Backend services built with TypeScript:
 
 ---
 
+## Deployment Model
+
+Nara is intended to run on one office PC or local server:
+
+* Backend API runs locally on the server machine.
+* PostgreSQL + pgvector and Redis run on the same machine or local network.
+* Flutter mobile app and Tauri desktop app are the user-facing frontends.
+* Web dashboard is the local admin surface for setup, diagnostics, logs, and server operations on the office PC.
+* Mobile and desktop apps connect to the backend API over the office network or Cloudflare Tunnel.
+* No public web domain is required for the dashboard surface.
+* Railway/VPS deployment remains a later option if the project outgrows the office-server model.
+
+---
+
 ## Core Workflow
 
-1. User sends a message through WhatsApp.
-2. OpenClaw receives and processes the request.
-3. The agent invokes backend tool endpoints.
-4. Backend services query databases and business systems.
-5. Structured data is returned to the agent.
-6. The agent generates a response.
-7. The response is delivered back through WhatsApp.
+1. User works from the mobile app, desktop app, or WhatsApp conversation.
+2. Client app calls the backend API.
+3. Backend services query databases and business systems.
+4. Backend returns structured operational data to the client.
+5. Agent workflows can invoke backend tool endpoints for automated work.
+6. Scheduled reports and reminders can run without direct user interaction.
+7. WhatsApp messages go through OpenClaw before invoking the same backend tools.
 
-Additionally, scheduled reports and automated workflows can be generated and delivered without direct user interaction.
+The backend remains the source of truth whether the request comes from desktop, mobile, scheduled jobs, or a future messaging channel.
 
 ---
 
 ## Key Principles
 
 * Self-hosted by default
-* WhatsApp-first user experience
-* Agent and backend services run on the same server
+* Separate user app frontend and local admin web dashboard
+* Local-first desktop and mobile experience
+* Agent and backend services can run on the same server
 * Clear separation between AI orchestration and business logic
 * Backend remains the source of truth
 * Extensible tool-based architecture
@@ -100,7 +126,7 @@ Additionally, scheduled reports and automated workflows can be generated and del
 ### Agent Layer
 
 * OpenClaw
-* WhatsApp Web / Baileys
+* WhatsApp Web / Baileys (later phase)
 
 ### Backend
 
@@ -112,6 +138,13 @@ Additionally, scheduled reports and automated workflows can be generated and del
 * TypeScript
 * shadcn/ui
 * Tailwind CSS
+* Tauri
+* Flutter
+
+Frontend workspace split:
+
+* `apps/web-admin`: local admin dashboard for the office server PC.
+* `apps/web-app`: user-facing app frontend prototype for mobile/desktop workflows.
 
 ### Database & Infrastructure
 
@@ -137,30 +170,48 @@ Set `OPENCLAW_GATEWAY_TOKEN` from `gateway.auth.token` in:
 C:\Users\<username>\.openclaw\openclaw.json
 ```
 
-Start PostgreSQL + pgvector with Docker:
+Start PostgreSQL + pgvector and Redis with Docker:
 
 ```powershell
-docker compose up -d postgres
+npm run infra:up
 ```
 
-If Redis is already running in WSL on port `6379`, keep using it. Do not start the Redis container at the same time unless the WSL Redis service is stopped.
+This starts local containers on the same ports used by `.env`:
+
+* PostgreSQL: `localhost:5432`
+* Redis: `localhost:6379`
+
+If Redis or PostgreSQL is already running from WSL or another local service on those ports, stop that service first before starting Docker.
 
 Apply the database schema:
 
 ```powershell
-npm.cmd run db:push
+npm run db:push
 ```
 
-Start the backend and dashboard:
+Start the backend, local admin dashboard, and app frontend:
 
 ```powershell
-npm.cmd run dev
+npm run dev
 ```
 
-Open the dashboard at:
+Open the local admin dashboard at:
 
 ```text
 http://localhost:5173
+```
+
+Open the user-facing web app prototype at:
+
+```text
+http://localhost:5174
+```
+
+Log in with the local operator credentials from `.env`:
+
+```text
+OPERATOR_USERNAME
+OPERATOR_PASSWORD
 ```
 
 The dashboard reads:
@@ -170,16 +221,27 @@ The dashboard reads:
 * `POST /api/tasks`
 * `PATCH /api/tasks/:id/complete`
 
+Identity and Nara Bot access endpoints:
+
+* `GET /api/users`
+* `POST /api/users`
+* `POST /api/users/:id/contacts`
+* `POST /api/users/:id/agent-access`
+* `GET /api/agent-access`
+* `PATCH /api/agent-access/:id`
+
+These endpoints store user WhatsApp access intent in Nara's database. OpenClaw allowlist sync is intentionally behind a future service/worker boundary.
+
 Test the agent tool endpoints without WhatsApp:
 
 ```powershell
-npm.cmd run agent:smoke
+npm run agent:smoke
 ```
 
 To delete the smoke-test task after the run:
 
 ```powershell
-npm.cmd --workspace @nara/backend run agent:smoke -- --cleanup
+npm --workspace @nara/backend run agent:smoke -- --cleanup
 ```
 
 Useful checks:
@@ -193,23 +255,129 @@ docker exec nara-postgres-1 psql -U nara -d nara_db -c "\dt"
 Stop PostgreSQL when not needed:
 
 ```powershell
-docker compose stop postgres
+npm run infra:down
 ```
+
+---
+
+## Remote Access
+
+For access outside the office network, use Cloudflare Tunnel to expose only the backend API:
+
+```text
+Cloudflare Tunnel URL -> http://127.0.0.1:4000
+```
+
+Do not expose PostgreSQL or Redis. Keep them local to the server PC.
+
+Remote mobile and desktop apps should store a configurable server URL, for example:
+
+```text
+https://your-tunnel-hostname.example.com
+```
+
+See [Cloudflare Tunnel Deployment](docs/deployment/cloudflare-tunnel.md) for the deployment model and security checklist.
 
 ---
 
 ## Roadmap
 
+See [Nara UI/UX Brief](docs/design/ui-ux-brief.md), [App Frontend UX Spec](docs/design/app-frontend-spec.md), [Web Admin UX Spec](docs/design/web-admin-spec.md), and [Visual System Baseline](docs/design/visual-system.md) for the current frontend split, screen map, and implementation-ready design baseline.
+
+See [ADR 003](docs/adr/003-identity-and-whatsapp-allowlist.md) for the identity, WhatsApp contact, and Nara Bot allowlist model.
+
+### Implementation Plan
+
+1. Harden backend access before exposing it outside the office network:
+   operator auth, protected write endpoints, admin auth, rate limiting, and audit logs.
+2. Keep the office PC as the server:
+   PostgreSQL and Redis stay local, backend runs on the server PC, and Cloudflare Tunnel exposes only the backend API.
+3. Make every client configurable:
+   mobile and desktop apps must store a server URL instead of hardcoding `localhost`.
+4. Build two frontend tracks:
+   user-facing app frontend for mobile/desktop, and local web admin dashboard for the office server PC.
+5. Add agent workflows after the core app is stable:
+   OpenClaw tool expansion, confirmation flow, memory/context storage, reports, and schedules.
+6. Prioritize the OpenClaw WhatsApp agent as the main product selling point:
+   WhatsApp first when the assistant phone number is ready, Telegram only if useful later.
+
+### Phase 1: Local Backend Foundation
+
+* [x] Monorepo scaffold
+* [x] PostgreSQL + pgvector Docker setup
+* [x] Redis connection support
+* [x] Task schema and initial migration
+* [x] Protected agent tool endpoints
+* [x] Local agent smoke test without WhatsApp
+* [x] Backend readiness checks for database, Redis, and OpenClaw
+* [x] Backend operator authentication
+* [x] Protect write endpoints
+* [x] Admin/dashboard authentication
+
+### Phase 2: Remote Access and Security
+
+* [x] Backend operator authentication
+* [x] Protect write endpoints
+* [x] Admin/dashboard authentication
+* [ ] Server URL settings for mobile and desktop clients
+* [ ] Cloudflare Tunnel setup for backend API
+* [ ] Rate limiting for exposed endpoints
+* [ ] Document backup and recovery basics
+
+### Phase 3: Operational Core
+
+* [ ] Task management CRUD
+* [ ] Schedule management CRUD
+* [ ] Reminder worker with Redis/BullMQ
+* [ ] Reporting service
+* [ ] Client/contact management
+* [ ] Basic authentication and operator access control
+* [x] User WhatsApp contact and Nara Bot allowlist model
+* [x] Audit logs foundation for identity and access changes
+* [ ] Audit logs for agent-triggered actions
+
+### Phase 4: Mobile App
+
+* [ ] Flutter app scaffold
+* [ ] Backend API connection settings
+* [ ] Mobile task and reminder views
+* [ ] Personality and assistant setup screens
+* [ ] WhatsApp number and Nara Bot access screen
+* [ ] Push or local notification strategy
+* [ ] Approval screen for agent-triggered actions
+
+### Phase 5: Desktop App
+
+* [ ] Tauri desktop shell
+* [ ] Shared app feature parity with mobile where practical
+* [ ] Backend API connection settings
+* [ ] Personality and assistant setup screens
+* [ ] Desktop task and schedule screens
+
+### Phase 6: Web Admin Panel
+
+* [ ] Local admin dashboard authentication
+* [ ] System health and logs
+* [ ] Tool endpoint debugging
+* [x] Users and WhatsApp access API foundation
+* [ ] Users and WhatsApp access management UI
+* [ ] Server configuration checks
+* [ ] Local backup/export controls
+* [ ] Open source attribution section
+
+### Phase 7: Agent Automation
+
+* [ ] Expand OpenClaw tool definitions
+* [ ] Scheduled report generation
+* [ ] Agent-safe confirmation flow for destructive actions
+* [ ] Memory/context storage for business workflows
+
+### Phase 8: Messaging Channels
+
 * [ ] WhatsApp integration
-* [ ] Agent tool framework
-* [ ] Task management
-* [ ] Schedule management
-* [ ] Automated reminders
-* [ ] Reporting engine
-* [ ] Analytics dashboard
-* [ ] Web dashboard
-* [ ] Mobile application
-* [ ] Desktop application
+* [ ] Nara Bot allowlist sync with OpenClaw
+* [ ] Telegram integration (optional)
+* [ ] Messaging delivery for reminders and reports
 
 ---
 
