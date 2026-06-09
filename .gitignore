@@ -1,8 +1,14 @@
 node_modules/
 dist/
+build/
+coverage/
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 *.log
 .turbo/
+.tmp/
+.cache/
+data/
+*.tsbuildinfo
 .DS_Store

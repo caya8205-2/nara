@@ -38,6 +38,16 @@ export type CreateTaskInput = {
   dueAt?: string
 }
 
+export type Operator = {
+  username: string
+  role: 'operator'
+}
+
+export type LoginInput = {
+  username: string
+  password: string
+}
+
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
   if (token) config.headers.Authorization = `Bearer ${token}`
@@ -49,6 +59,21 @@ export const getReadiness = async () => {
     validateStatus: (status) => status < 600,
   })
   return response.data
+}
+
+export const loginOperator = async (input: LoginInput) => {
+  const response = await api.post<{ token: string; operator: Operator }>('/auth/login', input)
+  localStorage.setItem('token', response.data.token)
+  return response.data
+}
+
+export const getCurrentOperator = async () => {
+  const response = await api.get<{ operator: Operator }>('/auth/me')
+  return response.data.operator
+}
+
+export const logoutOperator = () => {
+  localStorage.removeItem('token')
 }
 
 export const listTasks = async () => {

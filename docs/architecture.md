@@ -6,12 +6,16 @@ See `diagram.png` in repo root for the current high-level architecture diagram.
 
 Nara is local-first. The main backend, database, Redis queue, and OpenClaw runtime are intended to run on one office PC or local server. Client apps connect to that backend API instead of requiring a public web deployment.
 
+The WhatsApp agent should be branded as Nara Bot in user-facing surfaces. OpenClaw remains the runtime layer and should be credited in settings/open-source attribution.
+
 The web dashboard is useful for development and internal diagnostics, but the primary product surfaces are expected to move toward:
 
 1. Flutter mobile app for main day-to-day usage.
 2. Tauri desktop app with feature parity where practical.
 3. Web admin panel for local server diagnostics and internal operations.
 4. WhatsApp or Telegram as later messaging channels through OpenClaw.
+
+See [ADR 003](adr/003-identity-and-whatsapp-allowlist.md) for the user identity, WhatsApp contact, and OpenClaw allowlist model.
 
 ## Layers
 

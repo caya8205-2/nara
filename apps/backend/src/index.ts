@@ -26,13 +26,15 @@ app.get('/health', async () => ({
 
 // Routes
 app.register(import('./routes/readiness.js'), { prefix: '/api/readiness' })
+app.register(import('./routes/auth.js'), { prefix: '/api/auth' })
 app.register(import('./routes/tasks.js'), { prefix: '/api/tasks' })
+app.register(import('./routes/users.js'), { prefix: '/api/users' })
+app.register(import('./routes/agent-access.js'), { prefix: '/api/agent-access' })
 app.register(import('./routes/agent-tools.js'), { prefix: '/api/agent' })
 
 // Stubs - uncomment as implemented
 // app.register(import('./routes/schedules.js'), { prefix: '/api/schedules' })
 // app.register(import('./routes/reports.js'), { prefix: '/api/reports' })
-// app.register(import('./routes/auth.js'), { prefix: '/api/auth' })
 // app.register(import('./routes/clients.js'), { prefix: '/api/clients' })
 
 const start = async () => {

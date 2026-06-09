@@ -1,4 +1,4 @@
-import type { FastifyPluginAsync } from 'fastify'
+import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { taskService } from '../services/task.service.js'
 
@@ -16,6 +16,14 @@ const UpdateTaskSchema = z.object({
 })
 
 const plugin: FastifyPluginAsync = async (app) => {
+  const requireOperator = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+      await req.jwtVerify()
+    } catch {
+      return reply.status(401).send({ error: 'Authentication required' })
+    }
+  }
+
   // GET /api/tasks
   app.get('/', async (req, reply) => {
     const query = req.query as { done?: string }
@@ -40,7 +48,7 @@ const plugin: FastifyPluginAsync = async (app) => {
   })
 
   // POST /api/tasks
-  app.post('/', async (req, reply) => {
+  app.post('/', { preHandler: requireOperator }, async (req, reply) => {
     const body = CreateTaskSchema.parse(req.body)
     const task = await taskService.create({
       ...body,
@@ -50,7 +58,7 @@ const plugin: FastifyPluginAsync = async (app) => {
   })
 
   // PATCH /api/tasks/:id
-  app.patch('/:id', async (req, reply) => {
+  app.patch('/:id', { preHandler: requireOperator }, async (req, reply) => {
     const { id } = req.params as { id: string }
     const body = UpdateTaskSchema.parse(req.body)
     const task = await taskService.update(id, {
@@ -62,7 +70,7 @@ const plugin: FastifyPluginAsync = async (app) => {
   })
 
   // PATCH /api/tasks/:id/complete
-  app.patch('/:id/complete', async (req, reply) => {
+  app.patch('/:id/complete', { preHandler: requireOperator }, async (req, reply) => {
     const { id } = req.params as { id: string }
     const task = await taskService.complete(id)
     if (!task) return reply.status(404).send({ error: 'Task not found' })
@@ -70,7 +78,7 @@ const plugin: FastifyPluginAsync = async (app) => {
   })
 
   // DELETE /api/tasks/:id
-  app.delete('/:id', async (req, reply) => {
+  app.delete('/:id', { preHandler: requireOperator }, async (req, reply) => {
     const { id } = req.params as { id: string }
     const task = await taskService.delete(id)
     if (!task) return reply.status(404).send({ error: 'Task not found' })
