@@ -22,6 +22,8 @@ Instead of switching between multiple applications, users can interact with a si
 
 ## Architecture Overview
 
+![Diagram](diagram.png)
+
 Nara is built around four primary layers:
 
 ### User Interfaces
@@ -118,6 +120,81 @@ Additionally, scheduled reports and automated workflows can be generated and del
 * Redis
 * BullMQ
 * SQLite (optional)
+
+---
+
+## Local Development
+
+Copy the example environment file and fill the local secrets:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Set `OPENCLAW_GATEWAY_TOKEN` from `gateway.auth.token` in:
+
+```text
+C:\Users\<username>\.openclaw\openclaw.json
+```
+
+Start PostgreSQL + pgvector with Docker:
+
+```powershell
+docker compose up -d postgres
+```
+
+If Redis is already running in WSL on port `6379`, keep using it. Do not start the Redis container at the same time unless the WSL Redis service is stopped.
+
+Apply the database schema:
+
+```powershell
+npm.cmd run db:push
+```
+
+Start the backend and dashboard:
+
+```powershell
+npm.cmd run dev
+```
+
+Open the dashboard at:
+
+```text
+http://localhost:5173
+```
+
+The dashboard reads:
+
+* `GET /api/readiness`
+* `GET /api/tasks`
+* `POST /api/tasks`
+* `PATCH /api/tasks/:id/complete`
+
+Test the agent tool endpoints without WhatsApp:
+
+```powershell
+npm.cmd run agent:smoke
+```
+
+To delete the smoke-test task after the run:
+
+```powershell
+npm.cmd --workspace @nara/backend run agent:smoke -- --cleanup
+```
+
+Useful checks:
+
+```powershell
+docker compose ps
+docker exec nara-postgres-1 pg_isready -U nara -d nara_db
+docker exec nara-postgres-1 psql -U nara -d nara_db -c "\dt"
+```
+
+Stop PostgreSQL when not needed:
+
+```powershell
+docker compose stop postgres
+```
 
 ---
 

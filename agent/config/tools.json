@@ -1,0 +1,65 @@
+{
+  "tools": [
+    {
+      "name": "create_task",
+      "endpoint": "/api/agent/tasks/create",
+      "method": "POST",
+      "description": "Create a new task. Provide title, optional description, optional dueAt (ISO 8601).",
+      "headers": {
+        "x-agent-secret": "AGENT_API_SECRET"
+      },
+      "parameters": {
+        "title": "string (required)",
+        "description": "string (optional)",
+        "dueAt": "ISO 8601 datetime string (optional)"
+      }
+    },
+    {
+      "name": "list_tasks",
+      "endpoint": "/api/agent/tasks/list",
+      "method": "POST",
+      "description": "List tasks. Filter by done status or get overdue tasks.",
+      "headers": {
+        "x-agent-secret": "AGENT_API_SECRET"
+      },
+      "parameters": {
+        "done": "boolean (optional) - filter by completion",
+        "overdue": "boolean (optional) - get only overdue tasks"
+      }
+    },
+    {
+      "name": "complete_task",
+      "endpoint": "/api/agent/tasks/complete",
+      "method": "POST",
+      "description": "Mark a task as done by its ID.",
+      "headers": {
+        "x-agent-secret": "AGENT_API_SECRET"
+      },
+      "parameters": {
+        "id": "UUID string (required)"
+      }
+    },
+    {
+      "name": "delete_task",
+      "endpoint": "/api/agent/tasks/delete",
+      "method": "POST",
+      "description": "Delete a task by its ID. Always confirm with user before calling.",
+      "headers": {
+        "x-agent-secret": "AGENT_API_SECRET"
+      },
+      "parameters": {
+        "id": "UUID string (required)"
+      }
+    },
+    {
+      "name": "get_summary",
+      "endpoint": "/api/agent/summary",
+      "method": "POST",
+      "description": "Get a quick summary: pending tasks count, overdue count, next due task.",
+      "headers": {
+        "x-agent-secret": "AGENT_API_SECRET"
+      },
+      "parameters": {}
+    }
+  ]
+}
