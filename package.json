@@ -21,6 +21,8 @@
     "db:push": "npm --workspace @nara/backend run db:push"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^25.9.2",
     "turbo": "^2.0.0",
     "typescript": "^5.4.0"
   }

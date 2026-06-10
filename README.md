@@ -14,6 +14,10 @@ Nara is a self-hosted agentic personal assistant platform designed to help manag
 
 Nara combines a local backend, user-facing mobile/desktop apps, a local web admin dashboard, and an OpenClaw-powered WhatsApp agent layer. The backend stays on a trusted office PC, while the app frontends call its API for daily operations and the admin dashboard stays local to the server machine.
 
+<p style="text-align: center;">
+   <img src="logo.png" alt="Logo" width="250"/>
+</p>
+
 > Project status: Early Development / R&D
 
 ## Vision
