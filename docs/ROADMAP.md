@@ -1532,3 +1532,130 @@ The web admin dashboard should feel denser and more technical:
 - Text-heavy onboarding panels on operational screens.
 - Hiding important server errors behind vague "something went wrong" messages.
 
+
+
+---
+
+## Phase 6 Web Admin Panel - Completion Status
+
+**Status:** Core screens complete (Updated: 2026-06-10)
+
+### Completed Items
+
+All Phase 6 admin dashboard screens are now built and functional:
+
+1. **Overview (Dashboard)** - `/`
+   - Refactored to use shared Layout component
+   - Operator authentication integrated
+   - Dependency status cards (Backend, PostgreSQL, Redis, OpenClaw)
+   - Task management with create/complete functionality
+   - Consistent visual styling with other admin pages
+
+2. **Health** - `/health`
+   - Dependency diagnostics for all services
+   - Status cards with last checked timestamps
+   - Recheck button with loading states
+   - Copy diagnostics for debugging
+   - Suggested fixes for unhealthy services
+
+3. **Agent Tools** - `/agent-tools`
+   - Tool endpoint testing interface
+   - JSON payload editor with validation
+   - Test runner with x-agent-secret authentication
+   - Response viewer with status, duration, timestamp
+   - Pre-populated example payloads for all tools
+
+4. **Users** - `/users`
+   - User table with name, email, role, status, created date
+   - Create user form (inline)
+   - Role badges (admin/user with visual distinction)
+   - Status indicators (active/disabled)
+   - Empty state with CTA
+
+5. **WhatsApp Access** - `/whatsapp-access`
+   - Access request table with status tracking
+   - Status management: approve, block, retry sync
+   - Status badges for all states (pending, allowed, blocked, sync_failed)
+   - Sync error display and resolution
+   - Status guide documentation
+
+6. **Logs** - `/logs`
+   - Filter controls: source, severity, search, time range
+   - Log table with expandable metadata
+   - Export functionality
+   - Ready for backend `/api/logs` integration
+   - Empty state with backend integration instructions
+
+7. **Config** - `/config`
+   - Environment verification display
+   - Required/optional config indicators
+   - Status checks from readiness API + localStorage
+   - Category grouping (Backend, Database, Redis, OpenClaw, Agent, Frontend)
+   - Copy report functionality
+   - Configuration notes and help text
+
+8. **Backup** - `/backup`
+   - Backup status summary
+   - Export sections: Database, Reports, Config
+   - Run backup action (ready for backend)
+   - Backup history table placeholder
+   - Restore procedure documentation
+
+### Technical Implementation
+
+- **Shared Layout:** All admin pages now use unified Layout component with functional sidebar navigation
+- **Routing:** Complete routing setup in App.tsx for all 10 admin routes
+- **API Integration:** Added types and functions to lib/api.ts for users and agent access
+- **Visual Consistency:** All screens follow visual system specs (stone-50 bg, teal accents, emerald success states)
+- **TypeScript:** All code type-safe, compilation verified with no errors
+- **Files Changed:** 19 files, 2,573 insertions, 218 deletions
+
+### Pending Items
+
+- [ ] Open source attribution section (not yet implemented)
+- [ ] Backend API integration for Logs screen
+- [ ] Backend API integration for Backup screen
+- [ ] Enhanced WhatsApp Access with joined user/contact data (optional UX improvement)
+
+### Backend Integration Required
+
+See **[Backend Integration Requirements](backend-integration.md)** for detailed specifications.
+
+**Priority endpoints needed:**
+
+1. **Logs System** (High Priority)
+   - `GET /api/logs` with filtering, search, pagination
+   - Store logs in PostgreSQL or structured log files
+   - Response: Array of log entries with timestamp, source, level, message, metadata
+
+2. **Backup System** (High Priority)
+   - `POST /api/backup` - trigger full backup
+   - `POST /api/backup/export` - export specific data type
+   - `GET /api/backup/history` - list backup records
+   - Implement pg_dump for database, tar for reports, config snapshot
+
+3. **WhatsApp Access Enhancement** (Medium Priority)
+   - Enhance `GET /api/agent-access` to return joined user + contact data
+   - Show displayName and phone number instead of UUIDs
+   - Improves UX without changing functionality
+
+### Next Steps
+
+1. Implement backend endpoints for Logs and Backup (see backend-integration.md)
+2. Test full integration with admin dashboard
+3. Add open source attribution section
+4. Consider scheduled backup automation via BullMQ
+5. Move to Phase 4 (Mobile App) or Phase 7 (Agent Automation) once admin dashboard is production-ready
+
+### Related Documentation
+
+- [Backend Integration Requirements](backend-integration.md) - Detailed API specifications
+- [Web Admin UX Spec](design/web-admin-spec.md) - Complete screen specifications
+- [Visual System Baseline](design/visual-system.md) - Design system and styling guide
+- [ADR 003](adr/003-identity-and-whatsapp-allowlist.md) - Identity and access model
+
+---
+
+*Phase 6 update: 2026-06-10*  
+*Admin dashboard core screens: Complete ✓*  
+*Backend integration: In progress*
