@@ -1,4 +1,4 @@
-# Nara
+﻿# Nara
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.4-3178c6?style=flat-square&logo=typescript&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react&logoColor=0f172a)
@@ -13,6 +13,10 @@
 Nara is a self-hosted agentic personal assistant platform designed to help manage tasks, schedules, reports, and business workflows from a local office server.
 
 Nara combines a local backend, user-facing mobile/desktop apps, a local web admin dashboard, and an OpenClaw-powered WhatsApp agent layer. The backend stays on a trusted office PC, while the app frontends call its API for daily operations and the admin dashboard stays local to the server machine.
+
+<p style="text-align: center;">
+   <img src="logo.png" alt="Logo" width="250"/>
+</p>
 
 > Project status: Early Development / R&D
 
@@ -356,14 +360,16 @@ See [ADR 003](docs/adr/003-identity-and-whatsapp-allowlist.md) for the identity,
 
 ### Phase 6: Web Admin Panel
 
-* [ ] Local admin dashboard authentication
-* [ ] System health and logs
-* [ ] Tool endpoint debugging
+* [x] Local admin dashboard authentication (completed in Phase 2)
+* [x] System health and logs (Health + Logs screens)
+* [x] Tool endpoint debugging (Agent Tools screen)
 * [x] Users and WhatsApp access API foundation
-* [ ] Users and WhatsApp access management UI
-* [ ] Server configuration checks
-* [ ] Local backup/export controls
+* [x] Users and WhatsApp access management UI (Users + WhatsApp Access screens)
+* [x] Server configuration checks (Config screen)
+* [x] Local backup/export controls (Backup screen UI, backend integration needed)
 * [ ] Open source attribution section
+
+> **Note:** Phase 6 core admin screens complete. See [Backend Integration Requirements](docs/backend-integration.md) for API endpoints needed by Logs, Backup, and WhatsApp Access screens.
 
 ### Phase 7: Agent Automation
 
@@ -384,3 +390,4 @@ See [ADR 003](docs/adr/003-identity-and-whatsapp-allowlist.md) for the identity,
 ## License
 
 TBD
+
