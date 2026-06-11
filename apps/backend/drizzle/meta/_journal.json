@@ -15,6 +15,13 @@
       "when": 1781043287509,
       "tag": "0001_dark_imperial_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1781186875044,
+      "tag": "0002_sleepy_jack_power",
+      "breakpoints": true
     }
   ]
 }

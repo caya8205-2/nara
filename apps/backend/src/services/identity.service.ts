@@ -1,4 +1,6 @@
 import { and, desc, eq } from 'drizzle-orm'
+import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto'
+import { promisify } from 'node:util'
 import { db } from '../db/index.js'
 import {
   agentChannelAccess,
@@ -7,6 +9,9 @@ import {
   userContacts,
   users,
 } from '../db/schema.js'
+
+const scrypt = promisify(scryptCallback)
+const passwordKeyLength = 64
 
 export type UserRole = 'admin' | 'user'
 export type ContactType = 'whatsapp' | 'email'
@@ -22,6 +27,7 @@ export interface CreateUserInput {
   displayName: string
   email?: string
   role?: UserRole
+  password?: string
 }
 
 export interface AddContactInput {
@@ -44,11 +50,17 @@ export interface UpdateAgentAccessInput {
 
 export class IdentityService {
   async createUser(input: CreateUserInput) {
+    const email = input.email?.toLowerCase()
+    const passwordHash = input.password
+      ? await this.hashPassword(input.password)
+      : null
+
     const [user] = await db
       .insert(users)
       .values({
         displayName: input.displayName,
-        email: input.email ?? null,
+        email: email ?? null,
+        passwordHash,
         role: input.role ?? 'user',
       })
       .returning()
@@ -57,14 +69,15 @@ export class IdentityService {
       role: user.role,
     })
 
-    return user
+    return this.toPublicUser(user)
   }
 
   async listUsers() {
-    return db
+    const rows = await db
       .select()
       .from(users)
       .orderBy(desc(users.createdAt))
+    return rows.map((user) => this.toPublicUser(user))
   }
 
   async getUserById(id: string) {
@@ -72,7 +85,37 @@ export class IdentityService {
       .select()
       .from(users)
       .where(eq(users.id, id))
+    return user ? this.toPublicUser(user) : null
+  }
+
+  async getUserByEmail(email: string) {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email.toLowerCase()))
     return user ?? null
+  }
+
+  async registerUser(input: { displayName: string; email: string; password: string }) {
+    const existing = await this.getUserByEmail(input.email)
+    if (existing) return null
+
+    return this.createUser({
+      displayName: input.displayName,
+      email: input.email,
+      password: input.password,
+      role: 'user',
+    })
+  }
+
+  async verifyUserPassword(email: string, password: string) {
+    const user = await this.getUserByEmail(email)
+    if (!user || user.disabled || !user.passwordHash) return null
+
+    const valid = await this.verifyPassword(password, user.passwordHash)
+    if (!valid) return null
+
+    return this.toPublicUser(user)
   }
 
   async addContact(input: AddContactInput) {
@@ -233,6 +276,28 @@ export class IdentityService {
       targetId,
       metadata: metadata ? JSON.stringify(metadata) : null,
     })
+  }
+
+  private async hashPassword(password: string) {
+    const salt = randomBytes(16).toString('hex')
+    const derivedKey = (await scrypt(password, salt, passwordKeyLength)) as Buffer
+    return `scrypt:${salt}:${derivedKey.toString('hex')}`
+  }
+
+  private async verifyPassword(password: string, passwordHash: string) {
+    const [algorithm, salt, storedKey] = passwordHash.split(':')
+    if (algorithm !== 'scrypt' || !salt || !storedKey) return false
+
+    const derivedKey = (await scrypt(password, salt, passwordKeyLength)) as Buffer
+    const storedBuffer = Buffer.from(storedKey, 'hex')
+    if (storedBuffer.length !== derivedKey.length) return false
+
+    return timingSafeEqual(storedBuffer, derivedKey)
+  }
+
+  private toPublicUser<T extends { passwordHash?: string | null }>(user: T) {
+    const { passwordHash: _passwordHash, ...publicUser } = user
+    return publicUser
   }
 }
 

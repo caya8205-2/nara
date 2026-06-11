@@ -1627,6 +1627,7 @@ See **[Backend Integration Requirements](backend-integration.md)** for detailed 
    - `GET /api/logs` with filtering, search, pagination
    - Current MVP reads from audit events in PostgreSQL
    - Response includes timestamp, source, level, message, metadata
+   - Backend process writes structured request/error logs to `BACKEND_LOG_DIR` or `.tmp/logs/backend.ndjson`
 
 2. **WhatsApp Access Enhancement**
    - `GET /api/agent-access` returns joined user + contact data
@@ -1642,9 +1643,9 @@ See **[Backend Integration Requirements](backend-integration.md)** for detailed 
 ### Next Steps
 
 1. Continue Phase 4 mobile work from `apps/mobile-app`
-2. Persist backend URL and operator token securely
-3. Add task create/complete actions in the mobile app
-4. Add WhatsApp number and Nara Bot access request flow
+2. Move mobile token storage from shared preferences to secure storage before production hardening
+3. Add WhatsApp number and Nara Bot access request flow
+4. Add reminders once backend schedule/reminder endpoints are ready
 5. Consider scheduled backup automation via BullMQ after mobile MVP is moving
 
 ### Related Documentation
@@ -1659,4 +1660,7 @@ See **[Backend Integration Requirements](backend-integration.md)** for detailed 
 
 *Phase 6 update: 2026-06-11*
 *Admin dashboard core screens: Complete*
+
+*Phase 4 mobile update: 2026-06-11*
+*Mobile login/register is backed by database users. Admin/operator env credentials remain for the local web admin dashboard. Mobile backend URL should come from NARA_API_BASE_URL for production builds, with debug-only local defaults for development. Home, Settings, and Tasks now share connection/task state; Tasks can create and complete backend tasks from mobile. The app now persists the user session/backend URL with shared_preferences, auto-refreshes connection status on app resume and timer, uses pull-to-refresh for manual checks, and supports custom assistant personality input.*
 *Backend integration: MVP complete*

@@ -1,7 +1,15 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
+import { ZodError } from 'zod'
 import { env } from './config/env.js'
+import { backendLogService } from './services/backend-log.service.js'
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    startTime?: bigint
+  }
+}
 
 const app = Fastify({
   logger: true,
@@ -16,6 +24,97 @@ const corsOrigins = env.CORS_ORIGINS
 
 app.register(cors, { origin: corsOrigins })
 app.register(jwt, { secret: env.JWT_SECRET })
+
+app.addHook('onRequest', async (request) => {
+  request.startTime = process.hrtime.bigint()
+})
+
+app.addHook('onResponse', async (request, reply) => {
+  const startTime = request.startTime
+  const durationMs = startTime
+    ? Number(process.hrtime.bigint() - startTime) / 1_000_000
+    : undefined
+
+  await backendLogService.write({
+    level: reply.statusCode >= 500 ? 'error' : 'info',
+    event: 'request.completed',
+    requestId: request.id,
+    method: request.method,
+    url: request.url,
+    statusCode: reply.statusCode,
+    durationMs,
+    ip: request.ip,
+    userAgent: request.headers['user-agent'],
+  })
+})
+
+app.addHook('onError', async (request, reply, error) => {
+  const startTime = request.startTime
+  const durationMs = startTime
+    ? Number(process.hrtime.bigint() - startTime) / 1_000_000
+    : undefined
+
+  await backendLogService.writeError({
+    event: 'request.failed',
+    requestId: request.id,
+    method: request.method,
+    url: request.url,
+    statusCode: reply.statusCode,
+    durationMs,
+    ip: request.ip,
+    userAgent: request.headers['user-agent'],
+    error,
+  })
+})
+
+app.setErrorHandler((error, request, reply) => {
+  request.log.error({ err: error }, 'request failed')
+
+  if (error instanceof ZodError) {
+    return reply.status(400).send({
+      error: 'Validation failed',
+      issues: error.issues.map((issue) => ({
+        path: issue.path.join('.'),
+        message: issue.message,
+      })),
+    })
+  }
+
+  if (error.statusCode && error.statusCode >= 400 && error.statusCode < 500) {
+    return reply.status(error.statusCode).send({
+      error: error.message,
+    })
+  }
+
+  return reply.status(500).send({
+    error: 'Internal server error',
+  })
+})
+
+app.setNotFoundHandler((request, reply) => {
+  return reply.status(404).send({
+    error: 'Route not found',
+    path: request.url,
+  })
+})
+
+process.on('unhandledRejection', (reason) => {
+  app.log.error({ reason }, 'unhandled promise rejection')
+  void backendLogService.writeError({
+    event: 'process.unhandled_rejection',
+    error: reason,
+  })
+})
+
+process.on('uncaughtException', (error) => {
+  app.log.fatal({ err: error }, 'uncaught exception')
+  void backendLogService.writeError({
+    level: 'fatal',
+    event: 'process.uncaught_exception',
+    error,
+  })
+  process.exit(1)
+})
 
 // Health check
 app.get('/health', async () => ({

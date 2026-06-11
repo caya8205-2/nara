@@ -34,7 +34,8 @@ class RemindersScreen extends StatelessWidget {
                         style: TextStyle(fontWeight: FontWeight.w700),
                       ),
                       SizedBox(height: 4),
-                      Text('Reminder and schedule controls will connect after the backend endpoints are ready.'),
+                      Text(
+                          'Reminder and schedule controls will connect after the backend endpoints are ready.'),
                     ],
                   ),
                 ),
