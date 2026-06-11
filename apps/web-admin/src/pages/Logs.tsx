@@ -1,4 +1,5 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertCircle,
   ChevronDown,
@@ -8,18 +9,7 @@ import {
   Search,
   XCircle,
 } from 'lucide-react'
-
-type LogLevel = 'debug' | 'info' | 'warn' | 'error'
-type LogSource = 'backend' | 'database' | 'redis' | 'openclaw' | 'agent' | 'system'
-
-type LogEntry = {
-  id: string
-  timestamp: string
-  source: LogSource
-  level: LogLevel
-  message: string
-  metadata?: Record<string, unknown>
-}
+import { listLogs, type LogLevel, type LogSource } from '../lib/api'
 
 const levelConfig = {
   debug: { label: 'DEBUG', color: 'border-slate-200 bg-slate-50 text-slate-600' },
@@ -29,19 +19,35 @@ const levelConfig = {
 }
 
 export default function Logs() {
+  const queryClient = useQueryClient()
   const [sourceFilter, setSourceFilter] = useState<LogSource | 'all'>('all')
   const [levelFilter, setLevelFilter] = useState<LogLevel | 'all'>('all')
+  const [timeRange, setTimeRange] = useState<'all' | '1h' | '24h' | '7d'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedLog, setExpandedLog] = useState<string | null>(null)
+  const from = (() => {
+    if (timeRange === 'all') return undefined
 
-  const logs: LogEntry[] = []
+    const date = new Date()
+    if (timeRange === '1h') date.setHours(date.getHours() - 1)
+    if (timeRange === '24h') date.setDate(date.getDate() - 1)
+    if (timeRange === '7d') date.setDate(date.getDate() - 7)
+    return date.toISOString()
+  })()
 
-  const filteredLogs = logs.filter((log) => {
-    if (sourceFilter !== 'all' && log.source !== sourceFilter) return false
-    if (levelFilter !== 'all' && log.level !== levelFilter) return false
-    if (searchQuery && !log.message.toLowerCase().includes(searchQuery.toLowerCase())) return false
-    return true
+  const logsQuery = useQuery({
+    queryKey: ['logs', sourceFilter, levelFilter, timeRange, searchQuery],
+    queryFn: () => listLogs({
+      source: sourceFilter === 'all' ? undefined : sourceFilter,
+      level: levelFilter === 'all' ? undefined : levelFilter,
+      search: searchQuery || undefined,
+      from,
+      limit: 100,
+    }),
   })
+
+  const filteredLogs = logsQuery.data?.logs ?? []
+  const totalLogs = logsQuery.data?.total ?? filteredLogs.length
 
   const exportLogs = () => {
     const content = filteredLogs
@@ -68,23 +74,34 @@ export default function Logs() {
   const clearFilters = () => {
     setSourceFilter('all')
     setLevelFilter('all')
+    setTimeRange('all')
     setSearchQuery('')
   }
 
-  const hasActiveFilters = sourceFilter !== 'all' || levelFilter !== 'all' || searchQuery !== ''
+  const hasActiveFilters = sourceFilter !== 'all' || levelFilter !== 'all' || timeRange !== 'all' || searchQuery !== ''
 
   return (
     <main className="min-h-screen bg-stone-50 text-slate-950">
       <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold text-slate-950">Logs</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Inspect backend runtime behavior and system events
-          </p>
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-slate-950">Logs</h1>
+            <p className="mt-1 text-sm text-slate-600">
+              Inspect backend runtime behavior and system events
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['logs'] })}
+            disabled={logsQuery.isFetching}
+            className="inline-flex h-10 items-center gap-2 rounded-md bg-teal-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Refresh
+          </button>
         </div>
 
         <div className="mb-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="grid gap-3 sm:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-5">
             <div>
               <label className="block text-xs font-semibold text-slate-700">Source</label>
               <select
@@ -114,6 +131,20 @@ export default function Logs() {
                 <option value="info">Info</option>
                 <option value="warn">Warning</option>
                 <option value="error">Error</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700">Time Range</label>
+              <select
+                value={timeRange}
+                onChange={(e) => setTimeRange(e.target.value as 'all' | '1h' | '24h' | '7d')}
+                className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-950 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100"
+              >
+                <option value="all">All Time</option>
+                <option value="1h">Last Hour</option>
+                <option value="24h">Last 24 Hours</option>
+                <option value="7d">Last 7 Days</option>
               </select>
             </div>
 
@@ -152,7 +183,7 @@ export default function Logs() {
             <div>
               <h2 className="text-sm font-semibold text-slate-950">Log Entries</h2>
               <p className="mt-0.5 text-sm text-slate-600">
-                {filteredLogs.length} {hasActiveFilters ? 'filtered' : 'total'} entries
+                {totalLogs} {hasActiveFilters ? 'filtered' : 'total'} entries
               </p>
             </div>
             <button
@@ -166,19 +197,27 @@ export default function Logs() {
             </button>
           </div>
 
-          {logs.length === 0 ? (
+          {logsQuery.isLoading ? (
+            <div className="p-8 text-center text-sm text-slate-500">Loading logs...</div>
+          ) : logsQuery.isError ? (
+            <div className="p-8">
+              <div className="flex items-start gap-3 rounded-md border border-rose-200 bg-rose-50 p-4">
+                <AlertCircle className="h-5 w-5 shrink-0 text-rose-600" />
+                <div>
+                  <h3 className="text-sm font-semibold text-rose-900">Failed to load logs</h3>
+                  <p className="mt-1 text-sm text-rose-700">
+                    Check your operator session and backend connection, then refresh.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : filteredLogs.length === 0 && !hasActiveFilters ? (
             <div className="p-8 text-center">
               <FileText className="mx-auto h-12 w-12 text-slate-300" />
               <h3 className="mt-4 text-sm font-semibold text-slate-950">No logs available</h3>
               <p className="mt-1 text-sm text-slate-600">
-                Log entries will appear here once backend logging endpoint is implemented.
+                Log entries will appear after users, access requests, or other audited actions are created.
               </p>
-              <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-left">
-                <p className="text-xs font-semibold text-amber-900">Backend Integration Required</p>
-                <p className="mt-1 text-xs text-amber-700">
-                  Add GET /api/logs endpoint to return log entries with timestamp, source, level, and message fields.
-                </p>
-              </div>
             </div>
           ) : filteredLogs.length === 0 ? (
             <div className="p-8 text-center">
@@ -204,7 +243,7 @@ export default function Logs() {
                 return (
                   <div key={log.id}>
                     <div
-                      className="flex items-start gap-3 p-4 hover:bg-slate-50 cursor-pointer"
+                      className="flex cursor-pointer items-start gap-3 p-4 hover:bg-slate-50"
                       onClick={() => setExpandedLog(isExpanded ? null : log.id)}
                     >
                       {log.metadata ? (
@@ -253,11 +292,11 @@ export default function Logs() {
         <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <h3 className="text-sm font-semibold text-slate-950">Log Management Notes</h3>
           <ul className="mt-3 space-y-2 text-sm text-slate-600">
-            <li>• Logs are stored locally on the backend server</li>
-            <li>• Use filters to narrow down specific events or error conditions</li>
-            <li>• Export logs before clearing or rotating log files</li>
-            <li>• Error logs should be investigated promptly for system health</li>
-            <li>• Backend needs to implement GET /api/logs endpoint for log retrieval</li>
+            <li>Logs are stored locally on the backend server</li>
+            <li>Use filters to narrow down specific events or error conditions</li>
+            <li>Export logs before clearing or rotating log files</li>
+            <li>Error logs should be investigated promptly for system health</li>
+            <li>Current MVP log data is backed by audit events from the backend database</li>
           </ul>
         </div>
       </div>

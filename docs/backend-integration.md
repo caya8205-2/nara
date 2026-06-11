@@ -1,16 +1,16 @@
 ﻿# Backend Integration Requirements
 
-> Status: Admin UI complete, backend endpoints needed for full functionality
+> Status: Admin dashboard backend integration complete for MVP.
 
 ## Overview
 
-Web admin dashboard screens are built and ready. The following backend API endpoints need implementation to enable full functionality for Logs, Backup, and enhanced WhatsApp Access features.
+Web admin dashboard screens are built and ready. Logs, enhanced WhatsApp Access, and Backup now have backend integration for MVP usage.
 
 ## Priority Order
 
-1. **High Priority:** Logs endpoint (operational diagnostics)
-2. **High Priority:** WhatsApp Access data joining (UX improvement)
-3. **Medium Priority:** Backup endpoints (data safety)
+1. **Done:** Logs endpoint backed by audit events
+2. **Done:** WhatsApp Access data joining
+3. **Done:** Backup endpoints with local history and export files
 
 ---
 
@@ -18,7 +18,7 @@ Web admin dashboard screens are built and ready. The following backend API endpo
 
 **Screen:** `/logs` (`apps/web-admin/src/pages/Logs.tsx`)
 
-**Status:** UI complete with filters, search, and export. Waiting for backend endpoint.
+**Status:** Implemented with filters, search, and export. Current MVP reads from audit events.
 
 ### Required Endpoint
 
@@ -100,7 +100,7 @@ GET /api/logs
 
 **Screen:** `/backup` (`apps/web-admin/src/pages/Backup.tsx`)
 
-**Status:** UI complete with export buttons and status display. Waiting for backend endpoints.
+**Status:** Implemented for MVP with local backup history and export files.
 
 ### Required Endpoints
 
@@ -115,19 +115,20 @@ POST /api/backup
 **Response:**
 ```typescript
 {
-  id: string // backup job ID
-  status: 'started' | 'in_progress' | 'success' | 'failed'
-  startedAt: string
-  message?: string
+  id: string
+  type: 'full'
+  timestamp: string
+  size: string
+  status: 'success' | 'failed'
+  location: string
+  error?: string
 }
 ```
 
 **Implementation:**
-- Create PostgreSQL dump using `pg_dump`
-- Archive reports directory
-- Snapshot environment config (redacted secrets)
-- Store backup with timestamp: `backup-YYYY-MM-DD-HHmmss.tar.gz`
-- Return job ID for status polling if async
+- Create a full JSON snapshot with redacted config and report manifest
+- Store backup history in `BACKUP_DIR/history.json`
+- Audit backup success/failure to `audit_logs`
 
 #### 2. Export Specific Data
 
@@ -147,10 +148,10 @@ POST /api/backup/export
 - Content-Disposition header with filename
 
 **Implementation:**
-- `database`: PostgreSQL dump file
-- `reports`: Tar archive of reports directory
+- `database`: PostgreSQL dump file through host `pg_dump` or Docker container `pg_dump`
+- `reports`: JSON manifest of report files
 - `config`: JSON file with redacted environment variables
-- `full`: Complete backup archive
+- `full`: JSON snapshot with config and reports manifest
 
 #### 3. List Backup History
 
@@ -201,11 +202,12 @@ GET /api/backup/history
 ```
 
 **Implementation Notes:**
-- Store backup metadata in PostgreSQL `backups` table
+- Store backup metadata in `BACKUP_DIR/history.json`
 - Configure backup directory path via environment variable: `BACKUP_DIR`
-- Implement automatic backup rotation (keep last N backups)
-- Consider scheduled backups via cron or BullMQ
-- Ensure backup directory has proper permissions and disk space monitoring
+- Configure reports directory path via environment variable: `REPORTS_DIR`
+- Configure Docker PostgreSQL container via `POSTGRES_CONTAINER_NAME` when using Docker Desktop
+- Keep the latest 50 backup history records
+- Future hardening can move metadata into PostgreSQL and add scheduled backups via BullMQ
 
 **Authentication:**
 - Requires operator JWT token
@@ -217,9 +219,9 @@ GET /api/backup/history
 
 **Screen:** `/whatsapp-access` (`apps/web-admin/src/pages/WhatsAppAccess.tsx`)
 
-**Status:** UI functional but showing user IDs and contact IDs instead of human-readable names.
+**Status:** Implemented. Endpoint returns joined user and contact data.
 
-### Current State
+### Previous State
 
 Existing endpoint:
 ```
@@ -239,7 +241,7 @@ Array<{
 }>
 ```
 
-### Recommended Enhancement
+### Implemented Enhancement
 
 Update `identityService.listAgentAccess()` to return joined data:
 
@@ -274,9 +276,8 @@ Array<{
 ```
 
 **Implementation:**
-- Modify `apps/backend/src/services/identity.service.ts`
-- Join `agent_channel_access` with `users` and `user_contacts` tables
-- Use Drizzle ORM joins or raw SQL with joins
+- `apps/backend/src/services/identity.service.ts` joins `agent_channel_access` with `users` and `user_contacts`
+- `apps/web-admin/src/pages/WhatsAppAccess.tsx` displays user names and WhatsApp numbers from the joined response
 
 **SQL Example:**
 ```sql
@@ -308,28 +309,28 @@ ORDER BY aca.requested_at DESC
 Before marking backend integration complete:
 
 **Logs:**
-- [ ] Endpoint returns logs with all required fields
-- [ ] Filtering by source works
-- [ ] Filtering by level works
-- [ ] Search query matches message text
-- [ ] Time range filtering works
-- [ ] Pagination works correctly
-- [ ] Export generates valid log file
+- [x] Endpoint returns logs with all required fields
+- [x] Filtering by source works
+- [x] Filtering by level works
+- [x] Search query matches message text
+- [x] Time range filtering works
+- [ ] Pagination works correctly beyond the MVP limit response
+- [x] Export generates valid log file
 
 **Backup:**
-- [ ] Full backup creates complete archive
-- [ ] Database export generates valid pg_dump file
-- [ ] Reports export creates tar archive
-- [ ] Config export includes environment variables (secrets redacted)
-- [ ] Backup history lists all backups with correct metadata
-- [ ] File download streams work correctly
-- [ ] Backup rotation prevents disk space issues
+- [x] Full backup creates an MVP JSON snapshot
+- [ ] Database export generates valid pg_dump file when pg_dump is installed
+- [x] Reports export creates a reports manifest
+- [x] Config export includes environment variables with secrets redacted
+- [x] Backup history lists all backups with correct metadata
+- [x] File download streams work correctly
+- [x] Backup history is capped to prevent unbounded growth
 
 **WhatsApp Access:**
-- [ ] Enhanced endpoint returns joined user data
-- [ ] Contact value (phone number) is displayed correctly
-- [ ] UI shows user displayName instead of UUID
-- [ ] Status updates still work with enhanced data structure
+- [x] Enhanced endpoint returns joined user data
+- [x] Contact value (phone number) is displayed correctly
+- [x] UI shows user displayName instead of UUID
+- [x] Status updates still work with enhanced data structure
 
 ---
 
@@ -362,13 +363,11 @@ Before marking backend integration complete:
 
 ## Next Steps for Implementation
 
-1. **Create database migration** for `logs` and `backups` tables if using PostgreSQL storage
-2. **Implement Logs endpoint** with filtering and pagination
-3. **Implement Backup endpoints** with file generation and history tracking
-4. **Enhance WhatsApp Access query** to return joined data
-5. **Test integration** with web admin UI
-6. **Configure scheduled backups** via cron or BullMQ
-7. **Document backup restoration procedure** for disaster recovery
+1. **Install or document pg_dump availability** on the office server PC
+2. **Add scheduled backups** via BullMQ or a local scheduler
+3. **Add backup restore verification** as a manual admin checklist
+4. **Move backup metadata to PostgreSQL** if file-based history becomes limiting
+5. **Add cursor pagination** for logs once audit volume grows
 
 ---
 
@@ -381,5 +380,5 @@ Before marking backend integration complete:
 ---
 
 *Document created: 2026-06-10*  
-*Last updated: 2026-06-10*  
-*Status: Ready for backend implementation*
+*Last updated: 2026-06-11*
+*Status: MVP backend integration complete*

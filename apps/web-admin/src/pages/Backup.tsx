@@ -1,4 +1,5 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertCircle,
   CheckCircle2,
@@ -6,58 +7,140 @@ import {
   Database,
   Download,
   FileText,
-  FolderOpen,
   HardDrive,
+  RefreshCw,
   Settings,
   XCircle,
 } from 'lucide-react'
+import {
+  exportBackup,
+  listBackups,
+  runBackup,
+  type BackupRecord,
+  type BackupType,
+} from '../lib/api'
 
-type BackupType = 'database' | 'reports' | 'config' | 'full'
+const downloadBlob = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
-type BackupRecord = {
-  id: string
-  type: BackupType
-  timestamp: string
-  size: string
-  status: 'success' | 'failed' | 'in_progress'
-  location: string
+const statusIcon = {
+  success: CheckCircle2,
+  failed: XCircle,
+  in_progress: Clock,
+}
+
+const statusColor = {
+  success: 'text-emerald-600',
+  failed: 'text-rose-600',
+  in_progress: 'text-amber-600',
 }
 
 export default function Backup() {
-  const [isBackingUp, setIsBackingUp] = useState(false)
+  const queryClient = useQueryClient()
+  const [exportError, setExportError] = useState<string | null>(null)
 
-  const backupRecords: BackupRecord[] = []
+  const backupQuery = useQuery({
+    queryKey: ['backups'],
+    queryFn: listBackups,
+  })
 
-  const lastBackup = backupRecords.length > 0 ? backupRecords[0] : null
+  const runBackupMutation = useMutation({
+    mutationFn: runBackup,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['backups'] })
+    },
+  })
 
-  const handleRunBackup = async () => {
-    setIsBackingUp(true)
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    setIsBackingUp(false)
-    alert('Backup functionality requires backend implementation at POST /api/backup')
-  }
+  const exportMutation = useMutation({
+    mutationFn: exportBackup,
+    onMutate: () => {
+      setExportError(null)
+    },
+    onSuccess: ({ blob, filename }) => {
+      downloadBlob(blob, filename)
+      queryClient.invalidateQueries({ queryKey: ['backups'] })
+    },
+    onError: (error) => {
+      setExportError(error instanceof Error ? error.message : String(error))
+      queryClient.invalidateQueries({ queryKey: ['backups'] })
+    },
+  })
+
+  const backupRecords = backupQuery.data ?? []
+  const lastBackup = backupRecords[0] ?? null
 
   const handleExport = (type: BackupType) => {
-    alert('Export ' + type + ' requires backend implementation at POST /api/backup/export')
+    exportMutation.mutate(type)
+  }
+
+  const renderBackupRecord = (backup: BackupRecord) => {
+    const Icon = statusIcon[backup.status]
+
+    return (
+      <div key={backup.id} className="flex items-center justify-between gap-4 p-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <Icon className={['h-5 w-5 shrink-0', statusColor[backup.status], backup.status === 'in_progress' && 'animate-pulse'].join(' ')} />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-slate-950">
+              {backup.type.charAt(0).toUpperCase() + backup.type.slice(1)} Backup
+            </p>
+            <p className="text-xs text-slate-500">
+              {new Date(backup.timestamp).toLocaleString()} - {backup.size}
+            </p>
+            {backup.error ? (
+              <p className="mt-1 text-xs text-rose-700">{backup.error}</p>
+            ) : (
+              <p className="mt-1 truncate font-mono text-xs text-slate-500">{backup.location}</p>
+            )}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
     <main className="min-h-screen bg-stone-50 text-slate-950">
       <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold text-slate-950">Backup</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Export and protect office server data
-          </p>
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-slate-950">Backup</h1>
+            <p className="mt-1 text-sm text-slate-600">
+              Export and protect office server data
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['backups'] })}
+            disabled={backupQuery.isFetching}
+            className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <RefreshCw className={['h-4 w-4', backupQuery.isFetching && 'animate-spin'].join(' ')} />
+            Refresh
+          </button>
         </div>
 
         <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex-1">
               <h2 className="text-sm font-semibold text-slate-950">Backup Status</h2>
-              {lastBackup ? (
+              {backupQuery.isLoading ? (
+                <p className="mt-3 text-sm text-slate-500">Loading backup history...</p>
+              ) : backupQuery.isError ? (
+                <div className="mt-3 flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 p-3">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                  <p className="text-xs font-semibold text-rose-900">
+                    Failed to load backup history. Check your operator session and backend connection.
+                  </p>
+                </div>
+              ) : lastBackup ? (
                 <div className="mt-3 space-y-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm text-slate-600">Last Backup:</span>
                     <span className="text-sm font-medium text-slate-950">
                       {new Date(lastBackup.timestamp).toLocaleString()}
@@ -69,7 +152,7 @@ export default function Backup() {
                       <XCircle className="h-4 w-4 text-rose-600" />
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm text-slate-600">Location:</span>
                     <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700">
                       {lastBackup.location}
@@ -90,15 +173,29 @@ export default function Backup() {
             </div>
             <button
               type="button"
-              onClick={handleRunBackup}
-              disabled={isBackingUp}
-              className="inline-flex h-10 items-center gap-2 rounded-md bg-teal-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => runBackupMutation.mutate()}
+              disabled={runBackupMutation.isPending}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <HardDrive className="h-4 w-4" />
-              {isBackingUp ? 'Backing Up...' : 'Run Backup'}
+              {runBackupMutation.isPending ? 'Backing Up...' : 'Run Backup'}
             </button>
           </div>
         </div>
+
+        {(runBackupMutation.error || exportError) && (
+          <div className="mb-6 rounded-lg border border-rose-200 bg-rose-50 p-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 shrink-0 text-rose-600" />
+              <div>
+                <h3 className="text-sm font-semibold text-rose-900">Backup action failed</h3>
+                <p className="mt-1 text-sm text-rose-700">
+                  {exportError || (runBackupMutation.error instanceof Error ? runBackupMutation.error.message : String(runBackupMutation.error))}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="mb-6 grid gap-4 sm:grid-cols-3">
           <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -108,13 +205,14 @@ export default function Backup() {
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="text-sm font-semibold text-slate-950">Database</h3>
-                <p className="text-xs text-slate-600">PostgreSQL dump</p>
+                <p className="text-xs text-slate-600">PostgreSQL dump via Docker pg_dump</p>
               </div>
             </div>
             <button
               type="button"
               onClick={() => handleExport('database')}
-              className="mt-4 inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              disabled={exportMutation.isPending}
+              className="mt-4 inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Download className="h-4 w-4" />
               Export
@@ -128,13 +226,14 @@ export default function Backup() {
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="text-sm font-semibold text-slate-950">Reports</h3>
-                <p className="text-xs text-slate-600">Generated reports</p>
+                <p className="text-xs text-slate-600">Reports manifest</p>
               </div>
             </div>
             <button
               type="button"
               onClick={() => handleExport('reports')}
-              className="mt-4 inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              disabled={exportMutation.isPending}
+              className="mt-4 inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Download className="h-4 w-4" />
               Export
@@ -143,18 +242,19 @@ export default function Backup() {
 
           <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-purple-100">
-                <Settings className="h-5 w-5 text-purple-700" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-slate-100">
+                <Settings className="h-5 w-5 text-slate-700" />
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="text-sm font-semibold text-slate-950">Config</h3>
-                <p className="text-xs text-slate-600">System config</p>
+                <p className="text-xs text-slate-600">Redacted environment snapshot</p>
               </div>
             </div>
             <button
               type="button"
               onClick={() => handleExport('config')}
-              className="mt-4 inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              disabled={exportMutation.isPending}
+              className="mt-4 inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Download className="h-4 w-4" />
               Export
@@ -169,36 +269,7 @@ export default function Backup() {
               <p className="mt-0.5 text-sm text-slate-600">{backupRecords.length} recent backups</p>
             </div>
             <div className="divide-y divide-slate-100">
-              {backupRecords.map((backup) => (
-                <div key={backup.id} className="flex items-center justify-between gap-4 p-4">
-                  <div className="flex items-center gap-3">
-                    {backup.status === 'success' && (
-                      <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                    )}
-                    {backup.status === 'failed' && (
-                      <XCircle className="h-5 w-5 text-rose-600" />
-                    )}
-                    {backup.status === 'in_progress' && (
-                      <Clock className="h-5 w-5 text-amber-600 animate-pulse" />
-                    )}
-                    <div>
-                      <p className="text-sm font-medium text-slate-950">
-                        {backup.type.charAt(0).toUpperCase() + backup.type.slice(1)} Backup
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {new Date(backup.timestamp).toLocaleString()} • {backup.size}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                  >
-                    <FolderOpen className="h-3 w-3" />
-                    Open
-                  </button>
-                </div>
-              ))}
+              {backupRecords.map(renderBackupRecord)}
             </div>
           </div>
         ) : (
@@ -211,37 +282,7 @@ export default function Backup() {
           </div>
         )}
 
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 shrink-0 text-amber-600" />
-            <div>
-              <h3 className="text-sm font-semibold text-amber-900">Backend Integration Required</h3>
-              <p className="mt-1 text-sm text-amber-700">
-                Backup functionality requires backend implementation:
-              </p>
-              <ul className="mt-2 space-y-1 text-sm text-amber-700">
-                <li>• POST /api/backup - trigger full backup</li>
-                <li>• POST /api/backup/export - export specific data type</li>
-                <li>• GET /api/backup/history - list backup records</li>
-                <li>• Configure backup storage location in .env</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-950">Backup Best Practices</h3>
-          <ul className="mt-3 space-y-2 text-sm text-slate-600">
-            <li>• Run backups regularly, at least once per day</li>
-            <li>• Store backups on separate storage from the main server</li>
-            <li>• Test restore procedures periodically to verify backup integrity</li>
-            <li>• Keep at least 7 days of backup history before rotation</li>
-            <li>• Document backup location and restore steps for disaster recovery</li>
-            <li>• Monitor backup job status and investigate failures promptly</li>
-          </ul>
-        </div>
-
-        <div className="mt-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
           <div className="flex items-start gap-3">
             <FileText className="h-5 w-5 shrink-0 text-blue-600" />
             <div>

@@ -9,6 +9,7 @@ import Users from './pages/Users'
 import WhatsAppAccess from './pages/WhatsAppAccess'
 import Logs from './pages/Logs'
 import Backup from './pages/Backup'
+import Attribution from './pages/Attribution'
 import Tasks from './pages/Tasks'
 import Schedules from './pages/Schedules'
 
@@ -27,6 +28,7 @@ export default function App() {
           <Route path="/logs" element={<Layout><Logs /></Layout>} />
           <Route path="/config" element={<Layout><Config /></Layout>} />
           <Route path="/backup" element={<Layout><Backup /></Layout>} />
+          <Route path="/attribution" element={<Layout><Attribution /></Layout>} />
           <Route path="/tasks" element={<Layout><Tasks /></Layout>} />
           <Route path="/schedules" element={<Layout><Schedules /></Layout>} />
         </Routes>

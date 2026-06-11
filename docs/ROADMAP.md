@@ -1612,43 +1612,44 @@ All Phase 6 admin dashboard screens are now built and functional:
 
 ### Pending Items
 
-- [ ] Open source attribution section (not yet implemented)
-- [ ] Backend API integration for Logs screen
-- [ ] Backend API integration for Backup screen
-- [ ] Enhanced WhatsApp Access with joined user/contact data (optional UX improvement)
+- [x] Open source attribution section
+- [x] Backend API integration for Logs screen
+- [x] Backend API integration for Backup screen
+- [x] Enhanced WhatsApp Access with joined user/contact data
 
-### Backend Integration Required
+### Backend Integration Status
 
 See **[Backend Integration Requirements](backend-integration.md)** for detailed specifications.
 
-**Priority endpoints needed:**
+**Completed:**
 
-1. **Logs System** (High Priority)
+1. **Logs System**
    - `GET /api/logs` with filtering, search, pagination
-   - Store logs in PostgreSQL or structured log files
-   - Response: Array of log entries with timestamp, source, level, message, metadata
+   - Current MVP reads from audit events in PostgreSQL
+   - Response includes timestamp, source, level, message, metadata
 
-2. **Backup System** (High Priority)
+2. **WhatsApp Access Enhancement**
+   - `GET /api/agent-access` returns joined user + contact data
+   - Admin UI shows displayName and phone number instead of UUIDs
+
+3. **Backup System**
    - `POST /api/backup` - trigger full backup
    - `POST /api/backup/export` - export specific data type
    - `GET /api/backup/history` - list backup records
-   - Implement pg_dump for database, tar for reports, config snapshot
-
-3. **WhatsApp Access Enhancement** (Medium Priority)
-   - Enhance `GET /api/agent-access` to return joined user + contact data
-   - Show displayName and phone number instead of UUIDs
-   - Improves UX without changing functionality
+   - MVP writes local backup history and JSON snapshots
+   - Database export uses pg_dump from the host or Docker PostgreSQL container
 
 ### Next Steps
 
-1. Implement backend endpoints for Logs and Backup (see backend-integration.md)
-2. Test full integration with admin dashboard
-3. Add open source attribution section
-4. Consider scheduled backup automation via BullMQ
-5. Move to Phase 4 (Mobile App) or Phase 7 (Agent Automation) once admin dashboard is production-ready
+1. Continue Phase 4 mobile work from `apps/mobile-app`
+2. Persist backend URL and operator token securely
+3. Add task create/complete actions in the mobile app
+4. Add WhatsApp number and Nara Bot access request flow
+5. Consider scheduled backup automation via BullMQ after mobile MVP is moving
 
 ### Related Documentation
 
+- [Mobile App Notes](mobile-app.md) - Flutter run commands, physical device notes, and next mobile work
 - [Backend Integration Requirements](backend-integration.md) - Detailed API specifications
 - [Web Admin UX Spec](design/web-admin-spec.md) - Complete screen specifications
 - [Visual System Baseline](design/visual-system.md) - Design system and styling guide
@@ -1656,6 +1657,6 @@ See **[Backend Integration Requirements](backend-integration.md)** for detailed 
 
 ---
 
-*Phase 6 update: 2026-06-10*  
-*Admin dashboard core screens: Complete ✓*  
-*Backend integration: In progress*
+*Phase 6 update: 2026-06-11*
+*Admin dashboard core screens: Complete*
+*Backend integration: MVP complete*
