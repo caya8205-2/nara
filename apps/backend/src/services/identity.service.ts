@@ -174,7 +174,7 @@ export class IdentityService {
   }
 
   async listAgentAccess() {
-    return db
+    const rows = await db
       .select({
         access: agentChannelAccess,
         channel: agentChannels,
@@ -186,6 +186,13 @@ export class IdentityService {
       .innerJoin(users, eq(agentChannelAccess.userId, users.id))
       .innerJoin(userContacts, eq(agentChannelAccess.contactId, userContacts.id))
       .orderBy(desc(agentChannelAccess.createdAt))
+
+    return rows.map((row) => ({
+      ...row.access,
+      channel: row.channel,
+      user: row.user,
+      contact: row.contact,
+    }))
   }
 
   async updateAgentAccess(id: string, input: UpdateAgentAccessInput) {

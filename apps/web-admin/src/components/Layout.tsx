@@ -7,6 +7,7 @@ import {
   Database,
   FileText,
   HardDrive,
+  Info,
   LogOut,
   MessageSquare,
   Settings,
@@ -29,6 +30,7 @@ const navItems = [
   { path: '/logs', label: 'Logs', icon: FileText },
   { path: '/config', label: 'Config', icon: Settings },
   { path: '/backup', label: 'Backup', icon: HardDrive },
+  { path: '/attribution', label: 'Attribution', icon: Info },
 ]
 
 export default function Layout({ children }: LayoutProps) {

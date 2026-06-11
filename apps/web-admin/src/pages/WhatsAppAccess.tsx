@@ -10,7 +10,6 @@ import {
 } from 'lucide-react'
 import {
   listAgentAccess,
-  listUsers,
   updateAgentAccess,
   type AgentChannelAccess,
 } from '../lib/api'
@@ -52,11 +51,6 @@ export default function WhatsAppAccess() {
     queryFn: listAgentAccess,
   })
 
-  const usersQuery = useQuery({
-    queryKey: ['users'],
-    queryFn: listUsers,
-  })
-
   const updateMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: AgentChannelAccess['status'] }) =>
       updateAgentAccess(id, { status }),
@@ -67,11 +61,13 @@ export default function WhatsAppAccess() {
   })
 
   const accessRecords = accessQuery.data ?? []
-  const users = usersQuery.data ?? []
 
-  const getUserName = (userId: string) => {
-    const user = users.find((u) => u.id === userId)
-    return user?.displayName || userId.slice(0, 8)
+  const getUserName = (access: AgentChannelAccess) => {
+    return access.user?.displayName || access.userId.slice(0, 8)
+  }
+
+  const getContactLabel = (access: AgentChannelAccess) => {
+    return access.contact?.value || access.contactId.slice(0, 8)
   }
 
   const handleApprove = (access: AgentChannelAccess) => {
@@ -104,7 +100,6 @@ export default function WhatsAppAccess() {
             type="button"
             onClick={() => {
               queryClient.invalidateQueries({ queryKey: ['agent-access'] })
-              queryClient.invalidateQueries({ queryKey: ['users'] })
             }}
             disabled={accessQuery.isFetching}
             className="inline-flex h-10 items-center gap-2 rounded-md bg-teal-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -160,7 +155,7 @@ export default function WhatsAppAccess() {
                 <thead className="border-b border-slate-100 bg-slate-50">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">User</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Contact ID</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">WhatsApp Number</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Status</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Requested</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Last Sync</th>
@@ -176,12 +171,12 @@ export default function WhatsAppAccess() {
                       <tr key={access.id} className="hover:bg-slate-50">
                         <td className="px-4 py-3">
                           <span className="text-sm font-medium text-slate-950">
-                            {getUserName(access.userId)}
+                            {getUserName(access)}
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <span className="font-mono text-xs text-slate-500">
-                            {access.contactId.slice(0, 8)}...
+                          <span className="text-sm text-slate-600">
+                            {getContactLabel(access)}
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -260,7 +255,7 @@ export default function WhatsAppAccess() {
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
                             <p className="text-xs font-semibold text-slate-950">
-                              {getUserName(access.userId)} - {access.contactId.slice(0, 8)}
+                              {getUserName(access)} - {getContactLabel(access)}
                             </p>
                             <p className="mt-1 text-xs text-orange-800">{access.syncError}</p>
                           </div>

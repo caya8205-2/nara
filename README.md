@@ -147,8 +147,10 @@ The backend remains the source of truth whether the request comes from desktop, 
 
 Frontend workspace split:
 
+* `apps/backend`: source of truth API for mobile, desktop, admin, and agent tools.
 * `apps/web-admin`: local admin dashboard for the office server PC.
-* `apps/web-app`: user-facing app frontend prototype for mobile/desktop workflows.
+* `apps/desktop-app`: desktop app frontend prototype for user-facing workflows.
+* `apps/mobile-app`: Flutter mobile app for the main user-facing experience.
 
 ### Database & Infrastructure
 
@@ -205,11 +207,20 @@ Open the local admin dashboard at:
 http://localhost:5173
 ```
 
-Open the user-facing web app prototype at:
+Open the desktop app frontend prototype at:
 
 ```text
 http://localhost:5174
 ```
+
+Run the Flutter mobile app from its project folder:
+
+```powershell
+cd apps/mobile-app
+flutter run
+```
+
+The mobile app has been smoke-tested on a physical Android device through wireless debugging. If `flutter run` cannot find the project, make sure the command is executed from `apps/mobile-app`, not the monorepo root.
 
 Log in with the local operator credentials from `.env`:
 
@@ -235,6 +246,12 @@ Identity and Nara Bot access endpoints:
 * `PATCH /api/agent-access/:id`
 
 These endpoints store user WhatsApp access intent in Nara's database. OpenClaw allowlist sync is intentionally behind a future service/worker boundary.
+
+Backup uses `BACKUP_DIR` for local backup files. Database export tries host `pg_dump` first and falls back to `docker exec` with `POSTGRES_CONTAINER_NAME`, which defaults to the Docker Compose container name:
+
+```text
+nara-postgres-1
+```
 
 Test the agent tool endpoints without WhatsApp:
 
@@ -290,6 +307,8 @@ See [Nara UI/UX Brief](docs/design/ui-ux-brief.md), [App Frontend UX Spec](docs/
 
 See [ADR 003](docs/adr/003-identity-and-whatsapp-allowlist.md) for the identity, WhatsApp contact, and Nara Bot allowlist model.
 
+See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device testing notes, and next mobile work.
+
 ### Implementation Plan
 
 1. Harden backend access before exposing it outside the office network:
@@ -326,7 +345,7 @@ See [ADR 003](docs/adr/003-identity-and-whatsapp-allowlist.md) for the identity,
 * [ ] Server URL settings for mobile and desktop clients
 * [ ] Cloudflare Tunnel setup for backend API
 * [ ] Rate limiting for exposed endpoints
-* [ ] Document backup and recovery basics
+* [x] Document backup and recovery basics
 
 ### Phase 3: Operational Core
 
@@ -342,10 +361,10 @@ See [ADR 003](docs/adr/003-identity-and-whatsapp-allowlist.md) for the identity,
 
 ### Phase 4: Mobile App
 
-* [ ] Flutter app scaffold
-* [ ] Backend API connection settings
-* [ ] Mobile task and reminder views
-* [ ] Personality and assistant setup screens
+* [x] Flutter app scaffold
+* [x] Backend API connection settings
+* [x] Mobile shell with Home, Tasks, Reminders, Assistant, and Settings
+* [x] Personality and assistant setup screen scaffold
 * [ ] WhatsApp number and Nara Bot access screen
 * [ ] Push or local notification strategy
 * [ ] Approval screen for agent-triggered actions
@@ -365,11 +384,13 @@ See [ADR 003](docs/adr/003-identity-and-whatsapp-allowlist.md) for the identity,
 * [x] Tool endpoint debugging (Agent Tools screen)
 * [x] Users and WhatsApp access API foundation
 * [x] Users and WhatsApp access management UI (Users + WhatsApp Access screens)
+* [x] Logs backend integration from audit events
+* [x] WhatsApp Access joined user/contact data
 * [x] Server configuration checks (Config screen)
-* [x] Local backup/export controls (Backup screen UI, backend integration needed)
-* [ ] Open source attribution section
+* [x] Local backup/export controls and backend MVP
+* [x] Open source attribution section
 
-> **Note:** Phase 6 core admin screens complete. See [Backend Integration Requirements](docs/backend-integration.md) for API endpoints needed by Logs, Backup, and WhatsApp Access screens.
+> **Note:** Phase 6 admin dashboard is complete for MVP. Backup restore and scheduled backup automation remain later hardening work.
 
 ### Phase 7: Agent Automation
 
@@ -390,4 +411,3 @@ See [ADR 003](docs/adr/003-identity-and-whatsapp-allowlist.md) for the identity,
 ## License
 
 TBD
-

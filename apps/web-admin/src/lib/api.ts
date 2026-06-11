@@ -94,6 +94,60 @@ export type AgentChannelAccess = {
   syncError: string | null
   createdAt: string
   updatedAt: string
+  channel?: {
+    id: string
+    type: 'whatsapp' | 'telegram'
+    name: string
+    accountId: string | null
+    enabled: boolean
+    createdAt: string
+    updatedAt: string
+  }
+  user?: User
+  contact?: UserContact
+}
+
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+export type LogSource = 'backend' | 'database' | 'redis' | 'openclaw' | 'agent' | 'system'
+
+export type LogEntry = {
+  id: string
+  timestamp: string
+  source: LogSource
+  level: LogLevel
+  message: string
+  metadata?: Record<string, unknown>
+}
+
+export type ListLogsInput = {
+  source?: LogSource
+  level?: LogLevel
+  search?: string
+  from?: string
+  to?: string
+  limit?: number
+}
+
+export type ListLogsResponse = {
+  logs: LogEntry[]
+  total: number
+  hasMore: boolean
+}
+
+export type BackupType = 'database' | 'reports' | 'config' | 'full'
+
+export type BackupRecord = {
+  id: string
+  type: BackupType
+  timestamp: string
+  size: string
+  status: 'success' | 'failed' | 'in_progress'
+  location: string
+  error?: string
+}
+
+export type BackupHistoryResponse = {
+  backups: BackupRecord[]
 }
 
 export type RequestAgentAccessInput = {
@@ -187,4 +241,31 @@ export const listAgentAccess = async () => {
 export const updateAgentAccess = async (id: string, input: UpdateAgentAccessInput) => {
   const response = await api.patch<AgentChannelAccess>('/agent-access/' + id, input)
   return response.data
+}
+
+export const listLogs = async (input: ListLogsInput = {}) => {
+  const response = await api.get<ListLogsResponse>('/logs', { params: input })
+  return response.data
+}
+
+export const listBackups = async () => {
+  const response = await api.get<BackupHistoryResponse>('/backup/history')
+  return response.data.backups
+}
+
+export const runBackup = async () => {
+  const response = await api.post<BackupRecord>('/backup')
+  return response.data
+}
+
+export const exportBackup = async (type: BackupType) => {
+  const response = await api.post('/backup/export', { type }, { responseType: 'blob' })
+  const disposition = response.headers['content-disposition']
+  const match = typeof disposition === 'string' ? disposition.match(/filename="([^"]+)"/) : null
+  const filename = match?.[1] ?? `nara-${type}-backup-${new Date().toISOString().split('T')[0]}.json`
+
+  return {
+    blob: response.data as Blob,
+    filename,
+  }
 }

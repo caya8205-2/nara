@@ -12,6 +12,14 @@ coverage/
 data/
 *.tsbuildinfo
 .DS_Store
+.idea/
+
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+**/ephemeral/
 
 # Playwright
 /test-results/
