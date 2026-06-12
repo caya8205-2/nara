@@ -25,7 +25,7 @@ class NaraLogoMark extends StatelessWidget {
           child: SizedBox.square(
             dimension: size,
             child: Image.asset(
-              'assets/brand/logo.png',
+              'assets/brand/logo-mark.png',
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) {
                 return _FallbackLogo(size: size);
