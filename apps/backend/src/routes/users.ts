@@ -19,6 +19,12 @@ const RequestAccessSchema = z.object({
   channelType: z.enum(['whatsapp', 'telegram']).optional(),
 })
 
+type AuthPayload = {
+  sub: string
+  role?: string
+  accountType?: string
+}
+
 const plugin: FastifyPluginAsync = async (app) => {
   const requireOperator = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
@@ -46,6 +52,21 @@ const plugin: FastifyPluginAsync = async (app) => {
   app.get('/:id/contacts', { preHandler: requireOperator }, async (req) => {
     const { id } = req.params as { id: string }
     return identityService.listUserContacts(id)
+  })
+
+  app.get('/:id/agent-access', async (req, reply) => {
+    const { id } = req.params as { id: string }
+
+    try {
+      const payload = await req.jwtVerify<AuthPayload>()
+      if (payload.accountType === 'user' && payload.sub !== id) {
+        return reply.status(403).send({ error: 'Forbidden' })
+      }
+    } catch {
+      return reply.status(401).send({ error: 'Authentication required' })
+    }
+
+    return identityService.listAgentAccessByUser(id)
   })
 
   app.post('/:id/contacts', { preHandler: requireOperator }, async (req, reply) => {

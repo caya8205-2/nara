@@ -117,6 +117,13 @@ process.on('uncaughtException', (error) => {
 })
 
 // Health check
+app.get('/', async () => ({
+  status: 'ok',
+  service: 'nara-backend',
+  message: 'Nara backend is running. Use /health for liveness and /api/readiness for dependency readiness.',
+  timestamp: new Date().toISOString(),
+}))
+
 app.get('/health', async () => ({
   status: 'ok',
   service: 'nara-backend',

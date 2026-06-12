@@ -63,6 +63,10 @@ class NaraApiClient {
     return getJson('/api/readiness');
   }
 
+  Future<Map<String, dynamic>> testHealth() {
+    return getJson('/health');
+  }
+
   Future<String> loginOperator(String username, String password) async {
     final response = await postJson('/api/auth/login', {
       'username': username,
@@ -137,6 +141,42 @@ class NaraApiClient {
     _applyHeaders(request);
     final response = await request.close();
     return _decodeResponse(response);
+  }
+
+  Future<List<dynamic>> listUserContacts(String userId) {
+    return getList('/api/users/$userId/contacts');
+  }
+
+  Future<Map<String, dynamic>> addUserContact({
+    required String userId,
+    required String type,
+    required String value,
+    String? label,
+  }) {
+    return postJson('/api/users/$userId/contacts', {
+      'type': type,
+      'value': value,
+      if (label != null && label.trim().isNotEmpty) 'label': label.trim(),
+    });
+  }
+
+  Future<Map<String, dynamic>> requestAgentAccess({
+    required String userId,
+    required String contactId,
+    String channelType = 'whatsapp',
+  }) {
+    return postJson('/api/users/$userId/agent-access', {
+      'contactId': contactId,
+      'channelType': channelType,
+    });
+  }
+
+  Future<List<dynamic>> listAgentAccess() {
+    return getList('/api/agent-access');
+  }
+
+  Future<List<dynamic>> listUserAgentAccess(String userId) {
+    return getList('/api/users/$userId/agent-access');
   }
 
   void _applyHeaders(HttpClientRequest request) {

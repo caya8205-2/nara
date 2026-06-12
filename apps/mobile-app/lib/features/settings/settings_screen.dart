@@ -66,6 +66,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final avatarLabel = displayName.trim().isEmpty
         ? 'N'
         : displayName.trim().substring(0, 1).toUpperCase();
+    final isServerUrlValid = _isValidServerUrl(serverController.text);
 
     return RefreshIndicator(
       onRefresh: refreshConnection,
@@ -134,11 +135,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   TextField(
                     controller: serverController,
                     keyboardType: TextInputType.url,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Backend API URL',
                       hintText: 'https://your-tunnel-hostname.example.com',
+                      errorText: serverController.text.trim().isEmpty ||
+                              isServerUrlValid
+                          ? null
+                          : 'Use a valid http or https URL',
                     ),
-                    onChanged: widget.onServerUrlChanged,
+                    onChanged: (value) {
+                      setState(() {});
+                      widget.onServerUrlChanged(value);
+                    },
                   ),
                   const SizedBox(height: 12),
                   Text(widget.state.connectionMessage),
@@ -147,6 +155,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       'Last checked ${_timeLabel(widget.state.lastConnectionCheck!)}',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: isServerUrlValid ? refreshConnection : null,
+                      icon: widget.state.connectionState ==
+                              NaraConnectionState.checking
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.sync),
+                      label: const Text('Test Connection'),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -175,8 +199,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const ListTile(
                   leading: Icon(Icons.info_outline),
                   title: Text('Open source'),
-                  subtitle: Text(
-                      'Attribution screen will be added with app settings.'),
+                  subtitle: Text('Flutter, Dart, and Nara workspace packages.'),
                 ),
               ],
             ),
@@ -185,6 +208,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
+}
+
+bool _isValidServerUrl(String value) {
+  final trimmed = value.trim();
+  final uri = Uri.tryParse(trimmed);
+  if (uri == null) return false;
+  if (uri.scheme != 'http' && uri.scheme != 'https') return false;
+  return uri.host.isNotEmpty;
 }
 
 class _ConnectionBadge extends StatelessWidget {

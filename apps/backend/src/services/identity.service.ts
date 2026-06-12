@@ -238,6 +238,29 @@ export class IdentityService {
     }))
   }
 
+  async listAgentAccessByUser(userId: string) {
+    const rows = await db
+      .select({
+        access: agentChannelAccess,
+        channel: agentChannels,
+        user: users,
+        contact: userContacts,
+      })
+      .from(agentChannelAccess)
+      .innerJoin(agentChannels, eq(agentChannelAccess.channelId, agentChannels.id))
+      .innerJoin(users, eq(agentChannelAccess.userId, users.id))
+      .innerJoin(userContacts, eq(agentChannelAccess.contactId, userContacts.id))
+      .where(eq(agentChannelAccess.userId, userId))
+      .orderBy(desc(agentChannelAccess.createdAt))
+
+    return rows.map((row) => ({
+      ...row.access,
+      channel: row.channel,
+      user: row.user,
+      contact: row.contact,
+    }))
+  }
+
   async updateAgentAccess(id: string, input: UpdateAgentAccessInput) {
     const now = new Date()
     const [access] = await db

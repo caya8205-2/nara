@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../state/nara_mobile_state.dart';
+
 class StoredNaraSession {
   const StoredNaraSession({
     required this.serverUrl,
@@ -18,6 +20,7 @@ class NaraSessionStore {
   static const _serverUrlKey = 'nara.serverUrl';
   static const _authTokenKey = 'nara.authToken';
   static const _userKey = 'nara.user';
+  static const _assistantPreferencesKey = 'nara.assistantPreferences';
 
   Future<StoredNaraSession?> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -53,6 +56,29 @@ class NaraSessionStore {
   Future<void> saveServerUrl(String serverUrl) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_serverUrlKey, serverUrl);
+  }
+
+  Future<NaraAssistantPreferences> loadAssistantPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_assistantPreferencesKey);
+    if (raw == null) return const NaraAssistantPreferences();
+
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map<String, dynamic>) {
+      return const NaraAssistantPreferences();
+    }
+
+    return NaraAssistantPreferences.fromJson(decoded);
+  }
+
+  Future<void> saveAssistantPreferences(
+    NaraAssistantPreferences preferences,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _assistantPreferencesKey,
+      jsonEncode(preferences.toJson()),
+    );
   }
 
   Future<void> clear() async {

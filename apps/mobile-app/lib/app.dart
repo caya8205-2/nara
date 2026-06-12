@@ -55,12 +55,18 @@ class _NaraMobileAppState extends State<NaraMobileApp>
         (currentUser != null || apiClient.currentUser != null)) {
       checkConnection(showChecking: false);
       loadTasks(silent: true);
+      loadAssistantProfile(silent: true);
     }
   }
 
   Future<void> restoreSession() async {
+    final assistantPreferences = await sessionStore.loadAssistantPreferences();
     final session = await sessionStore.load();
     if (!mounted) return;
+
+    setState(() {
+      appState.assistantPreferences = assistantPreferences;
+    });
 
     if (session == null) {
       setState(() => restoringSession = false);
@@ -100,6 +106,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
 
     checkConnection(showChecking: false);
     loadTasks(silent: true);
+    loadAssistantProfile(silent: true);
   }
 
   void updateServerUrl(String value) {
@@ -132,6 +139,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     }
     checkConnection(showChecking: false);
     loadTasks();
+    loadAssistantProfile();
   }
 
   void handleLogout() {
@@ -145,6 +153,12 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       appState.tasks = [];
       appState.tasksError = null;
       appState.tasksLoading = false;
+      appState.assistantLoading = false;
+      appState.assistantSaving = false;
+      appState.assistantError = null;
+      appState.assistantMessage = null;
+      appState.whatsappContact = null;
+      appState.whatsappAccess = null;
     });
     sessionStore.clear();
   }
@@ -158,8 +172,8 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     }
 
     try {
-      final report = await apiClient.testReadiness();
-      final ok = report['ok'] == true;
+      final report = await apiClient.testHealth();
+      final ok = report['status'] == 'ok';
       setState(() {
         appState.connectionState =
             ok ? NaraConnectionState.connected : NaraConnectionState.attention;
@@ -209,6 +223,140 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     }
   }
 
+  Future<void> loadAssistantProfile({bool silent = false}) async {
+    final userId = activeUserId;
+    if (userId == null) return;
+
+    if (!silent) {
+      setState(() {
+        appState.assistantLoading = true;
+        appState.assistantError = null;
+      });
+    } else {
+      appState.assistantError = null;
+    }
+
+    try {
+      final contactsResult = await apiClient.listUserContacts(userId);
+      final contacts = contactsResult
+          .whereType<Map<String, dynamic>>()
+          .map(NaraContact.fromJson)
+          .toList();
+      NaraContact? whatsappContact;
+      for (final contact in contacts) {
+        if (contact.type == 'whatsapp') {
+          whatsappContact = contact;
+          break;
+        }
+      }
+
+      NaraAgentAccess? whatsappAccess;
+      if (whatsappContact != null) {
+        final whatsappContactId = whatsappContact.id;
+        final accessResult = await apiClient.listUserAgentAccess(userId);
+        final accessList = accessResult
+            .whereType<Map<String, dynamic>>()
+            .map(NaraAgentAccess.fromJson)
+            .where(
+              (access) =>
+                  access.userId == userId &&
+                  access.contactId == whatsappContactId,
+            )
+            .toList();
+        whatsappAccess = accessList.isEmpty ? null : accessList.first;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        appState.whatsappContact = whatsappContact;
+        appState.whatsappAccess = whatsappAccess;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        appState.assistantError = 'Could not load assistant setup';
+      });
+    } finally {
+      if (!silent && mounted) {
+        setState(() {
+          appState.assistantLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> saveAssistantPreferences(
+    NaraAssistantPreferences preferences,
+  ) async {
+    setState(() {
+      appState.assistantPreferences = preferences;
+      appState.assistantMessage = 'Assistant settings saved';
+    });
+    await sessionStore.saveAssistantPreferences(preferences);
+  }
+
+  Future<void> requestWhatsAppAccess(String rawNumber) async {
+    final userId = activeUserId;
+    final number = rawNumber.trim();
+    if (userId == null) {
+      setState(() {
+        appState.assistantError = 'Please sign in again';
+      });
+      return;
+    }
+    if (number.length < 8) {
+      setState(() {
+        appState.assistantError = 'Enter a valid WhatsApp number';
+      });
+      return;
+    }
+
+    setState(() {
+      appState.assistantSaving = true;
+      appState.assistantError = null;
+      appState.assistantMessage = null;
+    });
+
+    try {
+      final existing = appState.whatsappContact;
+      final contact = existing != null && existing.value == number
+          ? existing
+          : NaraContact.fromJson(
+              await apiClient.addUserContact(
+                userId: userId,
+                type: 'whatsapp',
+                value: number,
+                label: 'Primary WhatsApp',
+              ),
+            );
+
+      final access = NaraAgentAccess.fromJson(
+        await apiClient.requestAgentAccess(
+          userId: userId,
+          contactId: contact.id,
+        ),
+      );
+
+      if (!mounted) return;
+      setState(() {
+        appState.whatsappContact = contact;
+        appState.whatsappAccess = access;
+        appState.assistantMessage = 'WhatsApp access requested';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        appState.assistantError = 'Could not request WhatsApp access';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          appState.assistantSaving = false;
+        });
+      }
+    }
+  }
+
   Future<void> createTask(String title, String? description) async {
     setState(() {
       appState.tasksLoading = true;
@@ -236,9 +384,12 @@ class _NaraMobileAppState extends State<NaraMobileApp>
   }
 
   Future<void> completeTask(String id) async {
+    final previousTasks = List<NaraTask>.from(appState.tasks);
     setState(() {
-      appState.tasksLoading = true;
       appState.tasksError = null;
+      appState.tasks = appState.tasks
+          .map((task) => task.id == id ? task.copyWith(done: true) : task)
+          .toList();
     });
 
     try {
@@ -250,17 +401,20 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       });
     } catch (error) {
       setState(() {
+        appState.tasks = previousTasks;
         appState.tasksError = 'Could not complete task';
-      });
-    } finally {
-      setState(() {
-        appState.tasksLoading = false;
       });
     }
   }
 
   void openTab(int index) {
     setState(() => selectedIndex = index);
+  }
+
+  String? get activeUserId {
+    final id = (currentUser ?? apiClient.currentUser)?['id']?.toString();
+    if (id == null || id.isEmpty) return null;
+    return id;
   }
 
   @override
@@ -272,6 +426,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
         user: user,
         onRefreshConnection: checkConnection,
         onRefreshTasks: loadTasks,
+        onRefreshAssistant: loadAssistantProfile,
         onOpenTasks: () => openTab(1),
         onAddTask: () => openTab(1),
         onOpenAssistant: () => openTab(3),
@@ -284,7 +439,12 @@ class _NaraMobileAppState extends State<NaraMobileApp>
         onCompleteTask: completeTask,
       ),
       RemindersScreen(apiClient: apiClient),
-      AssistantScreen(apiClient: apiClient),
+      AssistantScreen(
+        state: appState,
+        onRefresh: loadAssistantProfile,
+        onSavePreferences: saveAssistantPreferences,
+        onRequestWhatsAppAccess: requestWhatsAppAccess,
+      ),
       SettingsScreen(
         apiClient: apiClient,
         state: appState,

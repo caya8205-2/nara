@@ -19,6 +19,7 @@ data/
 .flutter-plugins
 .flutter-plugins-dependencies
 .packages
+devtools_options.yaml
 **/ephemeral/
 
 # Playwright

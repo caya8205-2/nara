@@ -1642,11 +1642,12 @@ See **[Backend Integration Requirements](backend-integration.md)** for detailed 
 
 ### Next Steps
 
-1. Continue Phase 4 mobile work from `apps/mobile-app`
-2. Move mobile token storage from shared preferences to secure storage before production hardening
-3. Add WhatsApp number and Nara Bot access request flow
+1. Harden mobile auth storage by moving tokens from shared preferences to secure storage
+2. Scope tasks by signed-in user so admin-created/global tasks do not appear in every mobile account
+3. Tighten server-side authorization for user contact read/create endpoints
 4. Add reminders once backend schedule/reminder endpoints are ready
-5. Consider scheduled backup automation via BullMQ after mobile MVP is moving
+5. Add approval queue once backend approval endpoints exist
+6. Consider scheduled backup automation via BullMQ after mobile MVP is moving
 
 ### Related Documentation
 
@@ -1663,4 +1664,7 @@ See **[Backend Integration Requirements](backend-integration.md)** for detailed 
 
 *Phase 4 mobile update: 2026-06-11*
 *Mobile login/register is backed by database users. Admin/operator env credentials remain for the local web admin dashboard. Mobile backend URL should come from NARA_API_BASE_URL for production builds, with debug-only local defaults for development. Home, Settings, and Tasks now share connection/task state; Tasks can create and complete backend tasks from mobile. The app now persists the user session/backend URL with shared_preferences, auto-refreshes connection status on app resume and timer, uses pull-to-refresh for manual checks, and supports custom assistant personality input.*
+*Phase 4 mobile update: 2026-06-12*
+*Assistant preferences are persisted locally, WhatsApp number/contact registration is wired to the existing identity API, Nara Bot access requests are sent from mobile, and Home/Assistant now show live access status from user-scoped backend agent-access data. Next hardening: secure token storage and stricter contact endpoint authorization.*
+*Known mobile issue: tasks are still global through `/api/tasks`; mobile user accounts can see tasks created from the admin dashboard. Next implementation should add task ownership/user scoping before task usage becomes real user data.*
 *Backend integration: MVP complete*

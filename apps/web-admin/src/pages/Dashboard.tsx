@@ -122,8 +122,15 @@ export default function Dashboard() {
   const isAuthenticated = hasToken && Boolean(operator)
 
   const backendStatus: DependencyStatus | undefined = readiness
-    ? { ok: readiness.ok, status: readiness.ok ? 'ok' : 'error' }
+    ? { ok: true, status: readiness.ok ? 'ok' : 'error' }
     : undefined
+  const backendLabel = readiness
+    ? readiness.ok
+      ? 'Ready'
+      : 'Degraded'
+    : readinessQuery.isLoading
+      ? 'Checking'
+      : 'Unavailable'
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -250,9 +257,9 @@ export default function Dashboard() {
               <StatusPill status={backendStatus} />
             </div>
             <p className="mt-4 text-2xl font-semibold text-slate-950">
-              {readiness?.ok ? 'Ready' : readinessQuery.isLoading ? 'Checking' : 'Down'}
+              {backendLabel}
             </p>
-            <p className="mt-1 text-sm text-slate-500">Service readiness</p>
+            <p className="mt-1 text-sm text-slate-500">API liveness and dependency readiness</p>
           </div>
 
           {readiness &&

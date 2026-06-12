@@ -239,10 +239,13 @@ OPERATOR_PASSWORD
 
 The dashboard reads:
 
+* `GET /health`
 * `GET /api/readiness`
 * `GET /api/tasks`
 * `POST /api/tasks`
 * `PATCH /api/tasks/:id/complete`
+
+Use `/health` for Cloudflare Tunnel checks, uptime checks, and app connectivity tests. Use `/api/readiness` for detailed dependency status; it can be degraded when OpenClaw is not reachable while the backend API is still running.
 
 Backend structured logs are written as newline-delimited JSON:
 
@@ -264,6 +267,7 @@ Identity and Nara Bot access endpoints:
 * `POST /api/users`
 * `POST /api/users/:id/contacts`
 * `POST /api/users/:id/agent-access`
+* `GET /api/users/:id/agent-access`
 * `GET /api/agent-access`
 * `PATCH /api/agent-access/:id`
 
@@ -365,13 +369,14 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
 * [x] Protect write endpoints
 * [x] Admin/dashboard authentication
 * [ ] Server URL settings for mobile and desktop clients
-* [ ] Cloudflare Tunnel setup for backend API
+* [x] Cloudflare Tunnel setup for backend API
 * [ ] Rate limiting for exposed endpoints
 * [x] Document backup and recovery basics
 
 ### Phase 3: Operational Core
 
 * [ ] Task management CRUD
+* [ ] User-scoped task ownership for mobile app data
 * [ ] Schedule management CRUD
 * [ ] Reminder worker with Redis/BullMQ
 * [ ] Reporting service
@@ -391,8 +396,9 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
 * [x] Mobile shell with Home, Tasks, Reminders, Assistant, and Settings
 * [x] Shared mobile connection state with automatic and pull-to-refresh checks
 * [x] Mobile task create and complete actions
-* [x] Personality and assistant setup screen scaffold with custom personality input
-* [ ] WhatsApp number and Nara Bot access screen
+* [x] Personality and assistant setup screen with persisted local preferences
+* [x] WhatsApp number and Nara Bot access request screen
+* [x] Home Nara Bot status backed by user contact and agent access data
 * [ ] Push or local notification strategy
 * [ ] Approval screen for agent-triggered actions
 

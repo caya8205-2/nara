@@ -12,6 +12,7 @@ class HomeScreen extends StatelessWidget {
     required this.user,
     required this.onRefreshConnection,
     required this.onRefreshTasks,
+    required this.onRefreshAssistant,
     required this.onOpenTasks,
     required this.onAddTask,
     required this.onOpenAssistant,
@@ -23,6 +24,7 @@ class HomeScreen extends StatelessWidget {
   final Map<String, dynamic>? user;
   final Future<void> Function() onRefreshConnection;
   final Future<void> Function() onRefreshTasks;
+  final Future<void> Function() onRefreshAssistant;
   final VoidCallback onOpenTasks;
   final VoidCallback onAddTask;
   final VoidCallback onOpenAssistant;
@@ -37,6 +39,7 @@ class HomeScreen extends StatelessWidget {
       onRefresh: () async {
         await onRefreshConnection();
         await onRefreshTasks();
+        await onRefreshAssistant();
       },
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -155,8 +158,8 @@ class HomeScreen extends StatelessWidget {
                 ListTile(
                   leading: const Icon(Icons.smart_toy_outlined),
                   title: const Text('Nara Bot'),
-                  subtitle: const Text('WhatsApp access is not connected yet.'),
-                  trailing: const Icon(Icons.chevron_right),
+                  subtitle: Text(_botSubtitle(state)),
+                  trailing: _BotStatusBadge(state: state),
                   onTap: onOpenAssistant,
                 ),
                 const Divider(height: 1),
@@ -172,6 +175,54 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  String _botSubtitle(NaraMobileState state) {
+    if (state.whatsappContact == null) {
+      return 'Add your WhatsApp number to request access.';
+    }
+    if (state.hasWhatsAppAccess) {
+      return '${state.whatsappContact!.value} can use Nara Bot.';
+    }
+    return '${state.whatsappContact!.value} is ${state.whatsappStatusLabel.toLowerCase()}.';
+  }
+}
+
+class _BotStatusBadge extends StatelessWidget {
+  const _BotStatusBadge({required this.state});
+
+  final NaraMobileState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (state.whatsappAccess?.status) {
+      'allowed' => _emerald,
+      'blocked' => _rose,
+      'sync_failed' => _rose,
+      'pending_verification' => _amber,
+      'pending_allowlist' => _amber,
+      _ => Theme.of(context).colorScheme.primary,
+    };
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (state.assistantLoading) ...[
+          const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 8),
+        ],
+        Text(
+          state.whatsappStatusLabel,
+          style: TextStyle(color: color, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(width: 4),
+        Icon(Icons.chevron_right, color: color),
+      ],
     );
   }
 }

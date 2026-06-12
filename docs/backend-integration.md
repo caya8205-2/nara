@@ -277,6 +277,7 @@ Array<{
 
 **Implementation:**
 - `apps/backend/src/services/identity.service.ts` joins `agent_channel_access` with `users` and `user_contacts`
+- `GET /api/users/:id/agent-access` returns the same joined data scoped to one user for the mobile app
 - `apps/web-admin/src/pages/WhatsAppAccess.tsx` displays user names and WhatsApp numbers from the joined response
 
 **SQL Example:**

@@ -48,11 +48,11 @@ export default function Config() {
     {
       key: 'BACKEND_STATUS',
       label: 'Backend Connection',
-      value: readiness?.ok ? 'Connected' : 'Disconnected',
+      value: readiness ? (readiness.ok ? 'Ready' : 'Degraded') : 'Disconnected',
       required: true,
-      present: Boolean(readiness?.ok),
+      present: Boolean(readiness),
       category: 'backend',
-      helpText: 'Backend server health status',
+      helpText: 'Backend API is reachable; dependency status is listed below',
     },
     {
       key: 'DATABASE_URL',

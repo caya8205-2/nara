@@ -21,6 +21,22 @@ class NaraTask {
   final bool done;
   final DateTime? dueAt;
 
+  NaraTask copyWith({
+    String? id,
+    String? title,
+    String? description,
+    bool? done,
+    DateTime? dueAt,
+  }) {
+    return NaraTask(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      done: done ?? this.done,
+      dueAt: dueAt ?? this.dueAt,
+    );
+  }
+
   factory NaraTask.fromJson(Map<String, dynamic> json) {
     final dueAtRaw = json['dueAt']?.toString();
 
@@ -34,6 +50,119 @@ class NaraTask {
   }
 }
 
+class NaraContact {
+  const NaraContact({
+    required this.id,
+    required this.type,
+    required this.value,
+    this.label,
+  });
+
+  final String id;
+  final String type;
+  final String value;
+  final String? label;
+
+  factory NaraContact.fromJson(Map<String, dynamic> json) {
+    return NaraContact(
+      id: json['id']?.toString() ?? '',
+      type: json['type']?.toString() ?? '',
+      value: json['value']?.toString() ?? '',
+      label: json['label']?.toString(),
+    );
+  }
+}
+
+class NaraAgentAccess {
+  const NaraAgentAccess({
+    required this.id,
+    required this.userId,
+    required this.contactId,
+    required this.status,
+    this.syncError,
+    this.lastSyncAt,
+  });
+
+  final String id;
+  final String userId;
+  final String contactId;
+  final String status;
+  final String? syncError;
+  final DateTime? lastSyncAt;
+
+  factory NaraAgentAccess.fromJson(Map<String, dynamic> json) {
+    final lastSyncRaw = json['lastSyncAt']?.toString();
+
+    return NaraAgentAccess(
+      id: json['id']?.toString() ?? '',
+      userId: json['userId']?.toString() ?? '',
+      contactId: json['contactId']?.toString() ?? '',
+      status: json['status']?.toString() ?? 'pending_allowlist',
+      syncError: json['syncError']?.toString(),
+      lastSyncAt: lastSyncRaw == null ? null : DateTime.tryParse(lastSyncRaw),
+    );
+  }
+}
+
+class NaraAssistantPreferences {
+  const NaraAssistantPreferences({
+    this.tone = 'Balanced',
+    this.autonomy = 'Confirm',
+    this.customPersonality = '',
+    this.allowTaskCreation = true,
+    this.allowReminderDrafts = true,
+    this.allowSensitiveActions = false,
+  });
+
+  final String tone;
+  final String autonomy;
+  final String customPersonality;
+  final bool allowTaskCreation;
+  final bool allowReminderDrafts;
+  final bool allowSensitiveActions;
+
+  NaraAssistantPreferences copyWith({
+    String? tone,
+    String? autonomy,
+    String? customPersonality,
+    bool? allowTaskCreation,
+    bool? allowReminderDrafts,
+    bool? allowSensitiveActions,
+  }) {
+    return NaraAssistantPreferences(
+      tone: tone ?? this.tone,
+      autonomy: autonomy ?? this.autonomy,
+      customPersonality: customPersonality ?? this.customPersonality,
+      allowTaskCreation: allowTaskCreation ?? this.allowTaskCreation,
+      allowReminderDrafts: allowReminderDrafts ?? this.allowReminderDrafts,
+      allowSensitiveActions:
+          allowSensitiveActions ?? this.allowSensitiveActions,
+    );
+  }
+
+  factory NaraAssistantPreferences.fromJson(Map<String, dynamic> json) {
+    return NaraAssistantPreferences(
+      tone: json['tone']?.toString() ?? 'Balanced',
+      autonomy: json['autonomy']?.toString() ?? 'Confirm',
+      customPersonality: json['customPersonality']?.toString() ?? '',
+      allowTaskCreation: json['allowTaskCreation'] != false,
+      allowReminderDrafts: json['allowReminderDrafts'] != false,
+      allowSensitiveActions: json['allowSensitiveActions'] == true,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'tone': tone,
+      'autonomy': autonomy,
+      'customPersonality': customPersonality,
+      'allowTaskCreation': allowTaskCreation,
+      'allowReminderDrafts': allowReminderDrafts,
+      'allowSensitiveActions': allowSensitiveActions,
+    };
+  }
+}
+
 class NaraMobileState {
   NaraConnectionState connectionState = NaraConnectionState.unknown;
   String connectionMessage = 'Not checked yet';
@@ -43,7 +172,32 @@ class NaraMobileState {
   String? tasksError;
   List<NaraTask> tasks = [];
 
+  NaraAssistantPreferences assistantPreferences =
+      const NaraAssistantPreferences();
+  bool assistantLoading = false;
+  bool assistantSaving = false;
+  String? assistantError;
+  String? assistantMessage;
+  NaraContact? whatsappContact;
+  NaraAgentAccess? whatsappAccess;
+
   int get pendingTaskCount => tasks.where((task) => !task.done).length;
 
   List<NaraTask> get latestTasks => tasks.take(3).toList();
+
+  String get whatsappStatusLabel {
+    if (assistantLoading) return 'Checking';
+    if (whatsappContact == null) return 'Not connected';
+
+    return switch (whatsappAccess?.status) {
+      'allowed' => 'Allowed',
+      'blocked' => 'Blocked',
+      'sync_failed' => 'Sync failed',
+      'pending_verification' => 'Needs verification',
+      'pending_allowlist' => 'Waiting approval',
+      _ => 'Waiting approval',
+    };
+  }
+
+  bool get hasWhatsAppAccess => whatsappAccess?.status == 'allowed';
 }

@@ -29,7 +29,7 @@ const dependencyIcons = {
 const suggestedFixes = {
   database: 'Check Docker container: docker ps | grep postgres',
   redis: 'Check Docker container: docker ps | grep redis',
-  openclaw: 'Verify OPENCLAW_API_TOKEN in .env and OpenClaw Gateway is running',
+  openclaw: 'Verify OPENCLAW_GATEWAY_URL, gateway token, and OpenClaw Gateway is running',
 } as const
 
 export default function Health() {
@@ -48,7 +48,7 @@ export default function Health() {
     : 'Never'
 
   const backendStatus: DependencyStatus | undefined = readiness
-    ? { ok: readiness.ok, status: readiness.ok ? 'ok' : 'error' }
+    ? { ok: true, status: readiness.ok ? 'ok' : 'error' }
     : undefined
 
   const allDependencies = useMemo(() => {

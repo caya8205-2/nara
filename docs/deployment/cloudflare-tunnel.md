@@ -55,6 +55,16 @@ The tunnel should forward public traffic to the local backend:
 https://your-tunnel-hostname.example.com -> http://127.0.0.1:4000
 ```
 
+In Cloudflare Zero Trust, use:
+
+```text
+Type: HTTP
+URL: 127.0.0.1:4000
+Path: empty
+```
+
+Use `/health` to test whether the backend is reachable through the tunnel. Do not use `/api/readiness` as the tunnel uptime check because it also reports dependency readiness and can be degraded when OpenClaw is not running.
+
 Do not expose:
 
 ```text
