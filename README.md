@@ -220,6 +220,14 @@ cd apps/mobile-app
 flutter run
 ```
 
+For Android emulator development, the mobile app defaults to `http://10.0.2.2:4000` so it can reach the backend running on the host PC. For physical devices, enter the backend LAN URL in the app sign-in screen or Settings, for example `http://192.168.x.x:4000`.
+
+Production builds should pass the backend URL explicitly:
+
+```powershell
+flutter run --dart-define=NARA_API_BASE_URL=https://your-nara-server.example.com
+```
+
 The mobile app has been smoke-tested on a physical Android device through wireless debugging. If `flutter run` cannot find the project, make sure the command is executed from `apps/mobile-app`, not the monorepo root.
 
 Log in with the local operator credentials from `.env`:
@@ -235,6 +243,20 @@ The dashboard reads:
 * `GET /api/tasks`
 * `POST /api/tasks`
 * `PATCH /api/tasks/:id/complete`
+
+Backend structured logs are written as newline-delimited JSON:
+
+```text
+.tmp/logs/backend.ndjson
+```
+
+Set `BACKEND_LOG_DIR` to move logs to a different local folder on the office server.
+
+Mobile authentication endpoints:
+
+* `POST /api/auth/register`
+* `POST /api/auth/user-login`
+* `GET /api/auth/me`
 
 Identity and Nara Bot access endpoints:
 
@@ -354,7 +376,8 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
 * [ ] Reminder worker with Redis/BullMQ
 * [ ] Reporting service
 * [ ] Client/contact management
-* [ ] Basic authentication and operator access control
+* [x] Basic user registration and mobile login
+* [ ] Role-aware user access control beyond the MVP auth gate
 * [x] User WhatsApp contact and Nara Bot allowlist model
 * [x] Audit logs foundation for identity and access changes
 * [ ] Audit logs for agent-triggered actions
@@ -363,8 +386,12 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
 
 * [x] Flutter app scaffold
 * [x] Backend API connection settings
+* [x] Login and register screen backed by database users
+* [x] Persist mobile backend URL and user session across app restarts
 * [x] Mobile shell with Home, Tasks, Reminders, Assistant, and Settings
-* [x] Personality and assistant setup screen scaffold
+* [x] Shared mobile connection state with automatic and pull-to-refresh checks
+* [x] Mobile task create and complete actions
+* [x] Personality and assistant setup screen scaffold with custom personality input
 * [ ] WhatsApp number and Nara Bot access screen
 * [ ] Push or local notification strategy
 * [ ] Approval screen for agent-triggered actions

@@ -1,4 +1,4 @@
-import { pgEnum, pgTable, text, timestamp, uuid, boolean } from 'drizzle-orm/pg-core'
+import { boolean, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 
 export const userRole = pgEnum('user_role', ['admin', 'user'])
 
@@ -16,15 +16,22 @@ export const agentAccessStatus = pgEnum('agent_access_status', [
 
 export const auditActorType = pgEnum('audit_actor_type', ['admin', 'user', 'agent', 'system'])
 
-export const users = pgTable('users', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  displayName: text('display_name').notNull(),
-  email: text('email'),
-  role: userRole('role').default('user').notNull(),
-  disabled: boolean('disabled').default(false).notNull(),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-})
+export const users = pgTable(
+  'users',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    displayName: text('display_name').notNull(),
+    email: text('email'),
+    passwordHash: text('password_hash'),
+    role: userRole('role').default('user').notNull(),
+    disabled: boolean('disabled').default(false).notNull(),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => ({
+    emailUnique: uniqueIndex('users_email_unique').on(table.email),
+  }),
+)
 
 export const userContacts = pgTable('user_contacts', {
   id: uuid('id').defaultRandom().primaryKey(),

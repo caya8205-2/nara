@@ -10,6 +10,7 @@ const EnvSchema = z.object({
   OPENCLAW_GATEWAY_URL: z.string().url().optional(),
   OPENCLAW_GATEWAY_TOKEN: z.string().optional(),
   BACKUP_DIR: z.string().optional(),
+  BACKEND_LOG_DIR: z.string().optional(),
   REPORTS_DIR: z.string().optional(),
   POSTGRES_CONTAINER_NAME: z.string().default('nara-postgres-1'),
   JWT_SECRET: z.string().min(1, 'JWT_SECRET is required'),

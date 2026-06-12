@@ -1,128 +1,259 @@
 import 'package:flutter/material.dart';
 
-import '../../core/services/api_client.dart';
+import '../../core/state/nara_mobile_state.dart';
 
 const _emerald = Color(0xFF059669);
+const _amber = Color(0xFFD97706);
+const _rose = Color(0xFFE11D48);
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({required this.apiClient, super.key});
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({
+    required this.state,
+    required this.user,
+    required this.onRefreshConnection,
+    required this.onRefreshTasks,
+    required this.onOpenTasks,
+    required this.onAddTask,
+    required this.onOpenAssistant,
+    required this.onOpenSettings,
+    super.key,
+  });
 
-  final NaraApiClient apiClient;
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  bool loading = false;
-  String status = 'Not checked';
-
-  Future<void> checkStatus() async {
-    setState(() {
-      loading = true;
-      status = 'Checking';
-    });
-
-    try {
-      final report = await widget.apiClient.testReadiness();
-      setState(() {
-        status = report['ok'] == true ? 'Connected' : 'Needs attention';
-      });
-    } catch (error) {
-      setState(() => status = 'Offline');
-    } finally {
-      setState(() => loading = false);
-    }
-  }
+  final NaraMobileState state;
+  final Map<String, dynamic>? user;
+  final Future<void> Function() onRefreshConnection;
+  final Future<void> Function() onRefreshTasks;
+  final VoidCallback onOpenTasks;
+  final VoidCallback onAddTask;
+  final VoidCallback onOpenAssistant;
+  final VoidCallback onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Row(
-          children: [
-            const Expanded(
+    final displayName = user?['displayName']?.toString() ?? 'there';
+    final theme = Theme.of(context);
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        await onRefreshConnection();
+        await onRefreshTasks();
+      },
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Hi, $displayName',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                        'Your tasks, server, and Nara Bot setup in one place.'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _ConnectionCard(
+            state: state,
+            onOpenSettings: onOpenSettings,
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _MetricCard(
+                  label: 'Pending',
+                  value: state.pendingTaskCount.toString(),
+                  icon: Icons.checklist,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _MetricCard(
+                  label: 'Completed',
+                  value:
+                      state.tasks.where((task) => task.done).length.toString(),
+                  icon: Icons.check_circle_outline,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Today',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+                  const Text(
+                    'Latest tasks',
+                    style: TextStyle(fontWeight: FontWeight.w800),
                   ),
-                  SizedBox(height: 4),
-                  Text('Tasks, Nara Bot, and pending decisions'),
+                  const SizedBox(height: 8),
+                  if (state.tasksLoading)
+                    const LinearProgressIndicator()
+                  else if (state.tasksError != null)
+                    Text(
+                      state.tasksError!,
+                      style: TextStyle(color: theme.colorScheme.error),
+                    )
+                  else if (state.tasks.isEmpty)
+                    const Text(
+                        'No tasks yet. Add one to start shaping the day.')
+                  else
+                    ...state.latestTasks.map(
+                      (task) => ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          task.done
+                              ? Icons.check_circle
+                              : Icons.circle_outlined,
+                          color:
+                              task.done ? _emerald : theme.colorScheme.primary,
+                        ),
+                        title: Text(task.title),
+                        subtitle: Text(task.description ?? 'No notes'),
+                      ),
+                    ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: onAddTask,
+                          icon: const Icon(Icons.add_task),
+                          label: const Text('Add Task'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      IconButton.outlined(
+                        onPressed: onOpenTasks,
+                        icon: const Icon(Icons.arrow_forward),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
-            IconButton(
-              onPressed: loading ? null : checkStatus,
-              icon: const Icon(Icons.refresh),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: Column(
               children: [
-                Icon(
-                  status == 'Connected'
-                      ? Icons.check_circle
-                      : Icons.info_outline,
-                  color: status == 'Connected'
-                      ? _emerald
-                      : Theme.of(context).colorScheme.primary,
+                ListTile(
+                  leading: const Icon(Icons.smart_toy_outlined),
+                  title: const Text('Nara Bot'),
+                  subtitle: const Text('WhatsApp access is not connected yet.'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: onOpenAssistant,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Office server',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      Text(status),
-                    ],
-                  ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.verified_outlined),
+                  title: const Text('Approvals'),
+                  subtitle: const Text('No approval queue connected yet.'),
+                  trailing: const Text('Soon'),
+                  onTap: onOpenAssistant,
                 ),
               ],
             ),
           ),
-        ),
-        const SizedBox(height: 12),
-        const _SummaryCard(
-          title: 'Pending tasks',
-          value: 'Open Tasks tab',
-          icon: Icons.checklist,
-        ),
-        const SizedBox(height: 12),
-        const _SummaryCard(
-          title: 'Nara Bot',
-          value: 'Set up WhatsApp access in Assistant',
-          icon: Icons.smart_toy_outlined,
-        ),
-        const SizedBox(height: 12),
-        const _SummaryCard(
-          title: 'Approvals',
-          value: 'No approval queue connected yet',
-          icon: Icons.verified_outlined,
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
-    required this.title,
+class _ConnectionCard extends StatelessWidget {
+  const _ConnectionCard({
+    required this.state,
+    required this.onOpenSettings,
+  });
+
+  final NaraMobileState state;
+  final VoidCallback onOpenSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _connectionColor(context, state.connectionState);
+    final icon = _connectionIcon(state.connectionState);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(icon, color: color),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Nara server',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(state.connectionMessage),
+                  if (state.lastConnectionCheck != null)
+                    Text(
+                      'Last checked ${_timeLabel(state.lastConnectionCheck!)}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                ],
+              ),
+            ),
+            IconButton(
+              onPressed: onOpenSettings,
+              icon: const Icon(Icons.tune),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _connectionIcon(NaraConnectionState state) {
+    return switch (state) {
+      NaraConnectionState.connected => Icons.check_circle,
+      NaraConnectionState.attention => Icons.warning_amber,
+      NaraConnectionState.offline => Icons.cloud_off,
+      NaraConnectionState.checking => Icons.sync,
+      NaraConnectionState.unknown => Icons.info_outline,
+    };
+  }
+
+  Color _connectionColor(BuildContext context, NaraConnectionState state) {
+    return switch (state) {
+      NaraConnectionState.connected => _emerald,
+      NaraConnectionState.attention => _amber,
+      NaraConnectionState.offline => _rose,
+      NaraConnectionState.checking => Theme.of(context).colorScheme.primary,
+      NaraConnectionState.unknown => Theme.of(context).colorScheme.primary,
+    };
+  }
+}
+
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({
+    required this.label,
     required this.value,
     required this.icon,
   });
 
-  final String title;
+  final String label;
   final String value;
   final IconData icon;
 
@@ -130,24 +261,28 @@ class _SummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(icon, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 4),
-                  Text(value),
-                ],
-              ),
+            const SizedBox(height: 12),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
             ),
+            Text(label),
           ],
         ),
       ),
     );
   }
+}
+
+String _timeLabel(DateTime value) {
+  final now = DateTime.now();
+  final delta = now.difference(value);
+  if (delta.inMinutes < 1) return 'just now';
+  if (delta.inMinutes < 60) return '${delta.inMinutes}m ago';
+  return '${delta.inHours}h ago';
 }

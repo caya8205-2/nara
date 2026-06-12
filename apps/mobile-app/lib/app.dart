@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'core/services/api_client.dart';
+import 'core/services/session_store.dart';
+import 'core/state/nara_mobile_state.dart';
 import 'core/theme/nara_theme.dart';
 import 'features/assistant/assistant_screen.dart';
+import 'features/auth/auth_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/reminders/reminders_screen.dart';
 import 'features/settings/settings_screen.dart';
@@ -15,33 +20,279 @@ class NaraMobileApp extends StatefulWidget {
   State<NaraMobileApp> createState() => _NaraMobileAppState();
 }
 
-class _NaraMobileAppState extends State<NaraMobileApp> {
+class _NaraMobileAppState extends State<NaraMobileApp>
+    with WidgetsBindingObserver {
   final NaraApiClient apiClient = NaraApiClient();
+  final NaraSessionStore sessionStore = NaraSessionStore();
+  final NaraMobileState appState = NaraMobileState();
   int selectedIndex = 0;
+  Map<String, dynamic>? currentUser;
+  Timer? connectionTimer;
+  bool restoringSession = true;
 
-  void updateServerUrl(String value) {
-    setState(() {
-      apiClient.serverUrl = value;
-    });
-  }
-
-  void updateOperatorToken(String? token) {
-    setState(() {
-      apiClient.operatorToken = token;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    restoreSession();
+    connectionTimer = Timer.periodic(const Duration(minutes: 2), (_) {
+      if (currentUser != null || apiClient.currentUser != null) {
+        checkConnection(showChecking: false);
+      }
     });
   }
 
   @override
+  void dispose() {
+    connectionTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        (currentUser != null || apiClient.currentUser != null)) {
+      checkConnection(showChecking: false);
+      loadTasks(silent: true);
+    }
+  }
+
+  Future<void> restoreSession() async {
+    final session = await sessionStore.load();
+    if (!mounted) return;
+
+    if (session == null) {
+      setState(() => restoringSession = false);
+      return;
+    }
+
+    apiClient.serverUrl = session.serverUrl;
+    apiClient.authToken = session.authToken;
+    apiClient.currentUser = session.user;
+    setState(() {
+      currentUser = session.user;
+      restoringSession = false;
+      appState.connectionMessage = 'Restored session';
+    });
+
+    try {
+      final user = await apiClient.loadSession();
+      if (!mounted) return;
+      if (user != null) {
+        await sessionStore.save(
+          serverUrl: apiClient.serverUrl,
+          authToken: apiClient.authToken!,
+          user: user,
+        );
+        setState(() => currentUser = user);
+      }
+    } catch (_) {
+      await sessionStore.clear();
+      apiClient.logout();
+      if (!mounted) return;
+      setState(() {
+        currentUser = null;
+        appState.connectionMessage = 'Session expired';
+      });
+      return;
+    }
+
+    checkConnection(showChecking: false);
+    loadTasks(silent: true);
+  }
+
+  void updateServerUrl(String value) {
+    setState(() {
+      apiClient.serverUrl = value;
+      appState.connectionState = NaraConnectionState.unknown;
+      appState.connectionMessage = 'Connection needs to be checked';
+      appState.lastConnectionCheck = null;
+    });
+    sessionStore.saveServerUrl(value);
+  }
+
+  void updateAuthToken(String? token) {
+    setState(() {
+      apiClient.authToken = token;
+    });
+  }
+
+  void handleAuthenticated(Map<String, dynamic> user) {
+    setState(() {
+      currentUser = user;
+      selectedIndex = 0;
+    });
+    if (apiClient.authToken != null) {
+      sessionStore.save(
+        serverUrl: apiClient.serverUrl,
+        authToken: apiClient.authToken!,
+        user: user,
+      );
+    }
+    checkConnection(showChecking: false);
+    loadTasks();
+  }
+
+  void handleLogout() {
+    setState(() {
+      apiClient.logout();
+      currentUser = null;
+      selectedIndex = 0;
+      appState.connectionState = NaraConnectionState.unknown;
+      appState.connectionMessage = 'Signed out';
+      appState.lastConnectionCheck = null;
+      appState.tasks = [];
+      appState.tasksError = null;
+      appState.tasksLoading = false;
+    });
+    sessionStore.clear();
+  }
+
+  Future<void> checkConnection({bool showChecking = true}) async {
+    if (showChecking) {
+      setState(() {
+        appState.connectionState = NaraConnectionState.checking;
+        appState.connectionMessage = 'Checking server';
+      });
+    }
+
+    try {
+      final report = await apiClient.testReadiness();
+      final ok = report['ok'] == true;
+      setState(() {
+        appState.connectionState =
+            ok ? NaraConnectionState.connected : NaraConnectionState.attention;
+        appState.connectionMessage = ok
+            ? 'Connected to Nara server'
+            : 'Server is reachable but needs attention';
+        appState.lastConnectionCheck = DateTime.now();
+      });
+    } catch (error) {
+      setState(() {
+        appState.connectionState = NaraConnectionState.offline;
+        appState.connectionMessage = 'Could not reach Nara server';
+        appState.lastConnectionCheck = DateTime.now();
+      });
+    }
+  }
+
+  Future<void> loadTasks({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        appState.tasksLoading = true;
+        appState.tasksError = null;
+      });
+    } else {
+      appState.tasksError = null;
+    }
+
+    try {
+      final result = await apiClient.listTasks();
+      final tasks = result
+          .whereType<Map<String, dynamic>>()
+          .map(NaraTask.fromJson)
+          .toList();
+      setState(() {
+        appState.tasks = tasks;
+      });
+    } catch (error) {
+      setState(() {
+        appState.tasksError = 'Could not load tasks';
+      });
+    } finally {
+      if (!silent) {
+        setState(() {
+          appState.tasksLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> createTask(String title, String? description) async {
+    setState(() {
+      appState.tasksLoading = true;
+      appState.tasksError = null;
+    });
+
+    try {
+      final task = await apiClient.createTask(
+        title: title,
+        description: description,
+      );
+      setState(() {
+        appState.tasks = [NaraTask.fromJson(task), ...appState.tasks];
+      });
+    } catch (error) {
+      setState(() {
+        appState.tasksError = 'Could not create task';
+      });
+      rethrow;
+    } finally {
+      setState(() {
+        appState.tasksLoading = false;
+      });
+    }
+  }
+
+  Future<void> completeTask(String id) async {
+    setState(() {
+      appState.tasksLoading = true;
+      appState.tasksError = null;
+    });
+
+    try {
+      final updated = NaraTask.fromJson(await apiClient.completeTask(id));
+      setState(() {
+        appState.tasks = appState.tasks
+            .map((task) => task.id == id ? updated : task)
+            .toList();
+      });
+    } catch (error) {
+      setState(() {
+        appState.tasksError = 'Could not complete task';
+      });
+    } finally {
+      setState(() {
+        appState.tasksLoading = false;
+      });
+    }
+  }
+
+  void openTab(int index) {
+    setState(() => selectedIndex = index);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final user = currentUser ?? apiClient.currentUser;
     final screens = [
-      HomeScreen(apiClient: apiClient),
-      TasksScreen(apiClient: apiClient),
+      HomeScreen(
+        state: appState,
+        user: user,
+        onRefreshConnection: checkConnection,
+        onRefreshTasks: loadTasks,
+        onOpenTasks: () => openTab(1),
+        onAddTask: () => openTab(1),
+        onOpenAssistant: () => openTab(3),
+        onOpenSettings: () => openTab(4),
+      ),
+      TasksScreen(
+        state: appState,
+        onRefresh: loadTasks,
+        onCreateTask: createTask,
+        onCompleteTask: completeTask,
+      ),
       RemindersScreen(apiClient: apiClient),
       AssistantScreen(apiClient: apiClient),
       SettingsScreen(
         apiClient: apiClient,
+        state: appState,
         onServerUrlChanged: updateServerUrl,
-        onOperatorTokenChanged: updateOperatorToken,
+        onTestConnection: checkConnection,
+        onAuthTokenChanged: updateAuthToken,
+        onLogout: handleLogout,
+        user: user,
       ),
     ];
 
@@ -49,41 +300,61 @@ class _NaraMobileAppState extends State<NaraMobileApp> {
       debugShowCheckedModeBanner: false,
       title: 'Nara',
       theme: buildNaraTheme(),
-      home: Scaffold(
-        body: SafeArea(child: screens[selectedIndex]),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: selectedIndex,
-          onDestinationSelected: (index) {
-            setState(() => selectedIndex = index);
-          },
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home),
-              label: 'Home',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.checklist_outlined),
-              selectedIcon: Icon(Icons.checklist),
-              label: 'Tasks',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.notifications_outlined),
-              selectedIcon: Icon(Icons.notifications),
-              label: 'Reminders',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.smart_toy_outlined),
-              selectedIcon: Icon(Icons.smart_toy),
-              label: 'Assistant',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.settings_outlined),
-              selectedIcon: Icon(Icons.settings),
-              label: 'Settings',
-            ),
-          ],
-        ),
+      home: restoringSession
+          ? const _SessionLoadingScreen()
+          : user == null
+              ? AuthScreen(
+                  apiClient: apiClient,
+                  onAuthenticated: handleAuthenticated,
+                )
+              : Scaffold(
+                  body: SafeArea(child: screens[selectedIndex]),
+                  bottomNavigationBar: NavigationBar(
+                    selectedIndex: selectedIndex,
+                    onDestinationSelected: (index) {
+                      setState(() => selectedIndex = index);
+                    },
+                    destinations: const [
+                      NavigationDestination(
+                        icon: Icon(Icons.home_outlined),
+                        selectedIcon: Icon(Icons.home),
+                        label: 'Home',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.checklist_outlined),
+                        selectedIcon: Icon(Icons.checklist),
+                        label: 'Tasks',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.notifications_outlined),
+                        selectedIcon: Icon(Icons.notifications),
+                        label: 'Reminders',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.smart_toy_outlined),
+                        selectedIcon: Icon(Icons.smart_toy),
+                        label: 'Assistant',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.settings_outlined),
+                        selectedIcon: Icon(Icons.settings),
+                        label: 'Settings',
+                      ),
+                    ],
+                  ),
+                ),
+    );
+  }
+}
+
+class _SessionLoadingScreen extends StatelessWidget {
+  const _SessionLoadingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: SafeArea(
+        child: Center(child: CircularProgressIndicator()),
       ),
     );
   }

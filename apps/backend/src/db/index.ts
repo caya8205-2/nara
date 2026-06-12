@@ -3,5 +3,10 @@ import postgres from 'postgres'
 import * as schema from './schema'
 import { env } from '../config/env.js'
 
-const client = postgres(env.DATABASE_URL)
+const client = postgres(env.DATABASE_URL, {
+  connect_timeout: 10,
+  idle_timeout: 30,
+  max: 10,
+})
+
 export const db = drizzle(client, { schema })

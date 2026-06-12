@@ -1,9 +1,21 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { z } from 'zod'
 import { env } from '../config/env.js'
+import { identityService } from '../services/identity.service.js'
 
 const LoginSchema = z.object({
   username: z.string().min(1),
+  password: z.string().min(1),
+})
+
+const RegisterSchema = z.object({
+  displayName: z.string().min(1),
+  email: z.string().email(),
+  password: z.string().min(8),
+})
+
+const UserLoginSchema = z.object({
+  email: z.string().email(),
   password: z.string().min(1),
 })
 
@@ -19,7 +31,7 @@ const plugin: FastifyPluginAsync = async (app) => {
     }
 
     const token = app.jwt.sign(
-      { sub: body.username, role: 'operator' },
+      { sub: body.username, role: 'operator', accountType: 'operator' },
       { expiresIn: '12h' }
     )
 
@@ -32,9 +44,52 @@ const plugin: FastifyPluginAsync = async (app) => {
     }
   })
 
+  app.post('/register', async (req, reply) => {
+    const body = RegisterSchema.parse(req.body)
+    const user = await identityService.registerUser(body)
+
+    if (!user) {
+      return reply.status(409).send({ error: 'Email already registered' })
+    }
+
+    const token = app.jwt.sign(
+      { sub: user.id, role: user.role, accountType: 'user' },
+      { expiresIn: '30d' },
+    )
+
+    return reply.status(201).send({ token, user })
+  })
+
+  app.post('/user-login', async (req, reply) => {
+    const body = UserLoginSchema.parse(req.body)
+    const user = await identityService.verifyUserPassword(body.email, body.password)
+
+    if (!user) {
+      return reply.status(401).send({ error: 'Invalid email or password' })
+    }
+
+    const token = app.jwt.sign(
+      { sub: user.id, role: user.role, accountType: 'user' },
+      { expiresIn: '30d' },
+    )
+
+    return { token, user }
+  })
+
   app.get('/me', async (req, reply) => {
     try {
-      const payload = await req.jwtVerify<{ sub: string; role: string }>()
+      const payload = await req.jwtVerify<{
+        sub: string
+        role: string
+        accountType?: string
+      }>()
+
+      if (payload.accountType === 'user') {
+        const user = await identityService.getUserById(payload.sub)
+        if (!user) return reply.status(401).send({ error: 'User not found' })
+        return { user }
+      }
+
       return {
         operator: {
           username: payload.sub,
