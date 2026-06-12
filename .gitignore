@@ -6,6 +6,8 @@ coverage/
 .env.*
 !.env.example
 *.log
+*.apk
+*.aab
 .turbo/
 .tmp/
 .cache/
@@ -21,6 +23,7 @@ data/
 .packages
 devtools_options.yaml
 **/ephemeral/
+apps/mobile-app/public/
 
 # Playwright
 /test-results/

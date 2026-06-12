@@ -957,51 +957,44 @@ Rejected:
 
 ## Screen: Settings
 
-Purpose: configure app connection and account behavior.
+Purpose: configure account, privacy, notifications, legal, and app information without exposing backend implementation details.
 
 ### Default Layout
 
 Sections:
 
-- Server connection.
-- Operator session.
-- WhatsApp number.
+- Account.
+- Nara Bot and WhatsApp setup.
 - Notifications.
-- Diagnostics.
-- Open source attribution.
-
-Server connection fields:
-
-- Backend API URL.
-- Connection test result.
-- Last successful connection.
+- Data and Privacy.
+- Terms and Privacy Policy.
+- Appearance.
+- Open Source Attribution.
+- About Nara.
 
 ### Key States
 
-Invalid URL:
+Backend unavailable:
 
-- Validate before saving.
-
-Connection failed:
-
-- Show reason from readiness response when possible.
+- Keep health checks silent until a user action fails.
+- Show user-facing recovery copy, not backend diagnostics.
 
 Logged out:
 
-- Show login CTA and keep connection settings accessible.
+- Show login CTA. Backend routing remains build-configured, not user-edited.
 
 ### MVP Components
 
-- ServerUrlForm
-- ConnectionStatus
-- OperatorSession
 - NotificationSettings
 - WhatsAppAccessStatus
 - OpenSourceAttribution
+- DataPrivacySummary
+- LegalPolicyScreen
+- AboutScreen
 
 ## First Build Recommendation
 
-Build App Home, Tasks, Assistant, and Approvals first with mock data. Add Settings connection next so the app can point to the office server.
+Build App Home, Tasks, Assistant, and Approvals first with mock data. Keep backend routing hidden from normal users; use build configuration for development overrides.
 
 Do not build reports, client management, or advanced schedule editing until the operational core is stable.
 
@@ -1643,11 +1636,10 @@ See **[Backend Integration Requirements](backend-integration.md)** for detailed 
 ### Next Steps
 
 1. Harden mobile auth storage by moving tokens from shared preferences to secure storage
-2. Scope tasks by signed-in user so admin-created/global tasks do not appear in every mobile account
-3. Tighten server-side authorization for user contact read/create endpoints
-4. Add reminders once backend schedule/reminder endpoints are ready
-5. Add approval queue once backend approval endpoints exist
-6. Consider scheduled backup automation via BullMQ after mobile MVP is moving
+2. Tighten server-side authorization for user contact read/create endpoints
+3. Add reminders once backend schedule/reminder endpoints are ready
+4. Add approval queue once backend approval endpoints exist
+5. Consider scheduled backup automation via BullMQ after mobile MVP is moving
 
 ### Related Documentation
 
@@ -1663,8 +1655,11 @@ See **[Backend Integration Requirements](backend-integration.md)** for detailed 
 *Admin dashboard core screens: Complete*
 
 *Phase 4 mobile update: 2026-06-11*
-*Mobile login/register is backed by database users. Admin/operator env credentials remain for the local web admin dashboard. Mobile backend URL should come from NARA_API_BASE_URL for production builds, with debug-only local defaults for development. Home, Settings, and Tasks now share connection/task state; Tasks can create and complete backend tasks from mobile. The app now persists the user session/backend URL with shared_preferences, auto-refreshes connection status on app resume and timer, uses pull-to-refresh for manual checks, and supports custom assistant personality input.*
+*Mobile login/register is backed by database users. Admin/operator env credentials remain for the local web admin dashboard. Mobile now defaults to the Nara backend tunnel and keeps backend routing hidden from normal users, while `NARA_API_BASE_URL` remains available for development overrides. Tasks can create and complete backend tasks from mobile. The app persists the user session with shared_preferences, auto-refreshes silently on app resume and timer, uses pull-to-refresh for data refresh, and supports custom assistant personality input.*
 *Phase 4 mobile update: 2026-06-12*
 *Assistant preferences are persisted locally, WhatsApp number/contact registration is wired to the existing identity API, Nara Bot access requests are sent from mobile, and Home/Assistant now show live access status from user-scoped backend agent-access data. Next hardening: secure token storage and stricter contact endpoint authorization.*
-*Known mobile issue: tasks are still global through `/api/tasks`; mobile user accounts can see tasks created from the admin dashboard. Next implementation should add task ownership/user scoping before task usage becomes real user data.*
+*Phase 4 mobile update: 2026-06-12*
+*Tasks are now scoped by signed-in user tokens, with priority, due date, and source metadata. Mobile Tasks groups work into Today, Open, and Done; Home now highlights Today tasks instead of a generic latest-task list.*
+*Phase 4 mobile update: 2026-06-12*
+*Mobile no longer exposes backend URL, backend mode, or connection-test UX to normal users. The app defaults to `https://narabot.web.id`, keeps backend health checks silent, adds animated tab transitions, and expands Settings with Notifications, Data and Privacy, Terms, Open Source Attribution, Appearance, and About screens. Admin task endpoints now show global/admin tasks by default rather than user task content.*
 *Backend integration: MVP complete*

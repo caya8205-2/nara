@@ -82,12 +82,14 @@ class _AssistantScreenState extends State<AssistantScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           const Text(
-            'Assistant',
+            'Nara',
             style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 4),
-          const Text('Set how Nara Bot should respond and reach you.'),
+          const Text('Connect the bot, tune personality, and set boundaries.'),
           const SizedBox(height: 16),
+          _NaraSetupProgress(state: widget.state),
+          const SizedBox(height: 12),
           _WhatsAppAccessCard(
             state: widget.state,
             controller: whatsappController,
@@ -99,7 +101,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
           const SizedBox(height: 12),
           _ChoiceCard(
             title: 'Personality',
-            subtitle: 'Choose the baseline tone Nara uses in replies.',
+            subtitle: _sampleReply(preferences),
             options: const [
               _ChoiceOption('Balanced', Icons.tune),
               _ChoiceOption('Formal', Icons.work_outline),
@@ -139,7 +141,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
           const SizedBox(height: 12),
           _ChoiceCard(
             title: 'Action style',
-            subtitle: 'Set how much Nara can do before asking you.',
+            subtitle: _actionStyleDescription(preferences.autonomy),
             options: const [
               _ChoiceOption('Suggest', Icons.lightbulb_outline),
               _ChoiceOption('Confirm', Icons.verified_outlined),
@@ -198,6 +200,134 @@ class _AssistantScreenState extends State<AssistantScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  String _sampleReply(NaraAssistantPreferences preferences) {
+    final custom = preferences.customPersonality.trim();
+    if (preferences.tone == 'Custom' && custom.isNotEmpty) {
+      return 'Preview: "$custom"';
+    }
+    return switch (preferences.tone) {
+      'Formal' =>
+        'Preview: "I will prepare that task and confirm the details."',
+      'Concise' => 'Preview: "Noted. I will track it."',
+      'Custom' => 'Write a custom personality below.',
+      _ => 'Preview: "Got it. I will keep this organized for you."',
+    };
+  }
+
+  String _actionStyleDescription(String value) {
+    return switch (value) {
+      'Suggest' => 'Nara drafts ideas but waits for you to act.',
+      'Act' => 'Nara can act faster for approved, low-risk tasks.',
+      _ => 'Nara prepares actions and asks before important changes.',
+    };
+  }
+}
+
+class _NaraSetupProgress extends StatelessWidget {
+  const _NaraSetupProgress({required this.state});
+
+  final NaraMobileState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasNumber = state.whatsappContact != null;
+    final isAllowed = state.hasWhatsAppAccess;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Nara Bot setup',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 12),
+            _SetupStep(
+              done: hasNumber,
+              title: 'Add WhatsApp number',
+              subtitle: hasNumber
+                  ? state.whatsappContact!.value
+                  : 'Nara needs a number before bot access can be approved.',
+            ),
+            _SetupStep(
+              done: state.whatsappAccess != null,
+              title: 'Request access',
+              subtitle: state.whatsappAccess == null
+                  ? 'Request access after adding your number.'
+                  : state.whatsappStatusLabel,
+            ),
+            _SetupStep(
+              done: isAllowed,
+              title: 'Ready for Nara Bot',
+              subtitle: isAllowed
+                  ? 'Your WhatsApp number can use Nara Bot.'
+                  : 'Approval is still pending or not requested yet.',
+              last: true,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SetupStep extends StatelessWidget {
+  const _SetupStep({
+    required this.done,
+    required this.title,
+    required this.subtitle,
+    this.last = false,
+  });
+
+  final bool done;
+  final String title;
+  final String subtitle;
+  final bool last;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = done ? _emerald : Theme.of(context).colorScheme.outline;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Column(
+          children: [
+            Icon(
+              done ? Icons.check_circle : Icons.radio_button_unchecked,
+              color: color,
+            ),
+            if (!last)
+              Container(
+                width: 1,
+                height: 28,
+                color: color.withValues(alpha: 0.35),
+              ),
+          ],
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(bottom: last ? 0 : 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 2),
+                Text(subtitle),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -368,14 +498,66 @@ class _ChoiceCard extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: options.map((option) {
-                return ChoiceChip(
+                return _ChoiceOptionTile(
                   selected: selected == option.label,
-                  avatar: Icon(option.icon, size: 18),
-                  label: Text(option.label),
-                  onSelected: (_) => onChanged(option.label),
+                  option: option,
+                  onTap: () => onChanged(option.label),
                 );
               }).toList(),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ChoiceOptionTile extends StatelessWidget {
+  const _ChoiceOptionTile({
+    required this.selected,
+    required this.option,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final _ChoiceOption option;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color =
+        selected ? theme.colorScheme.primary : theme.colorScheme.outline;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected
+              ? theme.colorScheme.primary.withValues(alpha: 0.08)
+              : Colors.white,
+          border: Border.all(color: color),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(option.icon, size: 18, color: color),
+            const SizedBox(width: 8),
+            Text(
+              option.label,
+              style: TextStyle(
+                color: selected ? theme.colorScheme.primary : null,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            if (selected) ...[
+              const SizedBox(width: 8),
+              Icon(Icons.check, size: 16, color: theme.colorScheme.primary),
+            ],
           ],
         ),
       ),

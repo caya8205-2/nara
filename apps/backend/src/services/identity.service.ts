@@ -285,6 +285,28 @@ export class IdentityService {
     return access
   }
 
+  async deleteAgentAccess(id: string, scope?: { userId?: string }) {
+    const conditions = [eq(agentChannelAccess.id, id)]
+    if (scope?.userId) {
+      conditions.push(eq(agentChannelAccess.userId, scope.userId))
+    }
+
+    const [access] = await db
+      .delete(agentChannelAccess)
+      .where(and(...conditions))
+      .returning()
+
+    if (!access) return null
+
+    await this.audit('system', 'agent_access.deleted', 'agent_channel_access', access.id, {
+      userId: access.userId,
+      contactId: access.contactId,
+      status: access.status,
+    })
+
+    return access
+  }
+
   private async audit(
     actorType: 'admin' | 'user' | 'agent' | 'system',
     action: string,

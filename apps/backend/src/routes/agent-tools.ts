@@ -27,13 +27,18 @@ const plugin: FastifyPluginAsync = async (app) => {
       const body = z.object({
         title: z.string().min(1),
         description: z.string().optional(),
+        userId: z.string().uuid().optional(),
         dueAt: z.string().optional(),
+        priority: z.enum(['low', 'normal', 'high', 'urgent']).optional(),
       }).parse(req.body)
 
       const task = await taskService.create({
         title: body.title,
         description: body.description,
+        userId: body.userId,
         dueAt: body.dueAt ? new Date(body.dueAt) : undefined,
+        priority: body.priority,
+        source: 'agent',
       })
 
       return ok({ task, message: `Task "${task.title}" created.` })
@@ -47,16 +52,22 @@ const plugin: FastifyPluginAsync = async (app) => {
     const body = z.object({
       done: z.boolean().optional(),
       overdue: z.boolean().optional(),
+      userId: z.string().uuid().optional(),
     }).parse(req.body ?? {})
 
     if (body.overdue) {
-      const tasks = await taskService.getOverdue()
+      const tasks = await taskService.list({
+        done: false,
+        dueBefore: new Date(),
+        userId: body.userId,
+      })
       return ok({ tasks, count: tasks.length })
     }
 
-    const tasks = await taskService.list(
-      body.done !== undefined ? { done: body.done } : undefined
-    )
+    const tasks = await taskService.list({
+      ...(body.done !== undefined ? { done: body.done } : {}),
+      userId: body.userId,
+    })
     return ok({ tasks, count: tasks.length })
   })
 
@@ -75,8 +86,14 @@ const plugin: FastifyPluginAsync = async (app) => {
   // Tool: delete_task
   app.post('/tasks/delete', async (req, reply) => {
     try {
-      const { id } = z.object({ id: z.string().uuid() }).parse(req.body)
-      const task = await taskService.delete(id)
+      const body = z.object({
+        id: z.string().uuid(),
+        userId: z.string().uuid().nullable().optional(),
+      }).parse(req.body)
+      const access = Object.prototype.hasOwnProperty.call(body, 'userId')
+        ? { userId: body.userId ?? null }
+        : undefined
+      const task = await taskService.delete(body.id, access)
       if (!task) return reply.status(404).send(fail('Task not found'))
       return ok({ message: `Task "${task.title}" deleted.` })
     } catch (e: any) {

@@ -220,12 +220,16 @@ cd apps/mobile-app
 flutter run
 ```
 
-For Android emulator development, the mobile app defaults to `http://10.0.2.2:4000` so it can reach the backend running on the host PC. For physical devices, enter the backend LAN URL in the app sign-in screen or Settings, for example `http://192.168.x.x:4000`.
+The mobile app defaults to the current Nara backend tunnel:
 
-Production builds should pass the backend URL explicitly:
+```text
+https://narabot.web.id
+```
+
+Development builds can still override the backend URL explicitly:
 
 ```powershell
-flutter run --dart-define=NARA_API_BASE_URL=https://your-nara-server.example.com
+flutter run --dart-define=NARA_API_BASE_URL=http://192.168.x.x:4000
 ```
 
 The mobile app has been smoke-tested on a physical Android device through wireless debugging. If `flutter run` cannot find the project, make sure the command is executed from `apps/mobile-app`, not the monorepo root.
@@ -244,6 +248,8 @@ The dashboard reads:
 * `GET /api/tasks`
 * `POST /api/tasks`
 * `PATCH /api/tasks/:id/complete`
+
+Task endpoints require authentication. Normal mobile users receive only their own tasks, while the local operator dashboard sees global/admin tasks by default.
 
 Use `/health` for Cloudflare Tunnel checks, uptime checks, and app connectivity tests. Use `/api/readiness` for detailed dependency status; it can be degraded when OpenClaw is not reachable while the backend API is still running.
 
@@ -341,8 +347,8 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
    operator auth, protected write endpoints, admin auth, rate limiting, and audit logs.
 2. Keep the office PC as the server:
    PostgreSQL and Redis stay local, backend runs on the server PC, and Cloudflare Tunnel exposes only the backend API.
-3. Make every client configurable:
-   mobile and desktop apps must store a server URL instead of hardcoding `localhost`.
+3. Make every client build-configurable:
+   mobile and desktop apps should use the Nara backend tunnel by default while still allowing development overrides.
 4. Build two frontend tracks:
    user-facing app frontend for mobile/desktop, and local web admin dashboard for the office server PC.
 5. Add agent workflows after the core app is stable:
@@ -368,7 +374,7 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
 * [x] Backend operator authentication
 * [x] Protect write endpoints
 * [x] Admin/dashboard authentication
-* [ ] Server URL settings for mobile and desktop clients
+* [x] Build-time backend URL configuration for mobile clients
 * [x] Cloudflare Tunnel setup for backend API
 * [ ] Rate limiting for exposed endpoints
 * [x] Document backup and recovery basics
@@ -376,7 +382,7 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
 ### Phase 3: Operational Core
 
 * [ ] Task management CRUD
-* [ ] User-scoped task ownership for mobile app data
+* [x] User-scoped task ownership for mobile app data
 * [ ] Schedule management CRUD
 * [ ] Reminder worker with Redis/BullMQ
 * [ ] Reporting service
@@ -393,9 +399,10 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
 * [x] Backend API connection settings
 * [x] Login and register screen backed by database users
 * [x] Persist mobile backend URL and user session across app restarts
-* [x] Mobile shell with Home, Tasks, Reminders, Assistant, and Settings
+* [x] Mobile shell with Home, Tasks, Reminders, Nara, and Me
 * [x] Shared mobile connection state with automatic and pull-to-refresh checks
 * [x] Mobile task create and complete actions
+* [x] Mobile task priority, due date, and Today/Open/Done grouping
 * [x] Personality and assistant setup screen with persisted local preferences
 * [x] WhatsApp number and Nara Bot access request screen
 * [x] Home Nara Bot status backed by user contact and agent access data
