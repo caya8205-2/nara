@@ -229,6 +229,11 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     }
 
     try {
+      final profile = NaraAssistantPreferences.fromJson(
+        await apiClient.getAssistantProfile(userId),
+      );
+      await sessionStore.saveAssistantPreferences(profile);
+
       final contactsResult = await apiClient.listUserContacts(userId);
       final contacts = contactsResult
           .whereType<Map<String, dynamic>>()
@@ -260,6 +265,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
 
       if (!mounted) return;
       setState(() {
+        appState.assistantPreferences = profile;
         appState.whatsappContact = whatsappContact;
         appState.whatsappAccess = whatsappAccess;
       });
@@ -315,11 +321,47 @@ class _NaraMobileAppState extends State<NaraMobileApp>
   Future<void> saveAssistantPreferences(
     NaraAssistantPreferences preferences,
   ) async {
+    final userId = activeUserId;
     setState(() {
       appState.assistantPreferences = preferences;
+      appState.assistantSaving = true;
       appState.assistantMessage = 'Assistant settings saved';
+      appState.assistantError = null;
     });
     await sessionStore.saveAssistantPreferences(preferences);
+    if (userId == null) {
+      setState(() {
+        appState.assistantSaving = false;
+      });
+      return;
+    }
+
+    try {
+      final profile = NaraAssistantPreferences.fromJson(
+        await apiClient.updateAssistantProfile(
+          userId: userId,
+          preferences: preferences.toJson(),
+        ),
+      );
+      await sessionStore.saveAssistantPreferences(profile);
+      if (!mounted) return;
+      setState(() {
+        appState.assistantPreferences = profile;
+        appState.assistantMessage = 'Assistant settings saved';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        appState.assistantError =
+            'Saved on this phone. Nara Bot will sync when the server is reachable.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          appState.assistantSaving = false;
+        });
+      }
+    }
   }
 
   Future<void> requestWhatsAppAccess(String rawNumber) async {

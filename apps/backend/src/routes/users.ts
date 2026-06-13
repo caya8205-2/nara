@@ -20,6 +20,15 @@ const RequestAccessSchema = z.object({
   channelType: z.enum(['whatsapp', 'telegram']).optional(),
 })
 
+const AssistantProfileSchema = z.object({
+  tone: z.string().min(1).optional(),
+  autonomy: z.string().min(1).optional(),
+  customPersonality: z.string().optional(),
+  allowTaskCreation: z.boolean().optional(),
+  allowReminderDrafts: z.boolean().optional(),
+  allowSensitiveActions: z.boolean().optional(),
+})
+
 type AuthPayload = {
   sub: string
   role?: string
@@ -69,6 +78,17 @@ const plugin: FastifyPluginAsync = async (app) => {
   app.get('/:id/contacts', { preHandler: requireUserOwnerOrOperator }, async (req) => {
     const { id } = req.params as { id: string }
     return identityService.listUserContacts(id)
+  })
+
+  app.get('/:id/assistant-profile', { preHandler: requireUserOwnerOrOperator }, async (req) => {
+    const { id } = req.params as { id: string }
+    return identityService.getAssistantProfile(id)
+  })
+
+  app.put('/:id/assistant-profile', { preHandler: requireUserOwnerOrOperator }, async (req) => {
+    const { id } = req.params as { id: string }
+    const body = AssistantProfileSchema.parse(req.body)
+    return identityService.updateAssistantProfile(id, body)
   })
 
   app.get('/:id/agent-access', async (req, reply) => {

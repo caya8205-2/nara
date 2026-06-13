@@ -48,6 +48,18 @@ class NaraApiClient {
     return _decodeResponse(response);
   }
 
+  Future<Map<String, dynamic>> putJson(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
+    final request = await HttpClient().putUrl(_uri(path));
+    _applyHeaders(request);
+    request.headers.contentType = ContentType.json;
+    request.write(jsonEncode(body));
+    final response = await request.close();
+    return _decodeResponse(response);
+  }
+
   Future<List<dynamic>> getList(String path) async {
     final request = await HttpClient().getUrl(_uri(path));
     _applyHeaders(request);
@@ -154,6 +166,17 @@ class NaraApiClient {
 
   Future<List<dynamic>> listUserContacts(String userId) {
     return getList('/api/users/$userId/contacts');
+  }
+
+  Future<Map<String, dynamic>> getAssistantProfile(String userId) {
+    return getJson('/api/users/$userId/assistant-profile');
+  }
+
+  Future<Map<String, dynamic>> updateAssistantProfile({
+    required String userId,
+    required Map<String, dynamic> preferences,
+  }) {
+    return putJson('/api/users/$userId/assistant-profile', preferences);
   }
 
   Future<Map<String, dynamic>> addUserContact({

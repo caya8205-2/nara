@@ -73,6 +73,25 @@ export const agentChannelAccess = pgTable('agent_channel_access', {
   updatedAt: timestamp('updated_at').defaultNow(),
 })
 
+export const assistantProfiles = pgTable(
+  'assistant_profiles',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id').references(() => users.id).notNull(),
+    tone: text('tone').default('Balanced').notNull(),
+    autonomy: text('autonomy').default('Confirm').notNull(),
+    customPersonality: text('custom_personality').default('').notNull(),
+    allowTaskCreation: boolean('allow_task_creation').default(true).notNull(),
+    allowReminderDrafts: boolean('allow_reminder_drafts').default(true).notNull(),
+    allowSensitiveActions: boolean('allow_sensitive_actions').default(false).notNull(),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => ({
+    userUnique: uniqueIndex('assistant_profiles_user_id_unique').on(table.userId),
+  }),
+)
+
 export const auditLogs = pgTable('audit_logs', {
   id: uuid('id').defaultRandom().primaryKey(),
   actorType: auditActorType('actor_type').notNull(),

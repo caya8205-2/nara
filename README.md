@@ -253,6 +253,23 @@ Task endpoints require authentication. Normal mobile users receive only their ow
 
 Use `/health` for Cloudflare Tunnel checks, uptime checks, and app connectivity tests. Use `/api/readiness` for detailed dependency status; it can be degraded when OpenClaw is not reachable while the backend API is still running.
 
+## Windows Server Setup
+
+For preparing an office PC as the Nara server, use the Windows runbook:
+
+```text
+ops/windows/README.md
+```
+
+It covers the repeatable setup path for:
+
+* Docker services for PostgreSQL and Redis
+* backend/admin process management on Windows
+* Cloudflare Tunnel routing to the backend
+* OpenClaw WhatsApp setup, self-phone development mode, and server migration notes
+
+The helper scripts in `ops/windows` intentionally do not commit secrets, Cloudflare tunnel tokens, OpenClaw config, or WhatsApp linked-device credentials.
+
 Backend structured logs are written as newline-delimited JSON:
 
 ```text
@@ -272,6 +289,8 @@ Identity and Nara Bot access endpoints:
 * `GET /api/users`
 * `POST /api/users`
 * `POST /api/users/:id/contacts`
+* `GET /api/users/:id/assistant-profile`
+* `PUT /api/users/:id/assistant-profile`
 * `POST /api/users/:id/agent-access`
 * `GET /api/users/:id/agent-access`
 * `GET /api/agent-access`
@@ -291,9 +310,12 @@ Test the agent tool endpoints without WhatsApp:
 npm run agent:smoke
 ```
 
-To delete the smoke-test task after the run:
+The smoke test creates a temporary user when `--user-id` is not provided, fetches user-specific agent context, creates a user-scoped task, lists it, completes it, reads a summary, and can clean up the task.
+
+To test an existing user or delete the smoke-test task after the run:
 
 ```powershell
+npm --workspace @nara/backend run agent:smoke -- --user-id <user-uuid>
 npm --workspace @nara/backend run agent:smoke -- --cleanup
 ```
 
@@ -434,7 +456,9 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
 
 ### Phase 7: Agent Automation
 
-* [ ] Expand OpenClaw tool definitions
+* [x] Expand OpenClaw tool definitions with user context and scoped task tools
+* [x] Backend assistant profile for user-specific agent personality
+* [x] No-WhatsApp agent smoke test with user-scoped task lifecycle
 * [ ] Scheduled report generation
 * [ ] Agent-safe confirmation flow for destructive actions
 * [ ] Memory/context storage for business workflows

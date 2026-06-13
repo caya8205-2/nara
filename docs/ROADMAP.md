@@ -42,6 +42,7 @@ See [ADR 003](adr/003-identity-and-whatsapp-allowlist.md) for the user identity,
 - Cloudflare Tunnel can expose only the backend API for remote access without opening router ports.
 - Railway/VPS remains a later option if the project outgrows the office-server model.
 - Messaging integrations are added later and should call the same backend tool endpoints.
+- Windows server setup is documented in `ops/windows/README.md`, with helper scripts for prerequisite checks and OpenClaw WhatsApp account setup without storing secrets in git.
 
 ## Key Principles
 
@@ -181,6 +182,7 @@ Until the exact OpenClaw interface is confirmed, Nara DB should be treated as th
 - Add app UI for adding a WhatsApp number.
 - Add web admin UI for reviewing users and Nara Bot access status.
 - Add open source attribution/settings section.
+- Keep OpenClaw WhatsApp credentials as server-local state; when moving to a new office server PC, relink the WhatsApp account on that machine instead of committing or copying secrets through git.
 
 ---
 
@@ -1662,4 +1664,8 @@ See **[Backend Integration Requirements](backend-integration.md)** for detailed 
 *Tasks are now scoped by signed-in user tokens, with priority, due date, and source metadata. Mobile Tasks groups work into Today, Open, and Done; Home now highlights Today tasks instead of a generic latest-task list.*
 *Phase 4 mobile update: 2026-06-12*
 *Mobile no longer exposes backend URL, backend mode, or connection-test UX to normal users. The app defaults to `https://narabot.web.id`, keeps backend health checks silent, adds animated tab transitions, and expands Settings with Notifications, Data and Privacy, Terms, Open Source Attribution, Appearance, and About screens. Admin task endpoints now show global/admin tasks by default rather than user task content.*
+*Mobile auth UI handoff: 2026-06-13*
+*Next mobile polish should redesign the welcome/login/register surface away from scaffold-like infrastructure copy and toward a distinctive user-facing Nara assistant identity. See `docs/mobile-app.md` for the auth UI redesign brief.*
+*Phase 7 agent update: 2026-06-13*
+*OpenClaw integration now has user-context-first tool contracts. Agent tools resolve user context by userId or future WhatsApp contact value, load backend assistant profiles for per-user tone/autonomy/action permissions, and scope task create/list/complete/delete to that user. `npm run agent:smoke` verifies the no-WhatsApp simulation path.*
 *Backend integration: MVP complete*

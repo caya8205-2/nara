@@ -11,8 +11,94 @@ Web admin dashboard screens are built and ready. Logs, enhanced WhatsApp Access,
 1. **Done:** Logs endpoint backed by audit events
 2. **Done:** WhatsApp Access data joining
 3. **Done:** Backup endpoints with local history and export files
+4. **Done:** OpenClaw agent tool contract with user context and assistant profile
 
 ---
+
+## OpenClaw Agent Tool Integration
+
+**Status:** Implemented for no-WhatsApp simulation and ready for a future WhatsApp channel adapter.
+
+Nara backend remains the source of truth. OpenClaw should orchestrate through Nara backend tools instead of writing tasks or user state directly.
+
+### Authentication
+
+All agent tool endpoints require:
+
+```http
+x-agent-secret: <AGENT_API_SECRET>
+```
+
+### User Context
+
+Every agent tool call must resolve a Nara user by one of these inputs:
+
+```typescript
+{
+  userId?: string
+  channelType?: 'whatsapp' | 'telegram'
+  contactValue?: string
+}
+```
+
+Use `userId` for local simulation or app-driven testing. Use `channelType + contactValue` later when OpenClaw receives a WhatsApp sender number.
+
+### Required First Tool
+
+```
+POST /api/agent/users/context
+```
+
+Returns:
+
+```typescript
+{
+  user: PublicUser
+  assistantProfile: {
+    tone: string
+    autonomy: 'Suggest' | 'Confirm' | 'Act' | string
+    customPersonality: string
+    allowTaskCreation: boolean
+    allowReminderDrafts: boolean
+    allowSensitiveActions: boolean
+  }
+  taskSummary: {
+    pendingTasks: number
+    overdueTasks: number
+    nextDue: string | null
+  }
+  instructions: string[]
+  toolContext: {
+    userId: string
+    channelType: 'whatsapp' | 'telegram'
+    contactValue: string | null
+  }
+}
+```
+
+OpenClaw should merge `instructions` into the runtime prompt for that conversation. This is what makes Nara Bot follow each user's personality and autonomy settings.
+
+### Task Tools
+
+Task tools are user-scoped:
+
+- `POST /api/agent/tasks/create`
+- `POST /api/agent/tasks/list`
+- `POST /api/agent/tasks/complete`
+- `POST /api/agent/tasks/delete`
+- `POST /api/agent/summary`
+
+Mutating tools respect `assistantProfile.autonomy`. For `Suggest` and `Confirm`, the backend returns `409` until the request includes `confirmed: true`.
+
+### Local Smoke Test
+
+```powershell
+npm run agent:smoke
+npm --workspace @nara/backend run agent:smoke -- --cleanup
+npm --workspace @nara/backend run agent:smoke -- --user-id <user-uuid>
+```
+
+The smoke test does not require a WhatsApp host number.
 
 ## Logs Screen Integration
 

@@ -1,28 +1,50 @@
 {
   "tools": [
     {
-      "name": "create_task",
-      "endpoint": "/api/agent/tasks/create",
+      "name": "get_user_context",
+      "endpoint": "/api/agent/users/context",
       "method": "POST",
-      "description": "Create a new task. Provide title, optional description, optional dueAt (ISO 8601).",
+      "description": "Resolve the current Nara user, assistant personality, access state, task summary, and user-specific agent instructions. Call this before other tools.",
       "headers": {
         "x-agent-secret": "AGENT_API_SECRET"
       },
       "parameters": {
+        "userId": "UUID string (optional when contactValue is provided)",
+        "channelType": "whatsapp | telegram (optional, defaults to whatsapp)",
+        "contactValue": "sender contact value such as WhatsApp phone number (optional when userId is provided)"
+      }
+    },
+    {
+      "name": "create_task",
+      "endpoint": "/api/agent/tasks/create",
+      "method": "POST",
+      "description": "Create a user-scoped task. Respect assistantProfile.autonomy and include confirmed=true only after confirmation when required.",
+      "headers": {
+        "x-agent-secret": "AGENT_API_SECRET"
+      },
+      "parameters": {
+        "userId": "UUID string (optional when contactValue is provided)",
+        "channelType": "whatsapp | telegram (optional, defaults to whatsapp)",
+        "contactValue": "sender contact value (optional when userId is provided)",
         "title": "string (required)",
         "description": "string (optional)",
-        "dueAt": "ISO 8601 datetime string (optional)"
+        "dueAt": "ISO 8601 datetime string (optional)",
+        "priority": "low | normal | high | urgent (optional)",
+        "confirmed": "boolean (required when user autonomy requires confirmation)"
       }
     },
     {
       "name": "list_tasks",
       "endpoint": "/api/agent/tasks/list",
       "method": "POST",
-      "description": "List tasks. Filter by done status or get overdue tasks.",
+      "description": "List tasks scoped to the resolved Nara user.",
       "headers": {
         "x-agent-secret": "AGENT_API_SECRET"
       },
       "parameters": {
+        "userId": "UUID string (optional when contactValue is provided)",
+        "channelType": "whatsapp | telegram (optional, defaults to whatsapp)",
+        "contactValue": "sender contact value (optional when userId is provided)",
         "done": "boolean (optional) - filter by completion",
         "overdue": "boolean (optional) - get only overdue tasks"
       }
@@ -31,35 +53,47 @@
       "name": "complete_task",
       "endpoint": "/api/agent/tasks/complete",
       "method": "POST",
-      "description": "Mark a task as done by its ID.",
+      "description": "Mark a user-scoped task as done by its ID. List tasks first if the user does not provide an ID.",
       "headers": {
         "x-agent-secret": "AGENT_API_SECRET"
       },
       "parameters": {
-        "id": "UUID string (required)"
+        "userId": "UUID string (optional when contactValue is provided)",
+        "channelType": "whatsapp | telegram (optional, defaults to whatsapp)",
+        "contactValue": "sender contact value (optional when userId is provided)",
+        "id": "UUID string (required)",
+        "confirmed": "boolean (required when user autonomy requires confirmation)"
       }
     },
     {
       "name": "delete_task",
       "endpoint": "/api/agent/tasks/delete",
       "method": "POST",
-      "description": "Delete a task by its ID. Always confirm with user before calling.",
+      "description": "Delete a user-scoped task by ID. Always confirm with the user before calling.",
       "headers": {
         "x-agent-secret": "AGENT_API_SECRET"
       },
       "parameters": {
-        "id": "UUID string (required)"
+        "userId": "UUID string (optional when contactValue is provided)",
+        "channelType": "whatsapp | telegram (optional, defaults to whatsapp)",
+        "contactValue": "sender contact value (optional when userId is provided)",
+        "id": "UUID string (required)",
+        "confirmed": "boolean (required)"
       }
     },
     {
       "name": "get_summary",
       "endpoint": "/api/agent/summary",
       "method": "POST",
-      "description": "Get a quick summary: pending tasks count, overdue count, next due task.",
+      "description": "Get a user-scoped summary: pending task count, overdue count, and next due task.",
       "headers": {
         "x-agent-secret": "AGENT_API_SECRET"
       },
-      "parameters": {}
+      "parameters": {
+        "userId": "UUID string (optional when contactValue is provided)",
+        "channelType": "whatsapp | telegram (optional, defaults to whatsapp)",
+        "contactValue": "sender contact value (optional when userId is provided)"
+      }
     }
   ]
 }

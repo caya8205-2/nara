@@ -5,6 +5,7 @@ import { db } from '../db/index.js'
 import {
   agentChannelAccess,
   agentChannels,
+  assistantProfiles,
   auditLogs,
   userContacts,
   users,
@@ -47,6 +48,25 @@ export interface UpdateAgentAccessInput {
   status: AgentAccessStatus
   syncError?: string
 }
+
+export interface AssistantProfileInput {
+  tone?: string
+  autonomy?: string
+  customPersonality?: string
+  allowTaskCreation?: boolean
+  allowReminderDrafts?: boolean
+  allowSensitiveActions?: boolean
+}
+
+const defaultAssistantProfile = (userId: string) => ({
+  userId,
+  tone: 'Balanced',
+  autonomy: 'Confirm',
+  customPersonality: '',
+  allowTaskCreation: true,
+  allowReminderDrafts: true,
+  allowSensitiveActions: false,
+})
 
 export class IdentityService {
   async createUser(input: CreateUserInput) {
@@ -146,6 +166,72 @@ export class IdentityService {
       .from(userContacts)
       .where(eq(userContacts.userId, userId))
       .orderBy(desc(userContacts.createdAt))
+  }
+
+  async findUserByContact(input: { type: ContactType; value: string }) {
+    const [row] = await db
+      .select({
+        user: users,
+        contact: userContacts,
+      })
+      .from(userContacts)
+      .innerJoin(users, eq(userContacts.userId, users.id))
+      .where(
+        and(
+          eq(userContacts.type, input.type),
+          eq(userContacts.value, input.value),
+        )
+      )
+
+    if (!row) return null
+
+    return {
+      user: this.toPublicUser(row.user),
+      contact: row.contact,
+    }
+  }
+
+  async getAssistantProfile(userId: string) {
+    const [profile] = await db
+      .select()
+      .from(assistantProfiles)
+      .where(eq(assistantProfiles.userId, userId))
+
+    return profile ?? defaultAssistantProfile(userId)
+  }
+
+  async updateAssistantProfile(userId: string, input: AssistantProfileInput) {
+    const values = {
+      ...defaultAssistantProfile(userId),
+      ...input,
+      userId,
+      updatedAt: new Date(),
+    }
+
+    const [profile] = await db
+      .insert(assistantProfiles)
+      .values(values)
+      .onConflictDoUpdate({
+        target: assistantProfiles.userId,
+        set: {
+          tone: values.tone,
+          autonomy: values.autonomy,
+          customPersonality: values.customPersonality,
+          allowTaskCreation: values.allowTaskCreation,
+          allowReminderDrafts: values.allowReminderDrafts,
+          allowSensitiveActions: values.allowSensitiveActions,
+          updatedAt: values.updatedAt,
+        },
+      })
+      .returning()
+
+    await this.audit('user', 'assistant_profile.updated', 'assistant_profile', profile.id, {
+      userId,
+      tone: profile.tone,
+      autonomy: profile.autonomy,
+    })
+
+    return profile
   }
 
   async ensureAgentChannel(type: AgentChannelType) {

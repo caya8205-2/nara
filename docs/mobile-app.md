@@ -33,7 +33,7 @@ The mobile app is the main user-facing Nara app. The backend remains the source 
 - Tasks screen can fetch, create, and complete signed-in user tasks
 - Tasks support priority, due date, source labels, and Today/Open/Done grouping
 - Task completion uses optimistic UI and rolls back when the backend rejects the update
-- Assistant preferences are persisted locally with `shared_preferences`
+- Assistant preferences sync to the backend assistant profile and are cached locally with `shared_preferences`
 - Nara screen can save personality, custom personality, autonomy, allowed-action toggles, WhatsApp number, and Nara Bot access request
 - First-run WhatsApp setup prompt appears when a signed-in user has not connected a WhatsApp number yet
 - WhatsApp access status is loaded from `GET /api/users/:id/agent-access` and shown on Home and Nara
@@ -104,10 +104,12 @@ The current mobile MVP uses existing identity endpoints:
 
 - `GET /api/users/:id/contacts`
 - `POST /api/users/:id/contacts`
+- `GET /api/users/:id/assistant-profile`
+- `PUT /api/users/:id/assistant-profile`
 - `POST /api/users/:id/agent-access`
 - `GET /api/users/:id/agent-access`
 
-The app stores assistant behavior preferences locally. WhatsApp number and access request state are stored in the backend. Mobile reads the signed-in user's access records from the user-scoped endpoint; the global `GET /api/agent-access` endpoint remains for admin-style access management.
+The app stores assistant behavior preferences in the backend so Nara Bot/OpenClaw can apply the user's tone, autonomy, and allowed-action settings. A local `shared_preferences` copy remains as a fallback cache. WhatsApp number and access request state are stored in the backend. Mobile reads the signed-in user's access records from the user-scoped endpoint; the global `GET /api/agent-access` endpoint remains for admin-style access management.
 
 ## Tasks
 
@@ -132,10 +134,72 @@ $env:APPDATA='C:\Users\ThinkPad T470\Desktop\Coding\nara\.tmp\appdata'
 
 The `APPDATA` override is only needed inside the Codex sandbox when Dart telemetry cannot write to the real user AppData folder.
 
+## Auth UI Redesign Handoff
+
+The current welcome/login/register surface is functional, but it still feels too generic and too close to a scaffold. The next UI pass should make the first screen feel like Nara as a personal work assistant, not like an infrastructure dashboard.
+
+### Product Direction
+
+- Keep the first screen user-facing and benefit-led.
+- Avoid developer-facing copy such as private server, backend mode, public cloud, API URL, connection status, agent workflow, or similar infrastructure language.
+- Present Nara as an assistant for keeping tasks, follow-ups, reminders, and WhatsApp-powered work conversations organized.
+- Keep OpenClaw, tunnel, server, and backend details in Settings, About, admin diagnostics, or docs only.
+
+### Visual Direction
+
+- Replace the current template-like grid/background treatment with a more distinctive assistant/workspace identity.
+- Make the screen feel warm, focused, and mobile-native rather than a generic SaaS landing page.
+- Use visual cues around daily work, command center, tasks, reminders, and future Nara Bot access without relying on emoji placeholders.
+- Keep the hero simple: the app name can stay prominent, while the supporting text explains the everyday benefit.
+
+### Copy Direction
+
+Suggested tone:
+
+```text
+Nara
+Asisten kerja pribadi untuk menjaga tugas, pengingat, dan follow-up tetap rapi.
+```
+
+Other acceptable copy themes:
+
+- "Mulai hari kerja dengan daftar yang jelas."
+- "Catat tugas, atur pengingat, dan siapkan Nara Bot untuk membantu lewat WhatsApp."
+- "Atur cara Nara merespons sesuai gaya kerja kamu."
+
+Avoid copy themes:
+
+- "Private server"
+- "Not a public cloud"
+- "Agent workflows"
+- "Backend health"
+- "Self-hosted command center"
+- "OpenClaw powered" on the first-run auth screen
+
+### Interaction Requirements
+
+- Login and register should remain real flows, not static cards.
+- Feature cards, if kept, should connect to real destinations or state:
+  - sign in
+  - create account
+  - view today's tasks after login
+  - request/connect WhatsApp access after login
+  - edit assistant personality after login
+- Auth errors should use natural user-facing language.
+- Loading states should be visible but quiet.
+- After successful login/register, transition directly into the app shell without exposing server details.
+
+### Implementation Notes
+
+- Keep backend URL configuration hidden from normal users.
+- Do not introduce new dependencies just for the redesign unless the existing Flutter toolkit cannot produce the needed interaction.
+- Preserve existing auth behavior, token storage, task loading, and assistant profile syncing.
+- Use screenshots from a physical phone or `scrcpy` during polish because Flutter web/Chrome can misrepresent the Android feel.
+
 ## Next Work
 
 1. Move token storage from `shared_preferences` to secure storage before production hardening.
-2. Add stricter server-side authorization to the existing contact create/read endpoints.
+2. Redesign the welcome/login/register surface using the Auth UI Redesign Handoff above.
 3. Add reminders once backend schedule/reminder endpoints are ready.
 4. Add approval queue once backend approval endpoints exist.
 5. Add notification strategy after reminder behavior is stable.

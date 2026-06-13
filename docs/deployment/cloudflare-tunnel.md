@@ -2,6 +2,8 @@
 
 This guide is for exposing the Nara backend from the office PC without moving the database to a cloud host.
 
+For the full Windows office-server checklist, PM2 notes, and OpenClaw WhatsApp migration steps, see `ops/windows/README.md`.
+
 ## Target Shape
 
 ```text
@@ -64,6 +66,8 @@ Path: empty
 ```
 
 Use `/health` to test whether the backend is reachable through the tunnel. Do not use `/api/readiness` as the tunnel uptime check because it also reports dependency readiness and can be degraded when OpenClaw is not running.
+
+On the server PC, `ops/windows/check-server-prereqs.ps1` can be used to verify local tool availability plus the backend `/health` endpoint before testing the public tunnel URL.
 
 Do not expose:
 

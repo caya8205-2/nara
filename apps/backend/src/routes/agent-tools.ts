@@ -1,16 +1,138 @@
-import type { FastifyPluginAsync } from 'fastify'
+import type { FastifyPluginAsync, FastifyReply } from 'fastify'
 import { z } from 'zod'
 import { env } from '../config/env.js'
-import { taskService } from '../services/task.service.js'
+import { identityService, type AgentChannelType } from '../services/identity.service.js'
+import { taskService, type TaskPriority } from '../services/task.service.js'
 
 /**
  * Agent Tool Endpoints
  * Called by OpenClaw tool calling system.
+ * Backend remains the source of truth; OpenClaw only orchestrates these tools.
  * All endpoints return { ok, data?, error? } for consistent agent parsing.
  */
 
 const ok = (data: unknown) => ({ ok: true, data })
 const fail = (error: string) => ({ ok: false, error })
+
+const AgentSubjectSchema = z.object({
+  userId: z.string().uuid().optional(),
+  channelType: z.enum(['whatsapp', 'telegram']).default('whatsapp'),
+  contactValue: z.string().min(1).optional(),
+})
+
+const TaskPrioritySchema = z.enum(['low', 'normal', 'high', 'urgent'])
+
+type AgentSubjectInput = z.infer<typeof AgentSubjectSchema>
+
+type ResolvedAgentSubject = {
+  userId: string
+  user: Record<string, unknown>
+  channelType: AgentChannelType
+  contact?: unknown
+  access: unknown[]
+}
+
+const parseSubject = (body: unknown) => AgentSubjectSchema.parse(body ?? {})
+
+const accessStatus = (access: unknown) => {
+  if (!access || typeof access !== 'object') return null
+  const status = (access as { status?: unknown }).status
+  return typeof status === 'string' ? status : null
+}
+
+const buildAgentInstructions = async (subject: ResolvedAgentSubject) => {
+  const profile = await identityService.getAssistantProfile(subject.userId)
+  const custom = profile.customPersonality.trim()
+  const autonomyRules = {
+    Suggest: 'Suggest actions and explain the next step. Do not call mutating tools unless the user explicitly asks again.',
+    Confirm: 'Before creating, completing, deleting, or changing records, ask for confirmation. Tool calls should include confirmed: true only after confirmation.',
+    Act: 'You may take allowed routine actions directly when the user intent is clear.',
+  } as Record<string, string>
+
+  return {
+    profile,
+    instructions: [
+      'You are Nara Bot, a practical WhatsApp-first assistant for this specific Nara user.',
+      `User display name: ${subject.user.displayName ?? 'Nara user'}.`,
+      `Tone: ${profile.tone}.`,
+      `Autonomy: ${profile.autonomy}. ${autonomyRules[profile.autonomy] ?? autonomyRules.Confirm}`,
+      custom ? `Custom personality: ${custom}` : null,
+      profile.allowTaskCreation
+        ? 'You may create task drafts or tasks according to the autonomy rule.'
+        : 'Do not create tasks for this user; offer a short suggestion instead.',
+      profile.allowReminderDrafts
+        ? 'You may draft reminders when the user asks.'
+        : 'Do not draft reminders for this user.',
+      profile.allowSensitiveActions
+        ? 'Sensitive actions are allowed only when the user request is explicit.'
+        : 'Sensitive actions must stay disabled and require a future approval flow.',
+      'Always use Nara backend tools for stored data. Never claim a task was created, completed, or deleted unless the tool returned ok: true.',
+      'Respond in the same language the user uses.',
+    ].filter(Boolean),
+  }
+}
+
+const resolveSubject = async (
+  input: AgentSubjectInput,
+  reply: FastifyReply,
+): Promise<ResolvedAgentSubject | null> => {
+  if (input.userId) {
+    const user = await identityService.getUserById(input.userId)
+    if (!user) {
+      reply.status(404).send(fail('Agent user not found'))
+      return null
+    }
+    const access = await identityService.listAgentAccessByUser(input.userId)
+    return {
+      userId: input.userId,
+      user: user as Record<string, unknown>,
+      channelType: input.channelType,
+      access,
+    }
+  }
+
+  if (!input.contactValue) {
+    reply.status(400).send(fail('Agent user context is required: provide userId or contactValue'))
+    return null
+  }
+
+  if (input.channelType !== 'whatsapp') {
+    reply.status(400).send(fail('Contact resolution currently supports WhatsApp only'))
+    return null
+  }
+
+  const resolved = await identityService.findUserByContact({
+    type: 'whatsapp',
+    value: input.contactValue,
+  })
+  if (!resolved) {
+    reply.status(404).send(fail('No Nara user is linked to that WhatsApp contact'))
+    return null
+  }
+
+  const userId = String(resolved.user.id)
+  const access = await identityService.listAgentAccessByUser(userId)
+  const contactAccess = access.find((record) => {
+    if (!record || typeof record !== 'object') return false
+    return (record as { contactId?: unknown }).contactId === resolved.contact.id
+  })
+
+  if (accessStatus(contactAccess) !== 'allowed') {
+    reply.status(403).send(fail('WhatsApp contact is not allowed to use Nara Bot yet'))
+    return null
+  }
+
+  return {
+    userId,
+    user: resolved.user as Record<string, unknown>,
+    channelType: input.channelType,
+    contact: resolved.contact,
+    access,
+  }
+}
+
+const shouldRequireConfirmation = (autonomy: string) =>
+  autonomy === 'Confirm' || autonomy === 'Suggest'
 
 const plugin: FastifyPluginAsync = async (app) => {
   app.addHook('preHandler', async (req, reply) => {
@@ -21,100 +143,171 @@ const plugin: FastifyPluginAsync = async (app) => {
     }
   })
 
+  // Tool: get_user_context
+  app.post('/users/context', async (req, reply) => {
+    try {
+      const subject = await resolveSubject(parseSubject(req.body), reply)
+      if (!subject) return
+
+      const [{ profile, instructions }, tasks, overdue] = await Promise.all([
+        buildAgentInstructions(subject),
+        taskService.list({ done: false, userId: subject.userId }),
+        taskService.list({ done: false, dueBefore: new Date(), userId: subject.userId }),
+      ])
+
+      return ok({
+        user: subject.user,
+        channelType: subject.channelType,
+        contact: subject.contact ?? null,
+        access: subject.access,
+        assistantProfile: profile,
+        taskSummary: {
+          pendingTasks: tasks.length,
+          overdueTasks: overdue.length,
+          nextDue: tasks.find((task) => task.dueAt)?.title ?? null,
+        },
+        instructions,
+        toolContext: {
+          userId: subject.userId,
+          channelType: subject.channelType,
+          contactValue: req.body && typeof req.body === 'object'
+            ? (req.body as { contactValue?: unknown }).contactValue ?? null
+            : null,
+        },
+      })
+    } catch (e: unknown) {
+      return reply.status(400).send(fail(e instanceof Error ? e.message : String(e)))
+    }
+  })
+
   // Tool: create_task
   app.post('/tasks/create', async (req, reply) => {
     try {
-      const body = z.object({
+      const body = AgentSubjectSchema.extend({
         title: z.string().min(1),
         description: z.string().optional(),
-        userId: z.string().uuid().optional(),
-        dueAt: z.string().optional(),
-        priority: z.enum(['low', 'normal', 'high', 'urgent']).optional(),
+        dueAt: z.string().datetime().optional(),
+        priority: TaskPrioritySchema.optional(),
+        confirmed: z.boolean().optional(),
       }).parse(req.body)
+
+      const subject = await resolveSubject(body, reply)
+      if (!subject) return
+
+      const profile = await identityService.getAssistantProfile(subject.userId)
+      if (!profile.allowTaskCreation) {
+        return reply.status(403).send(fail('Task creation is disabled for this user'))
+      }
+      if (shouldRequireConfirmation(profile.autonomy) && body.confirmed !== true) {
+        return reply.status(409).send(fail('Confirmation required before creating a task'))
+      }
 
       const task = await taskService.create({
         title: body.title,
         description: body.description,
-        userId: body.userId,
+        userId: subject.userId,
         dueAt: body.dueAt ? new Date(body.dueAt) : undefined,
-        priority: body.priority,
+        priority: body.priority as TaskPriority | undefined,
         source: 'agent',
       })
 
       return ok({ task, message: `Task "${task.title}" created.` })
-    } catch (e: any) {
-      return reply.status(400).send(fail(e.message))
+    } catch (e: unknown) {
+      return reply.status(400).send(fail(e instanceof Error ? e.message : String(e)))
     }
   })
 
   // Tool: list_tasks
-  app.post('/tasks/list', async (req) => {
-    const body = z.object({
-      done: z.boolean().optional(),
-      overdue: z.boolean().optional(),
-      userId: z.string().uuid().optional(),
-    }).parse(req.body ?? {})
+  app.post('/tasks/list', async (req, reply) => {
+    try {
+      const body = AgentSubjectSchema.extend({
+        done: z.boolean().optional(),
+        overdue: z.boolean().optional(),
+      }).parse(req.body ?? {})
 
-    if (body.overdue) {
+      const subject = await resolveSubject(body, reply)
+      if (!subject) return
+
       const tasks = await taskService.list({
-        done: false,
-        dueBefore: new Date(),
-        userId: body.userId,
+        ...(body.done !== undefined ? { done: body.done } : {}),
+        ...(body.overdue ? { done: false, dueBefore: new Date() } : {}),
+        userId: subject.userId,
       })
       return ok({ tasks, count: tasks.length })
+    } catch (e: unknown) {
+      return reply.status(400).send(fail(e instanceof Error ? e.message : String(e)))
     }
-
-    const tasks = await taskService.list({
-      ...(body.done !== undefined ? { done: body.done } : {}),
-      userId: body.userId,
-    })
-    return ok({ tasks, count: tasks.length })
   })
 
   // Tool: complete_task
   app.post('/tasks/complete', async (req, reply) => {
     try {
-      const { id } = z.object({ id: z.string().uuid() }).parse(req.body)
-      const task = await taskService.complete(id)
+      const body = AgentSubjectSchema.extend({
+        id: z.string().uuid(),
+        confirmed: z.boolean().optional(),
+      }).parse(req.body)
+
+      const subject = await resolveSubject(body, reply)
+      if (!subject) return
+
+      const profile = await identityService.getAssistantProfile(subject.userId)
+      if (shouldRequireConfirmation(profile.autonomy) && body.confirmed !== true) {
+        return reply.status(409).send(fail('Confirmation required before completing a task'))
+      }
+
+      const task = await taskService.complete(body.id, { userId: subject.userId })
       if (!task) return reply.status(404).send(fail('Task not found'))
       return ok({ task, message: `Task "${task.title}" marked as done.` })
-    } catch (e: any) {
-      return reply.status(400).send(fail(e.message))
+    } catch (e: unknown) {
+      return reply.status(400).send(fail(e instanceof Error ? e.message : String(e)))
     }
   })
 
   // Tool: delete_task
   app.post('/tasks/delete', async (req, reply) => {
     try {
-      const body = z.object({
+      const body = AgentSubjectSchema.extend({
         id: z.string().uuid(),
-        userId: z.string().uuid().nullable().optional(),
+        confirmed: z.boolean().optional(),
       }).parse(req.body)
-      const access = Object.prototype.hasOwnProperty.call(body, 'userId')
-        ? { userId: body.userId ?? null }
-        : undefined
-      const task = await taskService.delete(body.id, access)
+
+      const subject = await resolveSubject(body, reply)
+      if (!subject) return
+
+      if (body.confirmed !== true) {
+        return reply.status(409).send(fail('Confirmation required before deleting a task'))
+      }
+
+      const task = await taskService.delete(body.id, { userId: subject.userId })
       if (!task) return reply.status(404).send(fail('Task not found'))
       return ok({ message: `Task "${task.title}" deleted.` })
-    } catch (e: any) {
-      return reply.status(400).send(fail(e.message))
+    } catch (e: unknown) {
+      return reply.status(400).send(fail(e instanceof Error ? e.message : String(e)))
     }
   })
 
-  // Tool: get_summary — buat laporan singkat buat agent
-  app.post('/summary', async () => {
-    const [pending, overdue] = await Promise.all([
-      taskService.getPending(),
-      taskService.getOverdue(),
-    ])
+  // Tool: get_summary
+  app.post('/summary', async (req, reply) => {
+    try {
+      const subject = await resolveSubject(parseSubject(req.body), reply)
+      if (!subject) return
 
-    return ok({
-      summary: {
-        pendingTasks: pending.length,
-        overdueTasks: overdue.length,
-        nextDue: pending.find(t => t.dueAt)?.title ?? null,
-      },
-    })
+      const [pending, overdue] = await Promise.all([
+        taskService.list({ done: false, userId: subject.userId }),
+        taskService.list({ done: false, dueBefore: new Date(), userId: subject.userId }),
+      ])
+
+      return ok({
+        summary: {
+          userId: subject.userId,
+          pendingTasks: pending.length,
+          overdueTasks: overdue.length,
+          nextDue: pending.find((task) => task.dueAt)?.title ?? null,
+        },
+      })
+    } catch (e: unknown) {
+      return reply.status(400).send(fail(e instanceof Error ? e.message : String(e)))
+    }
   })
 }
 
