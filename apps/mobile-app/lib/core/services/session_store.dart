@@ -21,6 +21,8 @@ class NaraSessionStore {
   static const _authTokenKey = 'nara.authToken';
   static const _userKey = 'nara.user';
   static const _assistantPreferencesKey = 'nara.assistantPreferences';
+  static const _themePreferenceKey = 'nara.themePreference';
+  static const _languagePreferenceKey = 'nara.languagePreference';
   static const _whatsAppPromptPrefix = 'nara.whatsAppPromptSeen.';
 
   Future<StoredNaraSession?> load() async {
@@ -80,6 +82,34 @@ class NaraSessionStore {
       _assistantPreferencesKey,
       jsonEncode(preferences.toJson()),
     );
+  }
+
+  Future<NaraThemePreference> loadThemePreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_themePreferenceKey);
+    return NaraThemePreference.values.firstWhere(
+      (value) => value.name == raw,
+      orElse: () => NaraThemePreference.light,
+    );
+  }
+
+  Future<void> saveThemePreference(NaraThemePreference preference) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_themePreferenceKey, preference.name);
+  }
+
+  Future<NaraLanguagePreference> loadLanguagePreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_languagePreferenceKey);
+    return NaraLanguagePreference.values.firstWhere(
+      (value) => value.name == raw,
+      orElse: () => NaraLanguagePreference.english,
+    );
+  }
+
+  Future<void> saveLanguagePreference(NaraLanguagePreference preference) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_languagePreferenceKey, preference.name);
   }
 
   Future<bool> hasSeenWhatsAppPrompt(String userId) async {

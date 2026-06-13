@@ -6,6 +6,17 @@ enum NaraConnectionState {
   offline,
 }
 
+enum NaraThemePreference {
+  system,
+  light,
+  dark,
+}
+
+enum NaraLanguagePreference {
+  english,
+  indonesia,
+}
+
 class NaraTask {
   const NaraTask({
     required this.id,
@@ -201,14 +212,84 @@ class NaraAssistantPreferences {
   }
 }
 
+class NaraApproval {
+  const NaraApproval({
+    required this.id,
+    required this.title,
+    required this.actionType,
+    required this.source,
+    required this.riskLevel,
+    required this.createdAt,
+    this.payload,
+  });
+
+  final String id;
+  final String title;
+  final String actionType;
+  final String source;
+  final String riskLevel;
+  final DateTime createdAt;
+  final Map<String, dynamic>? payload;
+
+  factory NaraApproval.fromJson(Map<String, dynamic> json) {
+    final createdAtRaw = json['createdAt']?.toString();
+    return NaraApproval(
+      id: json['id']?.toString() ?? '',
+      title: json['title']?.toString() ?? 'Untitled action',
+      actionType: json['actionType']?.toString() ?? 'unknown',
+      source: json['source']?.toString() ?? 'nara',
+      riskLevel: json['riskLevel']?.toString() ?? 'low',
+      createdAt: createdAtRaw == null
+          ? DateTime.now()
+          : DateTime.tryParse(createdAtRaw) ?? DateTime.now(),
+      payload: json['payload'] is Map<String, dynamic>
+          ? json['payload'] as Map<String, dynamic>
+          : null,
+    );
+  }
+}
+
+class NaraActivity {
+  const NaraActivity({
+    required this.id,
+    required this.type,
+    required this.title,
+    required this.timestamp,
+  });
+
+  final String id;
+  final String type;
+  final String title;
+  final DateTime timestamp;
+
+  factory NaraActivity.fromJson(Map<String, dynamic> json) {
+    final tsRaw = json['timestamp']?.toString();
+    return NaraActivity(
+      id: json['id']?.toString() ?? '',
+      type: json['type']?.toString() ?? 'unknown',
+      title: json['title']?.toString() ?? '',
+      timestamp: tsRaw == null
+          ? DateTime.now()
+          : DateTime.tryParse(tsRaw) ?? DateTime.now(),
+    );
+  }
+}
+
 class NaraMobileState {
   NaraConnectionState connectionState = NaraConnectionState.unknown;
   String connectionMessage = 'Not checked yet';
   DateTime? lastConnectionCheck;
 
+  bool isGuest = false;
+  NaraThemePreference themePreference = NaraThemePreference.light;
+  NaraLanguagePreference languagePreference = NaraLanguagePreference.english;
+
   bool tasksLoading = false;
   String? tasksError;
   List<NaraTask> tasks = [];
+
+  List<NaraApproval> approvals = [];
+  List<NaraActivity> activity = [];
 
   NaraAssistantPreferences assistantPreferences =
       const NaraAssistantPreferences();

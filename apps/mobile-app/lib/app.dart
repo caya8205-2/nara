@@ -7,11 +7,13 @@ import 'core/services/session_store.dart';
 import 'core/state/nara_mobile_state.dart';
 import 'core/theme/nara_theme.dart';
 import 'core/widgets/nara_logo_mark.dart';
+import 'features/approvals/approvals_screen.dart';
 import 'features/assistant/assistant_screen.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/reminders/reminders_screen.dart';
 import 'features/settings/settings_screen.dart';
+import 'features/tasks/task_detail_sheet.dart';
 import 'features/tasks/tasks_screen.dart';
 
 class NaraMobileApp extends StatefulWidget {
@@ -29,6 +31,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
   int selectedIndex = 0;
   int tabDirection = 1;
   Map<String, dynamic>? currentUser;
+  bool isGuest = false;
   Timer? connectionTimer;
   bool restoringSession = true;
   bool whatsAppPromptVisible = false;
@@ -39,7 +42,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     WidgetsBinding.instance.addObserver(this);
     restoreSession();
     connectionTimer = Timer.periodic(const Duration(minutes: 2), (_) {
-      if (currentUser != null || apiClient.currentUser != null) {
+      if (!isGuest && (currentUser != null || apiClient.currentUser != null)) {
         checkConnection(showChecking: false);
       }
     });
@@ -55,6 +58,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed &&
+        !isGuest &&
         (currentUser != null || apiClient.currentUser != null)) {
       checkConnection(showChecking: false);
       loadTasks(silent: true);
@@ -64,11 +68,15 @@ class _NaraMobileAppState extends State<NaraMobileApp>
 
   Future<void> restoreSession() async {
     final assistantPreferences = await sessionStore.loadAssistantPreferences();
+    final themePreference = await sessionStore.loadThemePreference();
+    final languagePreference = await sessionStore.loadLanguagePreference();
     final session = await sessionStore.load();
     if (!mounted) return;
 
     setState(() {
       appState.assistantPreferences = assistantPreferences;
+      appState.themePreference = themePreference;
+      appState.languagePreference = languagePreference;
     });
 
     if (session == null) {
@@ -118,6 +126,8 @@ class _NaraMobileAppState extends State<NaraMobileApp>
   }) {
     setState(() {
       currentUser = user;
+      isGuest = false;
+      appState.isGuest = false;
       selectedIndex = 0;
     });
     if (apiClient.authToken != null) {
@@ -132,10 +142,32 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     loadAssistantProfile(forceWhatsAppPrompt: isNewUser);
   }
 
-  void handleLogout() {
+  void handleTryAsGuest() {
+    setState(() {
+      isGuest = true;
+      appState.isGuest = true;
+      selectedIndex = 0;
+      apiClient.logout();
+      currentUser = null;
+      appState.tasks = [];
+      appState.approvals = [];
+      appState.activity = [];
+      appState.connectionState = NaraConnectionState.unknown;
+      appState.connectionMessage = 'Guest mode';
+    });
+  }
+
+  void handleSignIn() {
+    // Go back to auth screen to sign in
+    handleLogout(fromGuest: true);
+  }
+
+  void handleLogout({bool fromGuest = false}) {
     setState(() {
       apiClient.logout();
       currentUser = null;
+      isGuest = false;
+      appState.isGuest = false;
       selectedIndex = 0;
       appState.connectionState = NaraConnectionState.unknown;
       appState.connectionMessage = 'Signed out';
@@ -143,6 +175,8 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       appState.tasks = [];
       appState.tasksError = null;
       appState.tasksLoading = false;
+      appState.approvals = [];
+      appState.activity = [];
       appState.assistantLoading = false;
       appState.assistantSaving = false;
       appState.assistantError = null;
@@ -153,7 +187,21 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     sessionStore.clear();
   }
 
+  Future<void> updateThemePreference(NaraThemePreference preference) async {
+    setState(() => appState.themePreference = preference);
+    await sessionStore.saveThemePreference(preference);
+  }
+
+  Future<void> updateLanguagePreference(
+    NaraLanguagePreference preference,
+  ) async {
+    setState(() => appState.languagePreference = preference);
+    await sessionStore.saveLanguagePreference(preference);
+  }
+
   Future<void> checkConnection({bool showChecking = true}) async {
+    if (isGuest) return;
+
     if (showChecking) {
       setState(() {
         appState.connectionState = NaraConnectionState.checking;
@@ -181,6 +229,8 @@ class _NaraMobileAppState extends State<NaraMobileApp>
   }
 
   Future<void> loadTasks({bool silent = false}) async {
+    if (isGuest) return;
+
     if (!silent) {
       setState(() {
         appState.tasksLoading = true;
@@ -216,6 +266,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     bool silent = false,
     bool forceWhatsAppPrompt = false,
   }) async {
+    if (isGuest) return;
     final userId = activeUserId;
     if (userId == null) return;
 
@@ -254,11 +305,9 @@ class _NaraMobileAppState extends State<NaraMobileApp>
         final accessList = accessResult
             .whereType<Map<String, dynamic>>()
             .map(NaraAgentAccess.fromJson)
-            .where(
-              (access) =>
-                  access.userId == userId &&
-                  access.contactId == whatsappContactId,
-            )
+            .where((access) =>
+                access.userId == userId &&
+                access.contactId == whatsappContactId)
             .toList();
         whatsappAccess = accessList.isEmpty ? null : accessList.first;
       }
@@ -285,6 +334,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
   }
 
   Future<void> maybeShowWhatsAppPrompt({bool force = false}) async {
+    if (isGuest) return;
     final userId = activeUserId;
     if (!mounted ||
         userId == null ||
@@ -321,6 +371,10 @@ class _NaraMobileAppState extends State<NaraMobileApp>
   Future<void> saveAssistantPreferences(
     NaraAssistantPreferences preferences,
   ) async {
+    if (isGuest) {
+      _showGuestDialog();
+      return;
+    }
     final userId = activeUserId;
     setState(() {
       appState.assistantPreferences = preferences;
@@ -365,6 +419,10 @@ class _NaraMobileAppState extends State<NaraMobileApp>
   }
 
   Future<void> requestWhatsAppAccess(String rawNumber) async {
+    if (isGuest) {
+      _showGuestDialog();
+      return;
+    }
     final userId = activeUserId;
     final number = rawNumber.trim();
     if (userId == null) {
@@ -427,6 +485,10 @@ class _NaraMobileAppState extends State<NaraMobileApp>
   }
 
   Future<void> createTask(NaraTaskDraft draft) async {
+    if (isGuest) {
+      _showGuestDialog();
+      return;
+    }
     setState(() {
       appState.tasksError = null;
     });
@@ -450,6 +512,10 @@ class _NaraMobileAppState extends State<NaraMobileApp>
   }
 
   Future<void> completeTask(String id) async {
+    if (isGuest) {
+      _showGuestDialog();
+      return;
+    }
     final previousTasks = List<NaraTask>.from(appState.tasks);
     setState(() {
       appState.tasksError = null;
@@ -473,6 +539,81 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     }
   }
 
+  Future<void> updateTask(NaraTask task) async {
+    if (isGuest) {
+      _showGuestDialog();
+      return;
+    }
+    final previousTasks = List<NaraTask>.from(appState.tasks);
+    setState(() {
+      appState.tasksError = null;
+      appState.tasks =
+          appState.tasks.map((t) => t.id == task.id ? task : t).toList();
+    });
+
+    try {
+      final updated = NaraTask.fromJson(
+        await apiClient.putJson('/api/tasks/${task.id}', {
+          'title': task.title,
+          if (task.description != null) 'description': task.description,
+          'priority': task.priority,
+          'done': task.done,
+          if (task.dueAt != null)
+            'dueAt': task.dueAt!.toUtc().toIso8601String(),
+        }),
+      );
+      setState(() {
+        appState.tasks =
+            appState.tasks.map((t) => t.id == task.id ? updated : t).toList();
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        appState.tasks = previousTasks;
+        appState.tasksError = 'Could not update task';
+      });
+      rethrow;
+    }
+  }
+
+  Future<void> deleteTask(String id) async {
+    if (isGuest) {
+      _showGuestDialog();
+      return;
+    }
+    final previousTasks = List<NaraTask>.from(appState.tasks);
+    setState(() {
+      appState.tasks = appState.tasks.where((t) => t.id != id).toList();
+    });
+
+    try {
+      await apiClient.deleteTask(id);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        appState.tasks = previousTasks;
+        appState.tasksError = 'Could not delete task';
+      });
+      rethrow;
+    }
+  }
+
+  Future<void> handleApprove(NaraApproval approval) async {
+    // Placeholder — connect to backend endpoint later
+    setState(() {
+      appState.approvals =
+          appState.approvals.where((a) => a.id != approval.id).toList();
+    });
+  }
+
+  Future<void> handleReject(NaraApproval approval) async {
+    // Placeholder — connect to backend endpoint later
+    setState(() {
+      appState.approvals =
+          appState.approvals.where((a) => a.id != approval.id).toList();
+    });
+  }
+
   void openTab(int index) {
     if (index == selectedIndex) return;
     setState(() {
@@ -487,10 +628,40 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     return id;
   }
 
+  void _showGuestDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sign in to continue'),
+        content: const Text(
+          'You need an account to use this feature.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              handleSignIn();
+            },
+            child: const Text('Sign In'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = currentUser ?? apiClient.currentUser;
+    final showAsGuest = isGuest && user == null;
+    final isIndonesian =
+        appState.languagePreference == NaraLanguagePreference.indonesia;
+
     final screens = [
+      // 0 — Home
       HomeScreen(
         state: appState,
         user: user,
@@ -500,26 +671,43 @@ class _NaraMobileAppState extends State<NaraMobileApp>
         onOpenTasks: () => openTab(1),
         onCreateTask: createTask,
         onCompleteTask: completeTask,
-        onOpenNara: () => openTab(3),
+        onOpenAssistant: () => openTab(3),
         onRequestWhatsAppAccess: requestWhatsAppAccess,
+        onOpenSettings: () => openTab(5),
+        onOpenTaskDetail: _showTaskDetail,
+        onSignIn: handleSignIn,
       ),
+      // 1 — Tasks
       TasksScreen(
         state: appState,
         onRefresh: loadTasks,
         onCreateTask: createTask,
         onCompleteTask: completeTask,
+        onOpenTaskDetail: _showTaskDetail,
       ),
-      RemindersScreen(apiClient: apiClient),
+      // 2 — Reminders
+      RemindersScreen(state: appState),
+      // 3 — Assistant
       AssistantScreen(
         state: appState,
         onRefresh: loadAssistantProfile,
         onSavePreferences: saveAssistantPreferences,
         onRequestWhatsAppAccess: requestWhatsAppAccess,
       ),
+      // 4 — Approvals
+      ApprovalsScreen(
+        state: appState,
+        onApprove: handleApprove,
+        onReject: handleReject,
+      ),
+      // 5 — Settings (hidden tab)
       SettingsScreen(
         state: appState,
         onLogout: handleLogout,
         onOpenAssistant: () => openTab(3),
+        onBack: () => openTab(0),
+        onThemeChanged: updateThemePreference,
+        onLanguageChanged: updateLanguagePreference,
         user: user,
       ),
     ];
@@ -528,27 +716,23 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       debugShowCheckedModeBanner: false,
       title: 'Nara',
       theme: buildNaraTheme(),
+      darkTheme: buildNaraDarkTheme(),
+      themeMode: _themeMode(appState.themePreference),
       home: AnimatedSwitcher(
         duration: const Duration(milliseconds: 520),
         switchInCurve: Curves.easeOutCubic,
         switchOutCurve: Curves.easeInCubic,
-        transitionBuilder: (child, animation) {
-          final slide = Tween<Offset>(
-            begin: const Offset(0.02, 0.04),
-            end: Offset.zero,
-          ).animate(animation);
-          return FadeTransition(
-            opacity: animation,
-            child: SlideTransition(position: slide, child: child),
-          );
-        },
+        transitionBuilder: (child, animation) =>
+            FadeTransition(opacity: animation, child: child),
         child: restoringSession
             ? const _SessionLoadingScreen(key: ValueKey('session-loading'))
-            : user == null
+            : user == null && !showAsGuest
                 ? AuthScreen(
                     key: const ValueKey('auth'),
                     apiClient: apiClient,
                     onAuthenticated: handleAuthenticated,
+                    onTryAsGuest: handleTryAsGuest,
+                    language: appState.languagePreference,
                   )
                 : Scaffold(
                     key: const ValueKey('app-shell'),
@@ -557,59 +741,113 @@ class _NaraMobileAppState extends State<NaraMobileApp>
                         duration: const Duration(milliseconds: 260),
                         switchInCurve: Curves.easeOutCubic,
                         switchOutCurve: Curves.easeInCubic,
-                        transitionBuilder: (child, animation) {
-                          final slide = Tween<Offset>(
-                            begin: Offset(tabDirection * 0.06, 0),
-                            end: Offset.zero,
-                          ).animate(animation);
-                          return FadeTransition(
-                            opacity: animation,
-                            child: SlideTransition(
-                              position: slide,
-                              child: child,
-                            ),
-                          );
-                        },
+                        transitionBuilder: (child, animation) =>
+                            FadeTransition(opacity: animation, child: child),
                         child: KeyedSubtree(
                           key: ValueKey(selectedIndex),
                           child: screens[selectedIndex],
                         ),
                       ),
                     ),
-                    bottomNavigationBar: NavigationBar(
-                      selectedIndex: selectedIndex,
-                      onDestinationSelected: openTab,
-                      destinations: const [
-                        NavigationDestination(
-                          icon: Icon(Icons.home_outlined),
-                          selectedIcon: Icon(Icons.home),
-                          label: 'Home',
-                        ),
-                        NavigationDestination(
-                          icon: Icon(Icons.checklist_outlined),
-                          selectedIcon: Icon(Icons.checklist),
-                          label: 'Tasks',
-                        ),
-                        NavigationDestination(
-                          icon: Icon(Icons.notifications_outlined),
-                          selectedIcon: Icon(Icons.notifications),
-                          label: 'Reminders',
-                        ),
-                        NavigationDestination(
-                          icon: Icon(Icons.smart_toy_outlined),
-                          selectedIcon: Icon(Icons.smart_toy),
-                          label: 'Nara',
-                        ),
-                        NavigationDestination(
-                          icon: Icon(Icons.person_outline),
-                          selectedIcon: Icon(Icons.person),
-                          label: 'Me',
-                        ),
-                      ],
-                    ),
+                    bottomNavigationBar: selectedIndex == 5
+                        ? null
+                        : NavigationBar(
+                            selectedIndex: selectedIndex,
+                            onDestinationSelected: openTab,
+                            destinations: showAsGuest
+                                ? [
+                                    NavigationDestination(
+                                      icon: const Icon(Icons.home_outlined),
+                                      selectedIcon: const Icon(Icons.home),
+                                      label: isIndonesian ? 'Beranda' : 'Home',
+                                    ),
+                                    NavigationDestination(
+                                      icon:
+                                          const Icon(Icons.checklist_outlined),
+                                      selectedIcon: const Icon(Icons.checklist),
+                                      label: isIndonesian ? 'Tugas' : 'Tasks',
+                                    ),
+                                    NavigationDestination(
+                                      icon: const Icon(
+                                          Icons.notifications_outlined),
+                                      selectedIcon:
+                                          const Icon(Icons.notifications),
+                                      label: isIndonesian
+                                          ? 'Pengingat'
+                                          : 'Reminders',
+                                    ),
+                                    NavigationDestination(
+                                      icon:
+                                          const Icon(Icons.smart_toy_outlined),
+                                      selectedIcon: const Icon(Icons.smart_toy),
+                                      label: 'Nara',
+                                    ),
+                                  ]
+                                : [
+                                    NavigationDestination(
+                                      icon: const Icon(Icons.home_outlined),
+                                      selectedIcon: const Icon(Icons.home),
+                                      label: isIndonesian ? 'Beranda' : 'Home',
+                                    ),
+                                    NavigationDestination(
+                                      icon:
+                                          const Icon(Icons.checklist_outlined),
+                                      selectedIcon: const Icon(Icons.checklist),
+                                      label: isIndonesian ? 'Tugas' : 'Tasks',
+                                    ),
+                                    NavigationDestination(
+                                      icon: const Icon(
+                                          Icons.notifications_outlined),
+                                      selectedIcon:
+                                          const Icon(Icons.notifications),
+                                      label: isIndonesian
+                                          ? 'Pengingat'
+                                          : 'Reminders',
+                                    ),
+                                    NavigationDestination(
+                                      icon:
+                                          const Icon(Icons.smart_toy_outlined),
+                                      selectedIcon: const Icon(Icons.smart_toy),
+                                      label: 'Nara',
+                                    ),
+                                    NavigationDestination(
+                                      icon:
+                                          const Icon(Icons.checklist_outlined),
+                                      selectedIcon: const Icon(
+                                          Icons.assignment_turned_in),
+                                      label: isIndonesian
+                                          ? 'Persetujuan'
+                                          : 'Approvals',
+                                    ),
+                                  ],
+                          ),
                   ),
       ),
     );
+  }
+
+  Future<void> _showTaskDetail(NaraTask task) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => TaskDetailSheet(
+        task: task,
+        onSave: (updated) => updateTask(updated),
+        onDelete: (id) => deleteTask(id),
+      ),
+    );
+  }
+
+  ThemeMode _themeMode(NaraThemePreference preference) {
+    return switch (preference) {
+      NaraThemePreference.system => ThemeMode.system,
+      NaraThemePreference.light => ThemeMode.light,
+      NaraThemePreference.dark => ThemeMode.dark,
+    };
   }
 }
 

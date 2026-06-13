@@ -1,18 +1,24 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/state/nara_mobile_state.dart';
+import '../../core/theme/nara_theme.dart';
+import '../../core/widgets/nara_card.dart';
+import '../../core/widgets/nara_empty_state.dart';
+import '../../core/widgets/nara_metric_tile.dart';
 
-const _emerald = Color(0xFF059669);
-const _amber = Color(0xFFD97706);
-const _rose = Color(0xFFE11D48);
-const _ink = Color(0xFF1F2937);
+import '../../core/widgets/nara_task_row.dart';
 
-class TasksScreen extends StatelessWidget {
+enum _TaskFilter { all, pending, overdue, done }
+
+class TasksScreen extends StatefulWidget {
   const TasksScreen({
     required this.state,
     required this.onRefresh,
     required this.onCreateTask,
     required this.onCompleteTask,
+    required this.onOpenTaskDetail,
     super.key,
   });
 
@@ -20,92 +26,439 @@ class TasksScreen extends StatelessWidget {
   final Future<void> Function() onRefresh;
   final Future<void> Function(NaraTaskDraft draft) onCreateTask;
   final Future<void> Function(String id) onCompleteTask;
+  final Future<void> Function(NaraTask task) onOpenTaskDetail;
+
+  @override
+  State<TasksScreen> createState() => _TasksScreenState();
+}
+
+class _TasksScreenState extends State<TasksScreen> {
+  _TaskFilter _filter = _TaskFilter.all;
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+  Timer? _debounce;
+  bool _isGuest = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _isGuest = widget.state.isGuest;
+  }
+
+  @override
+  void didUpdateWidget(covariant TasksScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.state.isGuest != oldWidget.state.isGuest) {
+      setState(() => _isGuest = widget.state.isGuest);
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        setState(() => _searchQuery = value.trim().toLowerCase());
+      }
+    });
+  }
+
+  List<NaraTask> get _filteredTasks {
+    var tasks = switch (_filter) {
+      _TaskFilter.all => widget.state.tasks,
+      _TaskFilter.pending => widget.state.openTasks,
+      _TaskFilter.overdue => widget.state.tasks
+          .where((t) => t.dueAt != null && t.dueAt!.isBefore(DateTime.now()))
+          .toList(),
+      _TaskFilter.done => widget.state.completedTasks,
+    };
+
+    if (_searchQuery.isNotEmpty) {
+      tasks = tasks.where((t) {
+        final titleMatch = t.title.toLowerCase().contains(_searchQuery);
+        final descMatch =
+            t.description?.toLowerCase().contains(_searchQuery) ?? false;
+        return titleMatch || descMatch;
+      }).toList();
+    }
+
+    return tasks;
+  }
+
+  bool get _isSearching => _searchQuery.isNotEmpty;
+
+  NaraTask? get _focusTask {
+    final overdue = widget.state.tasks
+        .where((t) =>
+            !t.done && t.dueAt != null && t.dueAt!.isBefore(DateTime.now()))
+        .toList();
+    final candidates = [
+      ...overdue,
+      ...widget.state.todayTasks,
+      ...widget.state.openTasks,
+    ];
+    return candidates.isEmpty ? null : candidates.first;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final tasks = _filteredTasks;
+    final focusTask = _focusTask;
+    final isId =
+        widget.state.languagePreference == NaraLanguagePreference.indonesia;
+
     return Scaffold(
       backgroundColor: Colors.transparent,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed:
-            state.tasksLoading ? null : () => _showCreateTaskSheet(context),
-        icon: const Icon(Icons.add),
-        label: const Text('Task'),
-      ),
+      floatingActionButton: _isGuest
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: widget.state.tasksLoading
+                  ? null
+                  : () => _showCreateTaskSheet(context),
+              icon: const Icon(Icons.add),
+              label: Text(isId ? 'Tugas' : 'Task'),
+            ),
       body: RefreshIndicator(
-        onRefresh: onRefresh,
+        onRefresh: _isGuest ? () async {} : widget.onRefresh,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 104),
           children: [
-            const _TasksHeader(),
-            const SizedBox(height: 16),
-            if (state.tasksLoading) const LinearProgressIndicator(),
-            if (state.tasksError != null) ...[
-              _MessageCard(
-                icon: Icons.error_outline,
-                title: 'Tasks need attention',
-                body: state.tasksError!,
+            // ── Header ──
+            Text(
+              isId ? 'Tugas' : 'Tasks',
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${widget.state.tasks.length} tasks · ${widget.state.completedTaskCount} done',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w400,
+                color: context.naraTextSecondary,
+                height: 1.45,
               ),
-              const SizedBox(height: 12),
+            ),
+            const SizedBox(height: 16),
+
+            // ── Search bar ──
+            SizedBox(
+              height: 44,
+              child: TextField(
+                controller: _searchController,
+                onChanged: _onSearchChanged,
+                style: TextStyle(fontSize: 13, color: context.naraTextPrimary),
+                decoration: InputDecoration(
+                  hintText: 'Search tasks…',
+                  hintStyle: TextStyle(
+                    fontSize: 13,
+                    color: context.naraTextMuted,
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    size: 20,
+                    color: context.naraTextMuted,
+                  ),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () {
+                            _searchController.clear();
+                            _onSearchChanged('');
+                          },
+                          visualDensity: VisualDensity.compact,
+                        )
+                      : null,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  filled: true,
+                  fillColor: context.naraSurfaceRaised,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: context.naraBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: context.naraBorder),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide:
+                        const BorderSide(color: NaraColors.primary, width: 1.5),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // ── Loading ──
+            if (widget.state.tasksLoading)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 16),
+                child: LinearProgressIndicator(),
+              ),
+
+            // ── Error state ──
+            if (widget.state.tasksError != null) ...[
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: NaraColors.dangerLight,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: NaraColors.danger.withValues(alpha: 0.25),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.error_outline,
+                        size: 20, color: NaraColors.danger),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        widget.state.tasksError!,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: NaraColors.danger,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
             ],
-            Row(
-              children: [
-                Expanded(
-                  child: _TaskStatCard(
-                    label: 'Today',
-                    value: state.todayTasks.length.toString(),
-                    icon: Icons.today_outlined,
-                    color: _amber,
+
+            // ── Metric row ──
+            if (!_isSearching) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: NaraMetricTile(
+                      label: isId ? 'Hari ini' : 'Today',
+                      value: widget.state.todayTasks.length.toString(),
+                      icon: Icons.today_outlined,
+                      color: NaraColors.warning,
+                      bgColor: NaraColors.warningMuted,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: NaraMetricTile(
+                      label: isId ? 'Terbuka' : 'Open',
+                      value: widget.state.openTasks.length.toString(),
+                      icon: Icons.radio_button_unchecked,
+                      color: NaraColors.primary,
+                      bgColor: NaraColors.primaryMuted,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: NaraMetricTile(
+                      label: isId ? 'Selesai' : 'Done',
+                      value: widget.state.completedTaskCount.toString(),
+                      icon: Icons.check_circle_outline,
+                      color: NaraColors.agent,
+                      bgColor: NaraColors.agentMuted,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              _FocusTaskPanel(
+                task: focusTask,
+                isGuest: _isGuest,
+                onOpenTaskDetail: widget.onOpenTaskDetail,
+                onCompleteTask: widget.onCompleteTask,
+                onCreateTask: () => _showCreateTaskSheet(context),
+                onGuestAction: () => _showGuestDialog(context),
+              ),
+              const SizedBox(height: 18),
+            ],
+
+            // ── Filter chips ──
+            if (!_isSearching)
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.only(bottom: 14),
+                child: Row(
+                  children: _TaskFilter.values.map((f) {
+                    final active = _filter == f;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(_filterLabel(f, isId: isId)),
+                        selected: active,
+                        onSelected: (_) => setState(() => _filter = f),
+                        selectedColor: context.naraSelectedTint,
+                        labelStyle: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: active
+                              ? NaraColors.primary
+                              : context.naraTextSecondary,
+                        ),
+                        side: BorderSide(
+                          color: active
+                              ? NaraColors.primary.withValues(alpha: 0.3)
+                              : context.naraBorder,
+                        ),
+                        backgroundColor: context.naraSurfaceRaised,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 0),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+
+            // ── Search result label ──
+            if (_isSearching)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  '${tasks.length} task${tasks.length == 1 ? '' : 's'} match "${_searchQuery}"',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: context.naraTextSecondary,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _TaskStatCard(
-                    label: 'Open',
-                    value: state.openTasks.length.toString(),
-                    icon: Icons.radio_button_unchecked,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _TaskStatCard(
-                    label: 'Done',
-                    value: state.completedTaskCount.toString(),
-                    icon: Icons.check_circle_outline,
-                    color: _emerald,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            _TaskSection(
-              title: 'Today',
-              emptyTitle: 'Nothing due today',
-              emptyBody: 'The day is clear.',
-              tasks: state.todayTasks,
-              onCompleteTask: onCompleteTask,
-            ),
-            const SizedBox(height: 18),
-            _TaskSection(
-              title: 'Open',
-              emptyTitle: 'No open tasks',
-              emptyBody: 'Add a task when something needs Nara attention.',
-              tasks: state.openTasks,
-              onCompleteTask: onCompleteTask,
-            ),
-            const SizedBox(height: 18),
-            _TaskSection(
-              title: 'Done',
-              emptyTitle: 'Nothing completed yet',
-              emptyBody: 'Completed work will appear here.',
-              tasks: state.completedTasks,
-              onCompleteTask: onCompleteTask,
-              completed: true,
-            ),
-            const SizedBox(height: 88),
+              ),
+
+            // ── Task list ──
+            if (tasks.isEmpty && _isSearching)
+              NaraEmptyState(
+                icon: Icons.search_off,
+                title: isId
+                    ? 'Tidak ada tugas yang cocok.'
+                    : 'No tasks match your search.',
+                body: isId
+                    ? 'Coba kata kunci lain atau kosongkan pencarian.'
+                    : 'Try a different keyword or clear the search.',
+              )
+            else if (tasks.isEmpty)
+              NaraEmptyState(
+                icon: _filter == _TaskFilter.done
+                    ? Icons.check_circle_outline
+                    : Icons.inbox_outlined,
+                title: _emptyTitle(isId: isId),
+                body: _emptyBody(isId: isId),
+                actionLabel: _filter == _TaskFilter.done
+                    ? null
+                    : (_isGuest ? null : (isId ? 'Tugas Baru' : 'New Task')),
+                onActionTap: _filter == _TaskFilter.done || _isGuest
+                    ? null
+                    : () => widget.onCreateTask(
+                          const NaraTaskDraft(title: ''),
+                        ),
+              )
+            else
+              Column(
+                children: tasks
+                    .map(
+                      (task) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _TaskQueueCard(
+                          task: task,
+                          onOpen: () => widget.onOpenTaskDetail(task),
+                          onToggleComplete: _isGuest
+                              ? (_) async => _showGuestDialog(context)
+                              : widget.onCompleteTask,
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
           ],
         ),
+      ),
+    );
+  }
+
+  String _emptyTitle({required bool isId}) {
+    if (isId) {
+      return switch (_filter) {
+        _TaskFilter.all => 'Belum ada tugas',
+        _TaskFilter.pending => 'Tidak ada tugas terbuka',
+        _TaskFilter.overdue => 'Tidak ada yang terlambat',
+        _TaskFilter.done => 'Belum ada yang selesai',
+      };
+    }
+    return switch (_filter) {
+      _TaskFilter.all => 'No tasks yet',
+      _TaskFilter.pending => 'No open tasks',
+      _TaskFilter.overdue => 'Nothing overdue',
+      _TaskFilter.done => 'Nothing completed yet',
+    };
+  }
+
+  String _emptyBody({required bool isId}) {
+    if (isId) {
+      return switch (_filter) {
+        _TaskFilter.all => 'Tambahkan tugas saat ada yang perlu dikerjakan.',
+        _TaskFilter.pending =>
+          'Semua tugas sudah selesai. Tambahkan tugas baru untuk lanjut.',
+        _TaskFilter.overdue => 'Semua masih sesuai jadwal. Bagus.',
+        _TaskFilter.done => 'Tugas selesai akan muncul di sini.',
+      };
+    }
+    return switch (_filter) {
+      _TaskFilter.all => 'Add a task when something needs attention.',
+      _TaskFilter.pending => 'All tasks are done. Add a new one to keep going.',
+      _TaskFilter.overdue => 'Everything is on schedule. Good work.',
+      _TaskFilter.done => 'Completed tasks will appear here.',
+    };
+  }
+
+  String _filterLabel(_TaskFilter filter, {required bool isId}) {
+    if (isId) {
+      return switch (filter) {
+        _TaskFilter.all => 'Semua',
+        _TaskFilter.pending => 'Pending',
+        _TaskFilter.overdue => 'Terlambat',
+        _TaskFilter.done => 'Selesai',
+      };
+    }
+    return switch (filter) {
+      _TaskFilter.all => 'All',
+      _TaskFilter.pending => 'Pending',
+      _TaskFilter.overdue => 'Overdue',
+      _TaskFilter.done => 'Done',
+    };
+  }
+
+  void _showGuestDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sign in to continue'),
+        content: const Text(
+          'You need an account to create or edit tasks.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              // Guest can't sign in from here — use callback if available
+            },
+            child: const Text('Sign In'),
+          ),
+        ],
       ),
     );
   }
@@ -113,16 +466,17 @@ class TasksScreen extends StatelessWidget {
   Future<void> _showCreateTaskSheet(BuildContext context) async {
     final draft = await _collectTaskDraft(context);
     if (draft == null) return;
-    await _waitForSheetTeardown();
+    await Future.delayed(const Duration(milliseconds: 300));
     if (!context.mounted) return;
 
     try {
-      await onCreateTask(draft);
+      await widget.onCreateTask(draft);
     } catch (_) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Could not create task. Check your connection.'),
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -133,7 +487,227 @@ class TasksScreen extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (context) => const _TaskDraftSheet(),
+      builder: (_) => const _TaskDraftSheet(),
+    );
+  }
+}
+
+// ── Task Draft Sheet ─────────────────────────────────────────────────────
+
+class _FocusTaskPanel extends StatelessWidget {
+  const _FocusTaskPanel({
+    required this.task,
+    required this.isGuest,
+    required this.onOpenTaskDetail,
+    required this.onCompleteTask,
+    required this.onCreateTask,
+    required this.onGuestAction,
+  });
+
+  final NaraTask? task;
+  final bool isGuest;
+  final Future<void> Function(NaraTask task) onOpenTaskDetail;
+  final Future<void> Function(String id) onCompleteTask;
+  final VoidCallback onCreateTask;
+  final VoidCallback onGuestAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final currentTask = task;
+    final dark = context.isNaraDark;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: dark
+              ? const [
+                  Color(0xFF1A2C29),
+                  Color(0xFF244C46),
+                  Color(0xFF2B342F),
+                ]
+              : const [
+                  NaraColors.surface,
+                  NaraColors.primaryMuted,
+                  NaraColors.warningMuted,
+                ],
+          stops: const [0, 0.7, 1],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: context.naraBorder,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (dark ? const Color(0xFF081211) : NaraColors.primary)
+                .withValues(alpha: 0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.bolt_rounded,
+                  size: 18,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Next best action',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: dark
+                            ? const Color(0xFFF1F7F5)
+                            : NaraColors.textPrimary,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Keep the queue moving without scanning everything.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: dark
+                            ? const Color(0xFFC5D6D2)
+                            : NaraColors.textSecondary,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (currentTask == null)
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'No urgent task right now. Add one when something needs attention.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: dark
+                          ? const Color(0xFFF1F7F5)
+                          : NaraColors.textPrimary,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                FilledButton(
+                  onPressed: isGuest ? onGuestAction : onCreateTask,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: dark
+                        ? const Color(0xFF063F3A)
+                        : NaraColors.textOnPrimary,
+                  ),
+                  child: const Text('Add'),
+                ),
+              ],
+            )
+          else
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  currentTask.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color:
+                        dark ? const Color(0xFFF1F7F5) : NaraColors.textPrimary,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => onOpenTaskDetail(currentTask),
+                        icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                        label: const Text('Open'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor:
+                              Theme.of(context).colorScheme.primary,
+                          side: BorderSide(
+                            color:
+                                dark ? context.naraBorder : NaraColors.border,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: isGuest
+                            ? onGuestAction
+                            : () => onCompleteTask(currentTask.id),
+                        icon: const Icon(Icons.check_rounded, size: 16),
+                        label: const Text('Done'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor:
+                              Theme.of(context).colorScheme.primary,
+                          foregroundColor: dark
+                              ? const Color(0xFF063F3A)
+                              : NaraColors.textOnPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TaskQueueCard extends StatelessWidget {
+  const _TaskQueueCard({
+    required this.task,
+    required this.onOpen,
+    required this.onToggleComplete,
+  });
+
+  final NaraTask task;
+  final VoidCallback onOpen;
+  final Future<void> Function(String id) onToggleComplete;
+
+  @override
+  Widget build(BuildContext context) {
+    return NaraCard.tappable(
+      onTap: onOpen,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: NaraTaskRow(
+        task: task,
+        onToggleComplete: onToggleComplete,
+        showSource: true,
+      ),
     );
   }
 }
@@ -174,6 +748,7 @@ class _TaskDraftSheetState extends State<_TaskDraftSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Header
             Row(
               children: [
                 const Expanded(
@@ -189,10 +764,15 @@ class _TaskDraftSheetState extends State<_TaskDraftSheet> {
               ],
             ),
             const SizedBox(height: 8),
+            // Title
             TextFormField(
               controller: titleController,
               textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(labelText: 'Title'),
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Title',
+                hintText: 'What needs to be done?',
+              ),
               validator: (value) {
                 if ((value ?? '').trim().isEmpty) {
                   return 'Task title is required';
@@ -201,529 +781,92 @@ class _TaskDraftSheetState extends State<_TaskDraftSheet> {
               },
             ),
             const SizedBox(height: 12),
-            TextField(
+            // Description
+            TextFormField(
               controller: descriptionController,
+              textInputAction: TextInputAction.newline,
               minLines: 2,
               maxLines: 4,
               decoration: const InputDecoration(
-                labelText: 'Notes',
-                hintText: 'Optional context for Nara',
+                labelText: 'Description',
+                hintText: 'Optional details...',
               ),
             ),
-            const SizedBox(height: 16),
-            const _SheetLabel(icon: Icons.flag_outlined, label: 'Priority'),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final option in _priorityOptions)
-                  ChoiceChip(
-                    label: Text(option.label),
-                    selected: priority == option.value,
-                    onSelected: (_) {
-                      setState(() => priority = option.value);
-                    },
-                  ),
+            const SizedBox(height: 12),
+            // Priority
+            DropdownButtonFormField<String>(
+              initialValue: priority,
+              decoration: const InputDecoration(labelText: 'Priority'),
+              items: const [
+                DropdownMenuItem(value: 'low', child: Text('Low')),
+                DropdownMenuItem(value: 'normal', child: Text('Normal')),
+                DropdownMenuItem(value: 'high', child: Text('High')),
+                DropdownMenuItem(value: 'urgent', child: Text('Urgent')),
               ],
+              onChanged: (v) {
+                if (v != null) setState(() => priority = v);
+              },
             ),
-            const SizedBox(height: 16),
-            const _SheetLabel(icon: Icons.event_outlined, label: 'Due'),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                ChoiceChip(
-                  label: const Text('None'),
-                  selected: dueAt == null,
-                  onSelected: (_) {
-                    setState(() => dueAt = null);
-                  },
-                ),
-                ChoiceChip(
-                  label: const Text('Today'),
-                  selected: dueAt != null && _isSameDay(dueAt!, DateTime.now()),
-                  onSelected: (_) {
-                    final now = DateTime.now();
-                    setState(
-                      () => dueAt = DateTime(now.year, now.month, now.day, 18),
-                    );
-                  },
-                ),
-                ChoiceChip(
-                  label: const Text('Tomorrow'),
-                  selected: dueAt != null &&
-                      _isSameDay(
-                        dueAt!,
-                        DateTime.now().add(const Duration(days: 1)),
-                      ),
-                  onSelected: (_) {
-                    final tomorrow =
-                        DateTime.now().add(const Duration(days: 1));
-                    setState(
-                      () => dueAt = DateTime(
-                        tomorrow.year,
-                        tomorrow.month,
-                        tomorrow.day,
-                        18,
-                      ),
-                    );
-                  },
-                ),
-                ActionChip(
-                  avatar: const Icon(Icons.calendar_month, size: 18),
-                  label: Text(dueAt == null ? 'Pick date' : _dateLabel(dueAt!)),
-                  onPressed: () async {
-                    final now = DateTime.now();
-                    final picked = await showDatePicker(
-                      context: context,
-                      firstDate: DateTime(now.year, now.month, now.day),
-                      lastDate: DateTime(now.year + 2),
-                      initialDate: dueAt ?? now,
-                    );
-                    if (picked == null || !mounted) return;
-                    setState(
-                      () => dueAt = DateTime(
-                        picked.year,
-                        picked.month,
-                        picked.day,
-                        18,
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            FilledButton.icon(
-              onPressed: submit,
-              icon: const Icon(Icons.add_task),
-              label: const Text('Create Task'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void submit() {
-    if (!formKey.currentState!.validate()) return;
-    final description = descriptionController.text.trim();
-    Navigator.of(context).pop(
-      NaraTaskDraft(
-        title: titleController.text.trim(),
-        description: description.isEmpty ? null : description,
-        dueAt: dueAt,
-        priority: priority,
-      ),
-    );
-  }
-}
-
-Future<void> _waitForSheetTeardown() async {
-  await Future<void>.delayed(const Duration(milliseconds: 240));
-  await WidgetsBinding.instance.endOfFrame;
-}
-
-class _TasksHeader extends StatelessWidget {
-  const _TasksHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Tasks',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        SizedBox(height: 4),
-        Text('Today, open loops, and finished work.'),
-      ],
-    );
-  }
-}
-
-class _TaskSection extends StatelessWidget {
-  const _TaskSection({
-    required this.title,
-    required this.emptyTitle,
-    required this.emptyBody,
-    required this.tasks,
-    required this.onCompleteTask,
-    this.completed = false,
-  });
-
-  final String title;
-  final String emptyTitle;
-  final String emptyBody;
-  final List<NaraTask> tasks;
-  final Future<void> Function(String id) onCompleteTask;
-  final bool completed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              title,
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              tasks.length.toString(),
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        if (tasks.isEmpty)
-          _MessageCard(
-            icon: Icons.inbox_outlined,
-            title: emptyTitle,
-            body: emptyBody,
-          )
-        else
-          ...tasks.map(
-            (task) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _TaskTile(
-                task: task,
-                completed: completed,
-                onCompleteTask: onCompleteTask,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _TaskTile extends StatelessWidget {
-  const _TaskTile({
-    required this.task,
-    required this.completed,
-    required this.onCompleteTask,
-  });
-
-  final NaraTask task;
-  final bool completed;
-  final Future<void> Function(String id) onCompleteTask;
-
-  @override
-  Widget build(BuildContext context) {
-    final priorityColor = _priorityColor(task.priority);
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Icon(
-                completed ? Icons.check_circle : Icons.circle_outlined,
-                color: completed ? _emerald : priorityColor,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(height: 12),
+            // Due date
+            InputDecorator(
+              decoration: const InputDecoration(labelText: 'Due date'),
+              child: Row(
                 children: [
                   Text(
-                    task.title,
+                    dueAt == null
+                        ? 'No due date'
+                        : '${dueAt!.day}/${dueAt!.month}/${dueAt!.year}',
                     style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      decoration: completed ? TextDecoration.lineThrough : null,
+                      fontSize: 14,
+                      color: dueAt == null
+                          ? NaraColors.textMuted
+                          : NaraColors.textPrimary,
                     ),
                   ),
-                  if ((task.description ?? '').isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      task.description!,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                  const Spacer(),
+                  if (dueAt != null)
+                    IconButton(
+                      icon: const Icon(Icons.clear, size: 18),
+                      onPressed: () => setState(() => dueAt = null),
+                      visualDensity: VisualDensity.compact,
                     ),
-                  ],
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      _TaskChip(
-                        icon: Icons.flag_outlined,
-                        label: _priorityLabel(task.priority),
-                        color: priorityColor,
-                      ),
-                      if (task.dueAt != null)
-                        _TaskChip(
-                          icon: Icons.event_outlined,
-                          label: _dateLabel(task.dueAt!),
-                          color: task.isDueToday ? _amber : _ink,
-                        ),
-                      _TaskChip(
-                        icon: _sourceIcon(task.source),
-                        label: _sourceLabel(task.source),
-                        color: _ink,
-                      ),
-                    ],
+                  TextButton(
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: dueAt ?? DateTime.now(),
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                      );
+                      if (picked != null) {
+                        setState(() => dueAt = picked);
+                      }
+                    },
+                    child: const Text('Pick date'),
                   ),
                 ],
               ),
             ),
-            if (completed)
-              const Padding(
-                padding: EdgeInsets.only(top: 4),
-                child: Text(
-                  'Done',
-                  style: TextStyle(
-                    color: _emerald,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              )
-            else
-              IconButton(
-                tooltip: 'Complete task',
-                onPressed: () => onCompleteTask(task.id),
-                icon: const Icon(Icons.check),
-              ),
+            const SizedBox(height: 20),
+            FilledButton(
+              onPressed: () {
+                if (!formKey.currentState!.validate()) return;
+                Navigator.of(context).pop(NaraTaskDraft(
+                  title: titleController.text.trim(),
+                  description: descriptionController.text.trim().isEmpty
+                      ? null
+                      : descriptionController.text.trim(),
+                  dueAt: dueAt,
+                  priority: priority,
+                ));
+              },
+              child: const Text('Create Task'),
+            ),
+            const SizedBox(height: 8),
           ],
         ),
       ),
     );
   }
-}
-
-class _TaskChip extends StatelessWidget {
-  const _TaskChip({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TaskStatCard extends StatelessWidget {
-  const _TaskStatCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
-
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color),
-            const SizedBox(height: 10),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            Text(label),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MessageCard extends StatelessWidget {
-  const _MessageCard({
-    required this.icon,
-    required this.title,
-    required this.body,
-  });
-
-  final IconData icon;
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(body),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SheetLabel extends StatelessWidget {
-  const _SheetLabel({
-    required this.icon,
-    required this.label,
-  });
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
-        const SizedBox(width: 6),
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
-      ],
-    );
-  }
-}
-
-class _PriorityOption {
-  const _PriorityOption(this.value, this.label);
-
-  final String value;
-  final String label;
-}
-
-const _priorityOptions = [
-  _PriorityOption('normal', 'Normal'),
-  _PriorityOption('high', 'High'),
-  _PriorityOption('urgent', 'Urgent'),
-  _PriorityOption('low', 'Low'),
-];
-
-String _priorityLabel(String value) {
-  return switch (value) {
-    'low' => 'Low',
-    'high' => 'High',
-    'urgent' => 'Urgent',
-    _ => 'Normal',
-  };
-}
-
-Color _priorityColor(String value) {
-  return switch (value) {
-    'low' => _emerald,
-    'high' => _amber,
-    'urgent' => _rose,
-    _ => _ink,
-  };
-}
-
-String _sourceLabel(String value) {
-  return switch (value) {
-    'admin' => 'Admin',
-    'agent' => 'Nara',
-    'scheduled' => 'Schedule',
-    _ => 'Manual',
-  };
-}
-
-IconData _sourceIcon(String value) {
-  return switch (value) {
-    'admin' => Icons.admin_panel_settings_outlined,
-    'agent' => Icons.smart_toy_outlined,
-    'scheduled' => Icons.schedule,
-    _ => Icons.edit_note,
-  };
-}
-
-String _dateLabel(DateTime value) {
-  final local = value.toLocal();
-  final now = DateTime.now();
-  if (_isSameDay(local, now)) return 'Today';
-  if (_isSameDay(local, now.add(const Duration(days: 1)))) {
-    return 'Tomorrow';
-  }
-  return '${local.day} ${_monthLabel(local.month)}';
-}
-
-String _monthLabel(int month) {
-  const labels = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  return labels[month - 1];
-}
-
-bool _isSameDay(DateTime first, DateTime second) {
-  final left = first.toLocal();
-  final right = second.toLocal();
-  return left.year == right.year &&
-      left.month == right.month &&
-      left.day == right.day;
 }
