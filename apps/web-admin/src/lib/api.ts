@@ -24,10 +24,13 @@ export type ReadinessReport = {
 
 export type Task = {
   id: string
+  userId: string | null
   title: string
   description: string | null
   done: boolean
   dueAt: string | null
+  priority: 'low' | 'normal' | 'high' | 'urgent'
+  source: 'manual' | 'admin' | 'agent' | 'scheduled'
   createdAt: string
   updatedAt: string
 }
@@ -36,6 +39,7 @@ export type CreateTaskInput = {
   title: string
   description?: string
   dueAt?: string
+  priority?: 'low' | 'normal' | 'high' | 'urgent'
 }
 
 export type Operator = {
@@ -203,6 +207,14 @@ export const completeTask = async (id: string) => {
   return response.data
 }
 
+export const deleteTask = async (id: string) => {
+  await api.delete('/tasks/' + id)
+}
+
+export const deleteUserTask = async (userId: string, taskId: string) => {
+  await api.delete('/users/' + userId + '/tasks/' + taskId)
+}
+
 export const listUsers = async () => {
   const response = await api.get<User[]>('/users')
   return response.data
@@ -233,6 +245,10 @@ export const requestAgentAccess = async (userId: string, input: RequestAgentAcce
   return response.data
 }
 
+export const deleteUserAgentAccess = async (userId: string, accessId: string) => {
+  await api.delete('/users/' + userId + '/agent-access/' + accessId)
+}
+
 export const listAgentAccess = async () => {
   const response = await api.get<AgentChannelAccess[]>('/agent-access')
   return response.data
@@ -241,6 +257,10 @@ export const listAgentAccess = async () => {
 export const updateAgentAccess = async (id: string, input: UpdateAgentAccessInput) => {
   const response = await api.patch<AgentChannelAccess>('/agent-access/' + id, input)
   return response.data
+}
+
+export const deleteAgentAccess = async (id: string) => {
+  await api.delete('/agent-access/' + id)
 }
 
 export const listLogs = async (input: ListLogsInput = {}) => {

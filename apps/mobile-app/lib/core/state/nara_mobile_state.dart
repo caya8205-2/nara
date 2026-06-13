@@ -12,28 +12,40 @@ class NaraTask {
     required this.title,
     required this.done,
     this.description,
+    this.userId,
     this.dueAt,
+    this.priority = 'normal',
+    this.source = 'manual',
   });
 
   final String id;
   final String title;
   final String? description;
+  final String? userId;
   final bool done;
   final DateTime? dueAt;
+  final String priority;
+  final String source;
 
   NaraTask copyWith({
     String? id,
     String? title,
     String? description,
+    String? userId,
     bool? done,
     DateTime? dueAt,
+    String? priority,
+    String? source,
   }) {
     return NaraTask(
       id: id ?? this.id,
       title: title ?? this.title,
       description: description ?? this.description,
+      userId: userId ?? this.userId,
       done: done ?? this.done,
       dueAt: dueAt ?? this.dueAt,
+      priority: priority ?? this.priority,
+      source: source ?? this.source,
     );
   }
 
@@ -44,10 +56,36 @@ class NaraTask {
       id: json['id']?.toString() ?? '',
       title: json['title']?.toString() ?? 'Untitled task',
       description: json['description']?.toString(),
+      userId: json['userId']?.toString(),
       done: json['done'] == true,
       dueAt: dueAtRaw == null ? null : DateTime.tryParse(dueAtRaw),
+      priority: json['priority']?.toString() ?? 'normal',
+      source: json['source']?.toString() ?? 'manual',
     );
   }
+
+  bool get isDueToday {
+    if (dueAt == null) return false;
+    final now = DateTime.now();
+    final localDue = dueAt!.toLocal();
+    return localDue.year == now.year &&
+        localDue.month == now.month &&
+        localDue.day == now.day;
+  }
+}
+
+class NaraTaskDraft {
+  const NaraTaskDraft({
+    required this.title,
+    this.description,
+    this.dueAt,
+    this.priority = 'normal',
+  });
+
+  final String title;
+  final String? description;
+  final DateTime? dueAt;
+  final String priority;
 }
 
 class NaraContact {
@@ -182,6 +220,17 @@ class NaraMobileState {
   NaraAgentAccess? whatsappAccess;
 
   int get pendingTaskCount => tasks.where((task) => !task.done).length;
+
+  int get completedTaskCount => tasks.where((task) => task.done).length;
+
+  List<NaraTask> get todayTasks =>
+      tasks.where((task) => !task.done && task.isDueToday).toList();
+
+  List<NaraTask> get openTasks =>
+      tasks.where((task) => !task.done && !task.isDueToday).toList();
+
+  List<NaraTask> get completedTasks =>
+      tasks.where((task) => task.done).toList();
 
   List<NaraTask> get latestTasks => tasks.take(3).toList();
 

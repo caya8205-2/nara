@@ -43,8 +43,8 @@ const tools: Tool[] = [
     id: 'delete_task',
     name: 'delete_task',
     endpoint: '/api/agent/tasks/delete',
-    description: 'Delete a task permanently',
-    examplePayload: JSON.stringify({ id: 'task-uuid-here' }, null, 2),
+    description: 'Delete a global task, or pass userId to delete within one user scope',
+    examplePayload: JSON.stringify({ id: 'task-uuid-here', userId: 'user-uuid-here' }, null, 2),
     requiresAuth: true,
   },
   {

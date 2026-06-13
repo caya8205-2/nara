@@ -12,10 +12,12 @@ import {
   RefreshCw,
   Server,
   Shield,
+  Trash2,
 } from 'lucide-react'
 import {
   completeTask,
   createTask,
+  deleteTask,
   getCurrentOperator,
   getReadiness,
   listTasks,
@@ -114,6 +116,13 @@ export default function Dashboard() {
     },
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: deleteTask,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+    },
+  })
+
   const tasks = tasksQuery.data ?? []
   const pendingTasks = useMemo(() => tasks.filter((task) => !task.done), [tasks])
   const doneTasks = tasks.length - pendingTasks.length
@@ -160,6 +169,12 @@ export default function Dashboard() {
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['readiness'] })
     queryClient.invalidateQueries({ queryKey: ['tasks'] })
+  }
+
+  const onDeleteTask = (id: string) => {
+    if (confirm('Delete this task permanently?')) {
+      deleteMutation.mutate(id)
+    }
   }
 
   return (
@@ -366,16 +381,27 @@ export default function Dashboard() {
                       <p className="mt-1 line-clamp-2 text-sm text-slate-500">{task.description}</p>
                     )}
                   </div>
-                  {!task.done && (
+                  <div className="flex shrink-0 items-center gap-2">
+                    {!task.done && (
+                      <button
+                        type="button"
+                        onClick={() => completeMutation.mutate(task.id)}
+                        disabled={!isAuthenticated || completeMutation.isPending}
+                        className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Complete
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={() => completeMutation.mutate(task.id)}
-                      disabled={!isAuthenticated}
-                      className="h-9 shrink-0 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={() => onDeleteTask(task.id)}
+                      disabled={!isAuthenticated || deleteMutation.isPending}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-rose-200 bg-rose-50 text-rose-700 shadow-sm hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      aria-label="Delete task"
                     >
-                      Complete
+                      <Trash2 className="h-4 w-4" />
                     </button>
-                  )}
+                  </div>
                 </div>
               ))}
             </div>

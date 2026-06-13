@@ -21,6 +21,7 @@ class NaraSessionStore {
   static const _authTokenKey = 'nara.authToken';
   static const _userKey = 'nara.user';
   static const _assistantPreferencesKey = 'nara.assistantPreferences';
+  static const _whatsAppPromptPrefix = 'nara.whatsAppPromptSeen.';
 
   Future<StoredNaraSession?> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -79,6 +80,16 @@ class NaraSessionStore {
       _assistantPreferencesKey,
       jsonEncode(preferences.toJson()),
     );
+  }
+
+  Future<bool> hasSeenWhatsAppPrompt(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('$_whatsAppPromptPrefix$userId') ?? false;
+  }
+
+  Future<void> markWhatsAppPromptSeen(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('$_whatsAppPromptPrefix$userId', true);
   }
 
   Future<void> clear() async {

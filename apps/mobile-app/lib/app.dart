@@ -6,6 +6,7 @@ import 'core/services/api_client.dart';
 import 'core/services/session_store.dart';
 import 'core/state/nara_mobile_state.dart';
 import 'core/theme/nara_theme.dart';
+import 'core/widgets/nara_logo_mark.dart';
 import 'features/assistant/assistant_screen.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/home/home_screen.dart';
@@ -26,9 +27,11 @@ class _NaraMobileAppState extends State<NaraMobileApp>
   final NaraSessionStore sessionStore = NaraSessionStore();
   final NaraMobileState appState = NaraMobileState();
   int selectedIndex = 0;
+  int tabDirection = 1;
   Map<String, dynamic>? currentUser;
   Timer? connectionTimer;
   bool restoringSession = true;
+  bool whatsAppPromptVisible = false;
 
   @override
   void initState() {
@@ -73,7 +76,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       return;
     }
 
-    apiClient.serverUrl = session.serverUrl;
+    apiClient.serverUrl = NaraApiClient.defaultServerUrl;
     apiClient.authToken = session.authToken;
     apiClient.currentUser = session.user;
     setState(() {
@@ -109,23 +112,10 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     loadAssistantProfile(silent: true);
   }
 
-  void updateServerUrl(String value) {
-    setState(() {
-      apiClient.serverUrl = value;
-      appState.connectionState = NaraConnectionState.unknown;
-      appState.connectionMessage = 'Connection needs to be checked';
-      appState.lastConnectionCheck = null;
-    });
-    sessionStore.saveServerUrl(value);
-  }
-
-  void updateAuthToken(String? token) {
-    setState(() {
-      apiClient.authToken = token;
-    });
-  }
-
-  void handleAuthenticated(Map<String, dynamic> user) {
+  void handleAuthenticated(
+    Map<String, dynamic> user, {
+    required bool isNewUser,
+  }) {
     setState(() {
       currentUser = user;
       selectedIndex = 0;
@@ -139,7 +129,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     }
     checkConnection(showChecking: false);
     loadTasks();
-    loadAssistantProfile();
+    loadAssistantProfile(forceWhatsAppPrompt: isNewUser);
   }
 
   void handleLogout() {
@@ -177,15 +167,14 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       setState(() {
         appState.connectionState =
             ok ? NaraConnectionState.connected : NaraConnectionState.attention;
-        appState.connectionMessage = ok
-            ? 'Connected to Nara server'
-            : 'Server is reachable but needs attention';
+        appState.connectionMessage =
+            ok ? 'Nara is ready' : 'Nara needs attention';
         appState.lastConnectionCheck = DateTime.now();
       });
     } catch (error) {
       setState(() {
         appState.connectionState = NaraConnectionState.offline;
-        appState.connectionMessage = 'Could not reach Nara server';
+        appState.connectionMessage = 'Could not reach Nara';
         appState.lastConnectionCheck = DateTime.now();
       });
     }
@@ -223,7 +212,10 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     }
   }
 
-  Future<void> loadAssistantProfile({bool silent = false}) async {
+  Future<void> loadAssistantProfile({
+    bool silent = false,
+    bool forceWhatsAppPrompt = false,
+  }) async {
     final userId = activeUserId;
     if (userId == null) return;
 
@@ -271,6 +263,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
         appState.whatsappContact = whatsappContact;
         appState.whatsappAccess = whatsappAccess;
       });
+      await maybeShowWhatsAppPrompt(force: forceWhatsAppPrompt);
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -283,6 +276,40 @@ class _NaraMobileAppState extends State<NaraMobileApp>
         });
       }
     }
+  }
+
+  Future<void> maybeShowWhatsAppPrompt({bool force = false}) async {
+    final userId = activeUserId;
+    if (!mounted ||
+        userId == null ||
+        whatsAppPromptVisible ||
+        appState.whatsappContact != null) {
+      return;
+    }
+
+    final hasSeen = await sessionStore.hasSeenWhatsAppPrompt(userId);
+    if (!force && hasSeen) return;
+    if (!mounted) return;
+
+    whatsAppPromptVisible = true;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _WhatsAppSetupPrompt(
+        onLater: () async {
+          await sessionStore.markWhatsAppPromptSeen(userId);
+          if (!context.mounted) return;
+          Navigator.of(context).pop();
+        },
+        onSetup: () async {
+          await sessionStore.markWhatsAppPromptSeen(userId);
+          if (!context.mounted) return;
+          Navigator.of(context).pop();
+          openTab(3);
+        },
+      ),
+    );
+    whatsAppPromptVisible = false;
   }
 
   Future<void> saveAssistantPreferences(
@@ -357,16 +384,17 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     }
   }
 
-  Future<void> createTask(String title, String? description) async {
+  Future<void> createTask(NaraTaskDraft draft) async {
     setState(() {
-      appState.tasksLoading = true;
       appState.tasksError = null;
     });
 
     try {
       final task = await apiClient.createTask(
-        title: title,
-        description: description,
+        title: draft.title,
+        description: draft.description,
+        dueAt: draft.dueAt,
+        priority: draft.priority,
       );
       setState(() {
         appState.tasks = [NaraTask.fromJson(task), ...appState.tasks];
@@ -376,10 +404,6 @@ class _NaraMobileAppState extends State<NaraMobileApp>
         appState.tasksError = 'Could not create task';
       });
       rethrow;
-    } finally {
-      setState(() {
-        appState.tasksLoading = false;
-      });
     }
   }
 
@@ -408,7 +432,11 @@ class _NaraMobileAppState extends State<NaraMobileApp>
   }
 
   void openTab(int index) {
-    setState(() => selectedIndex = index);
+    if (index == selectedIndex) return;
+    setState(() {
+      tabDirection = index > selectedIndex ? 1 : -1;
+      selectedIndex = index;
+    });
   }
 
   String? get activeUserId {
@@ -428,9 +456,10 @@ class _NaraMobileAppState extends State<NaraMobileApp>
         onRefreshTasks: loadTasks,
         onRefreshAssistant: loadAssistantProfile,
         onOpenTasks: () => openTab(1),
-        onAddTask: () => openTab(1),
-        onOpenAssistant: () => openTab(3),
-        onOpenSettings: () => openTab(4),
+        onCreateTask: createTask,
+        onCompleteTask: completeTask,
+        onOpenNara: () => openTab(3),
+        onRequestWhatsAppAccess: requestWhatsAppAccess,
       ),
       TasksScreen(
         state: appState,
@@ -446,12 +475,9 @@ class _NaraMobileAppState extends State<NaraMobileApp>
         onRequestWhatsAppAccess: requestWhatsAppAccess,
       ),
       SettingsScreen(
-        apiClient: apiClient,
         state: appState,
-        onServerUrlChanged: updateServerUrl,
-        onTestConnection: checkConnection,
-        onAuthTokenChanged: updateAuthToken,
         onLogout: handleLogout,
+        onOpenAssistant: () => openTab(3),
         user: user,
       ),
     ];
@@ -460,61 +486,174 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       debugShowCheckedModeBanner: false,
       title: 'Nara',
       theme: buildNaraTheme(),
-      home: restoringSession
-          ? const _SessionLoadingScreen()
-          : user == null
-              ? AuthScreen(
-                  apiClient: apiClient,
-                  onAuthenticated: handleAuthenticated,
-                )
-              : Scaffold(
-                  body: SafeArea(child: screens[selectedIndex]),
-                  bottomNavigationBar: NavigationBar(
-                    selectedIndex: selectedIndex,
-                    onDestinationSelected: (index) {
-                      setState(() => selectedIndex = index);
-                    },
-                    destinations: const [
-                      NavigationDestination(
-                        icon: Icon(Icons.home_outlined),
-                        selectedIcon: Icon(Icons.home),
-                        label: 'Home',
+      home: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 520),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) {
+          final slide = Tween<Offset>(
+            begin: const Offset(0.02, 0.04),
+            end: Offset.zero,
+          ).animate(animation);
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(position: slide, child: child),
+          );
+        },
+        child: restoringSession
+            ? const _SessionLoadingScreen(key: ValueKey('session-loading'))
+            : user == null
+                ? AuthScreen(
+                    key: const ValueKey('auth'),
+                    apiClient: apiClient,
+                    onAuthenticated: handleAuthenticated,
+                  )
+                : Scaffold(
+                    key: const ValueKey('app-shell'),
+                    body: SafeArea(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 260),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        transitionBuilder: (child, animation) {
+                          final slide = Tween<Offset>(
+                            begin: Offset(tabDirection * 0.06, 0),
+                            end: Offset.zero,
+                          ).animate(animation);
+                          return FadeTransition(
+                            opacity: animation,
+                            child: SlideTransition(
+                              position: slide,
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: KeyedSubtree(
+                          key: ValueKey(selectedIndex),
+                          child: screens[selectedIndex],
+                        ),
                       ),
-                      NavigationDestination(
-                        icon: Icon(Icons.checklist_outlined),
-                        selectedIcon: Icon(Icons.checklist),
-                        label: 'Tasks',
-                      ),
-                      NavigationDestination(
-                        icon: Icon(Icons.notifications_outlined),
-                        selectedIcon: Icon(Icons.notifications),
-                        label: 'Reminders',
-                      ),
-                      NavigationDestination(
-                        icon: Icon(Icons.smart_toy_outlined),
-                        selectedIcon: Icon(Icons.smart_toy),
-                        label: 'Assistant',
-                      ),
-                      NavigationDestination(
-                        icon: Icon(Icons.settings_outlined),
-                        selectedIcon: Icon(Icons.settings),
-                        label: 'Settings',
-                      ),
-                    ],
+                    ),
+                    bottomNavigationBar: NavigationBar(
+                      selectedIndex: selectedIndex,
+                      onDestinationSelected: openTab,
+                      destinations: const [
+                        NavigationDestination(
+                          icon: Icon(Icons.home_outlined),
+                          selectedIcon: Icon(Icons.home),
+                          label: 'Home',
+                        ),
+                        NavigationDestination(
+                          icon: Icon(Icons.checklist_outlined),
+                          selectedIcon: Icon(Icons.checklist),
+                          label: 'Tasks',
+                        ),
+                        NavigationDestination(
+                          icon: Icon(Icons.notifications_outlined),
+                          selectedIcon: Icon(Icons.notifications),
+                          label: 'Reminders',
+                        ),
+                        NavigationDestination(
+                          icon: Icon(Icons.smart_toy_outlined),
+                          selectedIcon: Icon(Icons.smart_toy),
+                          label: 'Nara',
+                        ),
+                        NavigationDestination(
+                          icon: Icon(Icons.person_outline),
+                          selectedIcon: Icon(Icons.person),
+                          label: 'Me',
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+      ),
     );
   }
 }
 
 class _SessionLoadingScreen extends StatelessWidget {
-  const _SessionLoadingScreen();
+  const _SessionLoadingScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
       body: SafeArea(
-        child: Center(child: CircularProgressIndicator()),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              NaraLogoMark(size: 78),
+              SizedBox(height: 18),
+              CircularProgressIndicator(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WhatsAppSetupPrompt extends StatelessWidget {
+  const _WhatsAppSetupPrompt({
+    required this.onLater,
+    required this.onSetup,
+  });
+
+  final Future<void> Function() onLater;
+  final Future<void> Function() onSetup;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Dialog(
+      insetPadding: const EdgeInsets.all(22),
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0.96, end: 1),
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutBack,
+        builder: (context, value, child) {
+          return Transform.scale(scale: value, child: child);
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const NaraLogoMark(size: 72),
+              const SizedBox(height: 16),
+              Text(
+                'Connect WhatsApp to unlock Nara Bot',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Without your WhatsApp number, Nara still works for manual tasks and reminders, but the main bot workflow cannot reach you yet.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 18),
+              FilledButton.icon(
+                onPressed: () {
+                  onSetup();
+                },
+                icon: const Icon(Icons.chat_outlined),
+                label: const Text('Set Up WhatsApp'),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () {
+                  onLater();
+                },
+                child: const Text('Later'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

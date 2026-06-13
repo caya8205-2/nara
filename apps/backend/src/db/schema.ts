@@ -16,6 +16,10 @@ export const agentAccessStatus = pgEnum('agent_access_status', [
 
 export const auditActorType = pgEnum('audit_actor_type', ['admin', 'user', 'agent', 'system'])
 
+export const taskPriority = pgEnum('task_priority', ['low', 'normal', 'high', 'urgent'])
+
+export const taskSource = pgEnum('task_source', ['manual', 'admin', 'agent', 'scheduled'])
+
 export const users = pgTable(
   'users',
   {
@@ -82,10 +86,13 @@ export const auditLogs = pgTable('audit_logs', {
 
 export const tasks = pgTable('tasks', {
   id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id),
   title: text('title').notNull(),
   description: text('description'),
   done: boolean('done').default(false),
   dueAt: timestamp('due_at'),
+  priority: taskPriority('priority').default('normal').notNull(),
+  source: taskSource('source').default('manual').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 })

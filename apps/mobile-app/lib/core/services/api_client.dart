@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
-
 class NaraApiClient {
   NaraApiClient() : serverUrl = defaultServerUrl;
+
+  static const productionServerUrl = 'https://narabot.web.id';
 
   static const configuredServerUrl = String.fromEnvironment(
     'NARA_API_BASE_URL',
@@ -12,9 +12,7 @@ class NaraApiClient {
 
   static String get defaultServerUrl {
     if (configuredServerUrl.isNotEmpty) return configuredServerUrl;
-    if (!kReleaseMode && Platform.isAndroid) return 'http://10.0.2.2:4000';
-    if (!kReleaseMode) return 'http://127.0.0.1:4000';
-    return '';
+    return productionServerUrl;
   }
 
   String serverUrl;
@@ -23,7 +21,7 @@ class NaraApiClient {
 
   Uri _uri(String path) {
     if (serverUrl.trim().isEmpty) {
-      throw const FormatException('Backend API URL is not configured');
+      throw const FormatException('Nara API is not configured');
     }
     final base = serverUrl.endsWith('/')
         ? serverUrl.substring(0, serverUrl.length - 1)
@@ -127,11 +125,15 @@ class NaraApiClient {
   Future<Map<String, dynamic>> createTask({
     required String title,
     String? description,
+    DateTime? dueAt,
+    String priority = 'normal',
   }) {
     return postJson('/api/tasks', {
       'title': title,
       if (description != null && description.trim().isNotEmpty)
         'description': description.trim(),
+      if (dueAt != null) 'dueAt': dueAt.toUtc().toIso8601String(),
+      'priority': priority,
     });
   }
 
@@ -141,6 +143,13 @@ class NaraApiClient {
     _applyHeaders(request);
     final response = await request.close();
     return _decodeResponse(response);
+  }
+
+  Future<void> deleteTask(String id) async {
+    final request = await HttpClient().deleteUrl(_uri('/api/tasks/$id'));
+    _applyHeaders(request);
+    final response = await request.close();
+    await _decodeRaw(response);
   }
 
   Future<List<dynamic>> listUserContacts(String userId) {
@@ -177,6 +186,17 @@ class NaraApiClient {
 
   Future<List<dynamic>> listUserAgentAccess(String userId) {
     return getList('/api/users/$userId/agent-access');
+  }
+
+  Future<void> deleteUserAgentAccess({
+    required String userId,
+    required String accessId,
+  }) async {
+    final request = await HttpClient()
+        .deleteUrl(_uri('/api/users/$userId/agent-access/$accessId'));
+    _applyHeaders(request);
+    final response = await request.close();
+    await _decodeRaw(response);
   }
 
   void _applyHeaders(HttpClientRequest request) {

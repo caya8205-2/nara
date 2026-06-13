@@ -6,9 +6,11 @@ import {
   Clock,
   MessageSquare,
   RefreshCw,
+  Trash2,
   XCircle,
 } from 'lucide-react'
 import {
+  deleteAgentAccess,
   listAgentAccess,
   updateAgentAccess,
   type AgentChannelAccess,
@@ -60,6 +62,14 @@ export default function WhatsAppAccess() {
     },
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: deleteAgentAccess,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent-access'] })
+      setSelectedAccess(null)
+    },
+  })
+
   const accessRecords = accessQuery.data ?? []
 
   const getUserName = (access: AgentChannelAccess) => {
@@ -84,6 +94,12 @@ export default function WhatsAppAccess() {
 
   const handleRetry = (access: AgentChannelAccess) => {
     updateMutation.mutate({ id: access.id, status: 'pending_allowlist' })
+  }
+
+  const handleDelete = (access: AgentChannelAccess) => {
+    if (confirm('Delete this WhatsApp access request permanently?')) {
+      deleteMutation.mutate(access.id)
+    }
   }
 
   return (
@@ -201,7 +217,7 @@ export default function WhatsAppAccess() {
                               <button
                                 type="button"
                                 onClick={() => handleApprove(access)}
-                                disabled={updateMutation.isPending}
+                                disabled={updateMutation.isPending || deleteMutation.isPending}
                                 className="inline-flex h-8 items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
                               >
                                 <CheckCircle2 className="h-3 w-3" />
@@ -212,7 +228,7 @@ export default function WhatsAppAccess() {
                               <button
                                 type="button"
                                 onClick={() => handleRetry(access)}
-                                disabled={updateMutation.isPending}
+                                disabled={updateMutation.isPending || deleteMutation.isPending}
                                 className="inline-flex h-8 items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                               >
                                 <RefreshCw className="h-3 w-3" />
@@ -223,13 +239,22 @@ export default function WhatsAppAccess() {
                               <button
                                 type="button"
                                 onClick={() => handleBlock(access)}
-                                disabled={updateMutation.isPending}
+                                disabled={updateMutation.isPending || deleteMutation.isPending}
                                 className="inline-flex h-8 items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-3 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
                               >
                                 <XCircle className="h-3 w-3" />
                                 Block
                               </button>
                             )}
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(access)}
+                              disabled={updateMutation.isPending || deleteMutation.isPending}
+                              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              Delete
+                            </button>
                           </div>
                         </td>
                       </tr>
