@@ -62,6 +62,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
         (currentUser != null || apiClient.currentUser != null)) {
       checkConnection(showChecking: false);
       loadTasks(silent: true);
+      loadReminders(silent: true);
       loadAssistantProfile(silent: true);
     }
   }
@@ -117,6 +118,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
 
     checkConnection(showChecking: false);
     loadTasks(silent: true);
+    loadReminders(silent: true);
     loadAssistantProfile(silent: true);
   }
 
@@ -139,6 +141,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     }
     checkConnection(showChecking: false);
     loadTasks();
+    loadReminders();
     loadAssistantProfile(forceWhatsAppPrompt: isNewUser);
   }
 
@@ -150,6 +153,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       apiClient.logout();
       currentUser = null;
       appState.tasks = [];
+      appState.reminders = [];
       appState.approvals = [];
       appState.activity = [];
       appState.connectionState = NaraConnectionState.unknown;
@@ -175,6 +179,9 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       appState.tasks = [];
       appState.tasksError = null;
       appState.tasksLoading = false;
+      appState.reminders = [];
+      appState.remindersError = null;
+      appState.remindersLoading = false;
       appState.approvals = [];
       appState.activity = [];
       appState.assistantLoading = false;
@@ -258,6 +265,33 @@ class _NaraMobileAppState extends State<NaraMobileApp>
         setState(() {
           appState.tasksLoading = false;
         });
+      }
+    }
+  }
+
+  Future<void> loadReminders({bool silent = false}) async {
+    if (isGuest) return;
+    if (!silent) {
+      setState(() {
+        appState.remindersLoading = true;
+        appState.remindersError = null;
+      });
+    }
+
+    try {
+      final result = await apiClient.listReminders();
+      final reminders = result
+          .whereType<Map<String, dynamic>>()
+          .map(NaraReminder.fromJson)
+          .toList();
+      if (!mounted) return;
+      setState(() => appState.reminders = reminders);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => appState.remindersError = 'Could not load reminders');
+    } finally {
+      if (!silent && mounted) {
+        setState(() => appState.remindersLoading = false);
       }
     }
   }
@@ -598,6 +632,70 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     }
   }
 
+  Future<void> createReminder(NaraReminderDraft draft) async {
+    if (isGuest) {
+      _showGuestDialog();
+      return;
+    }
+    final reminder = NaraReminder.fromJson(await apiClient.createReminder(
+      name: draft.name,
+      kind: draft.kind,
+      description: draft.description,
+      scheduledAt: draft.scheduledAt,
+      cronExpr: draft.cronExpr,
+    ));
+    if (!mounted) return;
+    setState(() {
+      appState.reminders = [reminder, ...appState.reminders];
+      appState.remindersError = null;
+    });
+  }
+
+  Future<void> setReminderEnabled(NaraReminder reminder, bool enabled) async {
+    final previous = List<NaraReminder>.from(appState.reminders);
+    setState(() {
+      appState.reminders = appState.reminders
+          .map((item) => item.id == reminder.id
+              ? item.copyWith(enabled: enabled)
+              : item)
+          .toList();
+    });
+    try {
+      final updated = NaraReminder.fromJson(
+        await apiClient.updateReminder(reminder.id, enabled: enabled),
+      );
+      if (!mounted) return;
+      setState(() {
+        appState.reminders = appState.reminders
+            .map((item) => item.id == reminder.id ? updated : item)
+            .toList();
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        appState.reminders = previous;
+        appState.remindersError = 'Could not update reminder';
+      });
+    }
+  }
+
+  Future<void> deleteReminder(String id) async {
+    final previous = List<NaraReminder>.from(appState.reminders);
+    setState(() {
+      appState.reminders =
+          appState.reminders.where((item) => item.id != id).toList();
+    });
+    try {
+      await apiClient.deleteReminder(id);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        appState.reminders = previous;
+        appState.remindersError = 'Could not delete reminder';
+      });
+    }
+  }
+
   Future<void> handleApprove(NaraApproval approval) async {
     // Placeholder — connect to backend endpoint later
     setState(() {
@@ -686,7 +784,13 @@ class _NaraMobileAppState extends State<NaraMobileApp>
         onOpenTaskDetail: _showTaskDetail,
       ),
       // 2 — Reminders
-      RemindersScreen(state: appState),
+      RemindersScreen(
+        state: appState,
+        onRefresh: loadReminders,
+        onCreate: createReminder,
+        onSetEnabled: setReminderEnabled,
+        onDelete: deleteReminder,
+      ),
       // 3 — Assistant
       AssistantScreen(
         state: appState,

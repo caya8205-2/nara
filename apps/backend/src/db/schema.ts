@@ -20,6 +20,8 @@ export const taskPriority = pgEnum('task_priority', ['low', 'normal', 'high', 'u
 
 export const taskSource = pgEnum('task_source', ['manual', 'admin', 'agent', 'scheduled'])
 
+export const reminderKind = pgEnum('reminder_kind', ['once', 'recurring'])
+
 export const users = pgTable(
   'users',
   {
@@ -118,11 +120,18 @@ export const tasks = pgTable('tasks', {
 
 export const schedules = pgTable('schedules', {
   id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id),
   name: text('name').notNull(),
-  cronExpr: text('cron_expr').notNull(),
-  action: text('action').notNull(),
-  enabled: boolean('enabled').default(true),
+  description: text('description'),
+  kind: reminderKind('kind').default('once').notNull(),
+  scheduledAt: timestamp('scheduled_at'),
+  cronExpr: text('cron_expr'),
+  timezone: text('timezone').default('Asia/Jakarta').notNull(),
+  action: text('action').default('notify').notNull(),
+  source: taskSource('source').default('manual').notNull(),
+  enabled: boolean('enabled').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 })
 
 export const clients = pgTable('clients', {

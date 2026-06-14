@@ -2,6 +2,15 @@
 
 This file combines the current planning, architecture, ADR, deployment, and design notes for sharing with other AI agents or collaborators.
 
+## Current Implementation Snapshot
+
+- Mobile task management is connected to user-scoped backend CRUD.
+- Mobile reminders are connected to user-scoped create, list, pause, resume, delete, and pull-to-refresh flows.
+- Reminder records support one-time schedules through `scheduledAt` and recurring schedules through `cronExpr` plus timezone.
+- OpenClaw-facing agent tools support user-scoped task and reminder lifecycles.
+- Agent-triggered reminder mutations are written to audit logs.
+- Redis/BullMQ reminder delivery, local/push notifications, and approval execution remain future milestones.
+
 ---
 
 Source: docs/architecture.md

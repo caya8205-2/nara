@@ -134,6 +134,7 @@ app.get('/health', async () => ({
 app.register(import('./routes/readiness.js'), { prefix: '/api/readiness' })
 app.register(import('./routes/auth.js'), { prefix: '/api/auth' })
 app.register(import('./routes/tasks.js'), { prefix: '/api/tasks' })
+app.register(import('./routes/reminders.js'), { prefix: '/api/reminders' })
 app.register(import('./routes/users.js'), { prefix: '/api/users' })
 app.register(import('./routes/agent-access.js'), { prefix: '/api/agent-access' })
 app.register(import('./routes/agent-tools.js'), { prefix: '/api/agent' })
@@ -141,7 +142,6 @@ app.register(import('./routes/logs.js'), { prefix: '/api/logs' })
 app.register(import('./routes/backup.js'), { prefix: '/api/backup' })
 
 // Stubs - uncomment as implemented
-// app.register(import('./routes/schedules.js'), { prefix: '/api/schedules' })
 // app.register(import('./routes/reports.js'), { prefix: '/api/reports' })
 // app.register(import('./routes/clients.js'), { prefix: '/api/clients' })
 

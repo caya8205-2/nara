@@ -122,6 +122,20 @@ Task rows include:
 - due date
 - source: manual, admin, Nara, or schedule
 
+## Reminders
+
+Reminder data is stored in PostgreSQL and scoped to the signed-in mobile user through authenticated endpoints:
+
+- `GET /api/reminders`
+- `GET /api/reminders/:id`
+- `POST /api/reminders`
+- `PATCH /api/reminders/:id`
+- `DELETE /api/reminders/:id`
+
+The mobile screen supports creating, listing, pausing, resuming, deleting, and pull-to-refresh. One-time reminders use `scheduledAt`. Recurring reminders currently offer daily, weekly, and monthly presets backed by cron expressions and the `Asia/Jakarta` timezone.
+
+This milestone stores reminder intent only. Redis/BullMQ execution and local/push notification delivery are intentionally separate follow-up work.
+
 ## Validation
 
 From the mobile app folder:
@@ -200,6 +214,6 @@ Avoid copy themes:
 
 1. Move token storage from `shared_preferences` to secure storage before production hardening.
 2. Redesign the welcome/login/register surface using the Auth UI Redesign Handoff above.
-3. Add reminders once backend schedule/reminder endpoints are ready.
+3. Add Redis/BullMQ reminder execution and decide the local/push notification strategy.
 4. Add approval queue once backend approval endpoints exist.
-5. Add notification strategy after reminder behavior is stable.
+5. Add reminder edit controls beyond pause/resume and the current recurrence presets.

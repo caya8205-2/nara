@@ -60,6 +60,18 @@ class NaraApiClient {
     return _decodeResponse(response);
   }
 
+  Future<Map<String, dynamic>> patchJson(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
+    final request = await HttpClient().patchUrl(_uri(path));
+    _applyHeaders(request);
+    request.headers.contentType = ContentType.json;
+    request.write(jsonEncode(body));
+    final response = await request.close();
+    return _decodeResponse(response);
+  }
+
   Future<List<dynamic>> getList(String path) async {
     final request = await HttpClient().getUrl(_uri(path));
     _applyHeaders(request);
@@ -159,6 +171,43 @@ class NaraApiClient {
 
   Future<void> deleteTask(String id) async {
     final request = await HttpClient().deleteUrl(_uri('/api/tasks/$id'));
+    _applyHeaders(request);
+    final response = await request.close();
+    await _decodeRaw(response);
+  }
+
+  Future<List<dynamic>> listReminders() {
+    return getList('/api/reminders');
+  }
+
+  Future<Map<String, dynamic>> createReminder({
+    required String name,
+    required String kind,
+    String? description,
+    DateTime? scheduledAt,
+    String? cronExpr,
+  }) {
+    return postJson('/api/reminders', {
+      'name': name,
+      'kind': kind,
+      if (description != null && description.trim().isNotEmpty)
+        'description': description.trim(),
+      if (scheduledAt != null)
+        'scheduledAt': scheduledAt.toUtc().toIso8601String(),
+      if (cronExpr != null) 'cronExpr': cronExpr,
+      'timezone': 'Asia/Jakarta',
+    });
+  }
+
+  Future<Map<String, dynamic>> updateReminder(
+    String id, {
+    required bool enabled,
+  }) {
+    return patchJson('/api/reminders/$id', {'enabled': enabled});
+  }
+
+  Future<void> deleteReminder(String id) async {
+    final request = await HttpClient().deleteUrl(_uri('/api/reminders/$id'));
     _applyHeaders(request);
     final response = await request.close();
     await _decodeRaw(response);

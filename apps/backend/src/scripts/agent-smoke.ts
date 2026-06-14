@@ -17,6 +17,14 @@ type User = {
   email?: string
 }
 
+type Reminder = {
+  id: string
+  name: string
+  enabled: boolean
+  kind: 'once' | 'recurring'
+  userId?: string
+}
+
 const backendUrl = process.env.NARA_BACKEND_URL ?? `http://127.0.0.1:${env.PORT}`
 const cleanup = process.argv.includes('--cleanup')
 
@@ -116,6 +124,40 @@ async function main() {
   if (completed.task.userId !== user.id) throw new Error('Completed task is not scoped to smoke user')
   console.log(`Completed: ${completed.task.id}`)
 
+  const reminderName = `Agent reminder ${new Date().toISOString()}`
+  const createdReminder = await callTool<{ reminder: Reminder; message: string }>(
+    '/reminders/create',
+    {
+      ...context,
+      name: reminderName,
+      kind: 'once',
+      scheduledAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      confirmed: true,
+    },
+  )
+  console.log(`Reminder created: ${createdReminder.reminder.id}`)
+
+  const listedReminders = await callTool<{ reminders: Reminder[]; count: number }>(
+    '/reminders/list',
+    context,
+  )
+  if (!listedReminders.reminders.some((item) => item.id === createdReminder.reminder.id)) {
+    throw new Error('Created reminder was not returned by list_reminders')
+  }
+  console.log(`Reminders for user: ${listedReminders.count}`)
+
+  const pausedReminder = await callTool<{ reminder: Reminder; message: string }>(
+    '/reminders/update',
+    {
+      ...context,
+      id: createdReminder.reminder.id,
+      enabled: false,
+      confirmed: true,
+    },
+  )
+  if (pausedReminder.reminder.enabled) throw new Error('Reminder was not paused')
+  console.log(`Reminder paused: ${pausedReminder.reminder.id}`)
+
   const summary = await callTool<{ summary: unknown }>('/summary', context)
   console.log(`Summary: ${JSON.stringify(summary.summary)}`)
 
@@ -126,6 +168,12 @@ async function main() {
       confirmed: true,
     })
     console.log(`Deleted: ${created.task.id}`)
+    await callTool('/reminders/delete', {
+      ...context,
+      id: createdReminder.reminder.id,
+      confirmed: true,
+    })
+    console.log(`Reminder deleted: ${createdReminder.reminder.id}`)
   }
 
   console.log('Agent smoke test passed.')

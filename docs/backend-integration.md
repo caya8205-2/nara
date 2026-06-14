@@ -67,6 +67,11 @@ Returns:
     overdueTasks: number
     nextDue: string | null
   }
+  reminderSummary: {
+    activeReminders: number
+    pausedReminders: number
+    recurringReminders: number
+  }
   instructions: string[]
   toolContext: {
     userId: string
@@ -89,6 +94,17 @@ Task tools are user-scoped:
 - `POST /api/agent/summary`
 
 Mutating tools respect `assistantProfile.autonomy`. For `Suggest` and `Confirm`, the backend returns `409` until the request includes `confirmed: true`.
+
+### Reminder Tools
+
+Reminder tools use the same user resolution and confirmation rules:
+
+- `POST /api/agent/reminders/create`
+- `POST /api/agent/reminders/list`
+- `POST /api/agent/reminders/update`
+- `POST /api/agent/reminders/delete`
+
+One-time reminders require `scheduledAt`. Recurring reminders require `cronExpr` and support a timezone. These tools persist reminder intent; Redis/BullMQ delivery execution is a separate worker milestone.
 
 ### Local Smoke Test
 

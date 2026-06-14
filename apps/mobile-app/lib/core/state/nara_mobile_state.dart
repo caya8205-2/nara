@@ -99,6 +99,76 @@ class NaraTaskDraft {
   final String priority;
 }
 
+class NaraReminder {
+  const NaraReminder({
+    required this.id,
+    required this.name,
+    required this.kind,
+    required this.enabled,
+    required this.timezone,
+    required this.source,
+    this.description,
+    this.scheduledAt,
+    this.cronExpr,
+  });
+
+  final String id;
+  final String name;
+  final String? description;
+  final String kind;
+  final DateTime? scheduledAt;
+  final String? cronExpr;
+  final String timezone;
+  final String source;
+  final bool enabled;
+
+  factory NaraReminder.fromJson(Map<String, dynamic> json) {
+    final scheduledAtRaw = json['scheduledAt']?.toString();
+    return NaraReminder(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? 'Untitled reminder',
+      description: json['description']?.toString(),
+      kind: json['kind']?.toString() ?? 'once',
+      scheduledAt:
+          scheduledAtRaw == null ? null : DateTime.tryParse(scheduledAtRaw),
+      cronExpr: json['cronExpr']?.toString(),
+      timezone: json['timezone']?.toString() ?? 'Asia/Jakarta',
+      source: json['source']?.toString() ?? 'manual',
+      enabled: json['enabled'] != false,
+    );
+  }
+
+  NaraReminder copyWith({bool? enabled}) {
+    return NaraReminder(
+      id: id,
+      name: name,
+      description: description,
+      kind: kind,
+      scheduledAt: scheduledAt,
+      cronExpr: cronExpr,
+      timezone: timezone,
+      source: source,
+      enabled: enabled ?? this.enabled,
+    );
+  }
+}
+
+class NaraReminderDraft {
+  const NaraReminderDraft({
+    required this.name,
+    required this.kind,
+    this.description,
+    this.scheduledAt,
+    this.cronExpr,
+  });
+
+  final String name;
+  final String? description;
+  final String kind;
+  final DateTime? scheduledAt;
+  final String? cronExpr;
+}
+
 class NaraContact {
   const NaraContact({
     required this.id,
@@ -288,6 +358,10 @@ class NaraMobileState {
   String? tasksError;
   List<NaraTask> tasks = [];
 
+  bool remindersLoading = false;
+  String? remindersError;
+  List<NaraReminder> reminders = [];
+
   List<NaraApproval> approvals = [];
   List<NaraActivity> activity = [];
 
@@ -314,6 +388,22 @@ class NaraMobileState {
       tasks.where((task) => task.done).toList();
 
   List<NaraTask> get latestTasks => tasks.take(3).toList();
+
+  List<NaraReminder> get upcomingReminders => reminders
+      .where((reminder) => reminder.enabled && reminder.kind == 'once')
+      .toList()
+    ..sort((a, b) {
+      if (a.scheduledAt == null) return 1;
+      if (b.scheduledAt == null) return -1;
+      return a.scheduledAt!.compareTo(b.scheduledAt!);
+    });
+
+  List<NaraReminder> get recurringReminders => reminders
+      .where((reminder) => reminder.enabled && reminder.kind == 'recurring')
+      .toList();
+
+  List<NaraReminder> get pausedReminders =>
+      reminders.where((reminder) => !reminder.enabled).toList();
 
   String get whatsappStatusLabel {
     if (assistantLoading) return 'Checking';

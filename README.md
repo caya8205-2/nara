@@ -298,6 +298,16 @@ Identity and Nara Bot access endpoints:
 
 These endpoints store user WhatsApp access intent in Nara's database. OpenClaw allowlist sync is intentionally behind a future service/worker boundary.
 
+Reminder endpoints:
+
+* `GET /api/reminders`
+* `GET /api/reminders/:id`
+* `POST /api/reminders`
+* `PATCH /api/reminders/:id`
+* `DELETE /api/reminders/:id`
+
+Reminder records are scoped to the signed-in mobile user. One-time reminders use `scheduledAt`; recurring reminders use a cron expression and timezone. Delivery execution through Redis/BullMQ remains the next backend milestone.
+
 Backup uses `BACKUP_DIR` for local backup files. Database export tries host `pg_dump` first and falls back to `docker exec` with `POSTGRES_CONTAINER_NAME`, which defaults to the Docker Compose container name:
 
 ```text
@@ -310,7 +320,7 @@ Test the agent tool endpoints without WhatsApp:
 npm run agent:smoke
 ```
 
-The smoke test creates a temporary user when `--user-id` is not provided, fetches user-specific agent context, creates a user-scoped task, lists it, completes it, reads a summary, and can clean up the task.
+The smoke test creates a temporary user when `--user-id` is not provided, exercises the user-scoped task and reminder lifecycles, reads a summary, and can clean up the generated records.
 
 To test an existing user or delete the smoke-test task after the run:
 
@@ -403,9 +413,9 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
 
 ### Phase 3: Operational Core
 
-* [ ] Task management CRUD
+* [x] Task management CRUD
 * [x] User-scoped task ownership for mobile app data
-* [ ] Schedule management CRUD
+* [x] User-scoped reminder and schedule CRUD
 * [ ] Reminder worker with Redis/BullMQ
 * [ ] Reporting service
 * [ ] Client/contact management
@@ -413,7 +423,7 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
 * [ ] Role-aware user access control beyond the MVP auth gate
 * [x] User WhatsApp contact and Nara Bot allowlist model
 * [x] Audit logs foundation for identity and access changes
-* [ ] Audit logs for agent-triggered actions
+* [x] Audit logs for agent-triggered reminder actions
 
 ### Phase 4: Mobile App
 
@@ -425,6 +435,7 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
 * [x] Shared mobile connection state with automatic and pull-to-refresh checks
 * [x] Mobile task create and complete actions
 * [x] Mobile task priority, due date, and Today/Open/Done grouping
+* [x] Mobile reminder create, list, pause, resume, delete, and pull-to-refresh
 * [x] Personality and assistant setup screen with persisted local preferences
 * [x] WhatsApp number and Nara Bot access request screen
 * [x] Home Nara Bot status backed by user contact and agent access data
@@ -459,6 +470,7 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
 * [x] Expand OpenClaw tool definitions with user context and scoped task tools
 * [x] Backend assistant profile for user-specific agent personality
 * [x] No-WhatsApp agent smoke test with user-scoped task lifecycle
+* [x] User-scoped reminder tools and smoke-test lifecycle
 * [ ] Scheduled report generation
 * [ ] Agent-safe confirmation flow for destructive actions
 * [ ] Memory/context storage for business workflows

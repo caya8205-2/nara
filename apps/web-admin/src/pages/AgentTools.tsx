@@ -55,6 +55,53 @@ const tools: Tool[] = [
     examplePayload: '{}',
     requiresAuth: true,
   },
+  {
+    id: 'create_reminder',
+    name: 'create_reminder',
+    endpoint: '/api/agent/reminders/create',
+    description: 'Create a user-scoped one-time or recurring reminder',
+    examplePayload: JSON.stringify({
+      userId: 'user-uuid-here',
+      name: 'Follow up with supplier',
+      kind: 'once',
+      scheduledAt: new Date(Date.now() + 3600000).toISOString(),
+      confirmed: true,
+    }, null, 2),
+    requiresAuth: true,
+  },
+  {
+    id: 'list_reminders',
+    name: 'list_reminders',
+    endpoint: '/api/agent/reminders/list',
+    description: 'List reminders within one user scope',
+    examplePayload: JSON.stringify({ userId: 'user-uuid-here' }, null, 2),
+    requiresAuth: true,
+  },
+  {
+    id: 'update_reminder',
+    name: 'update_reminder',
+    endpoint: '/api/agent/reminders/update',
+    description: 'Edit, pause, or resume a reminder',
+    examplePayload: JSON.stringify({
+      userId: 'user-uuid-here',
+      id: 'reminder-uuid-here',
+      enabled: false,
+      confirmed: true,
+    }, null, 2),
+    requiresAuth: true,
+  },
+  {
+    id: 'delete_reminder',
+    name: 'delete_reminder',
+    endpoint: '/api/agent/reminders/delete',
+    description: 'Delete a user-scoped reminder after confirmation',
+    examplePayload: JSON.stringify({
+      userId: 'user-uuid-here',
+      id: 'reminder-uuid-here',
+      confirmed: true,
+    }, null, 2),
+    requiresAuth: true,
+  },
 ]
 
 type TestResult = {
