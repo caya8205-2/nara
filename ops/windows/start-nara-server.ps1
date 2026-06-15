@@ -1,6 +1,6 @@
 param(
-  [ValidateSet("foreground", "pm2")]
-  [string]$Mode = "foreground",
+  [ValidateSet("services", "foreground", "pm2")]
+  [string]$Mode = "services",
 
   [switch]$SkipInfra,
   [switch]$SkipMigrate,
@@ -115,6 +115,25 @@ if ($Mode -eq "pm2") {
 
   Invoke-Step "Saving PM2 process list" {
     pm2 save
+  }
+
+  Invoke-Step "Checking Nara health" {
+    powershell -ExecutionPolicy Bypass -File ".\ops\windows\check-nara-health.ps1"
+  }
+  exit 0
+}
+
+if ($Mode -eq "services") {
+  Invoke-Step "Starting Nara services" {
+    $args = @()
+    if ($SkipOpenClaw) {
+      $args += "-SkipOpenClaw"
+    }
+    if ($Skip9Router) {
+      $args += "-Skip9Router"
+    }
+
+    powershell -ExecutionPolicy Bypass -File ".\ops\windows\start-nara-services.ps1" @args
   }
 
   Invoke-Step "Checking Nara health" {

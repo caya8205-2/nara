@@ -3,6 +3,7 @@ param(
   [string]$OpenClawUrl = "http://127.0.0.1:18789",
   [string]$OperatorUsername,
   [string]$OperatorPassword,
+  [switch]$ExpectPm2,
   [switch]$Json
 )
 
@@ -143,10 +144,14 @@ $checks = @()
 $operatorToken = Get-OperatorToken
 $authHeaders = if ($operatorToken) { @{ Authorization = "Bearer $operatorToken" } } else { $null }
 $checks += Test-DockerContainers
-$checks += Test-Pm2Process "nara-backend"
-$checks += Test-Pm2Process "openclaw-gateway"
-$checks += Test-Pm2Process "openclaw-dashboard"
-$checks += Test-Pm2Process "9router"
+if ($ExpectPm2) {
+  $checks += Test-Pm2Process "nara-backend"
+  $checks += Test-Pm2Process "openclaw-gateway"
+  $checks += Test-Pm2Process "openclaw-dashboard"
+  $checks += Test-Pm2Process "9router"
+} else {
+  $checks += Skip-Check "pm2 process list" "not required unless -ExpectPm2 is provided"
+}
 $checks += Test-HttpJson "backend health" "$BackendUrl/health"
 $checks += Test-HttpJson "backend readiness" "$BackendUrl/api/readiness"
 if ($authHeaders) {

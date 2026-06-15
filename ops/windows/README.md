@@ -39,13 +39,33 @@ Or run the guided server bootstrap script:
 npm start
 ```
 
+`npm start` checks prerequisites, starts Docker services, applies migrations, builds the apps, then starts Nara services through `npm run start:server`.
+
 Start backend for a quick foreground test:
 
 ```powershell
 npm --workspace @nara/backend run start
 ```
 
-For a persistent local process manager, use PM2 or a Windows service wrapper. PM2 is convenient during MVP, but the important contract is the same: backend must run from the repo root with `.env` available.
+For the current Windows MVP server, prefer the plain Windows service launcher first:
+
+```powershell
+npm run start:server
+```
+
+This starts the built backend, OpenClaw gateway, OpenClaw dashboard, and 9router in hidden Windows processes with logs under:
+
+```text
+.tmp\service-logs
+```
+
+Use this path when setting up the office server under time pressure. PM2 is still documented below, but it has Windows argument parsing quirks and should be treated as optional hardening, not the default path.
+
+For backend-only recovery:
+
+```powershell
+npm run start:server:backend
+```
 
 ## Suggested PM2 Commands
 
@@ -55,7 +75,7 @@ Install PM2 globally if the server does not have it:
 npm install -g pm2
 ```
 
-Start the built backend:
+Start the built backend manually with PM2:
 
 ```powershell
 pm2 start npm --name nara-backend -- --workspace @nara/backend run start
@@ -83,7 +103,7 @@ The backend process runs compiled code directly with:
 node --env-file-if-exists=.env apps/backend/dist/index.js
 ```
 
-PM2 launches these services through `ops/windows/pm2-ecosystem.config.cjs`, which calls `ops/windows/pm2-service-runner.mjs`. This avoids Windows PM2 argument parsing issues where commands can fail with errors such as `unknown option '--workspace'` or `unknown option '-N'`, and keeps process names stable for `pm2 describe`.
+PM2 launches these services through `ops/windows/pm2-ecosystem.config.cjs`, which calls `ops/windows/pm2-service-runner.mjs`. If PM2 still reports `unknown option '--workspace'`, `unknown option '-N'`, or `Process or Namespace nara-backend not found` on a fresh Windows server, stop using PM2 for that setup session and use `npm run start:server` instead.
 
 For backend-only recovery:
 
@@ -113,7 +133,13 @@ To include the authenticated reminder execution summary, pass local operator cre
 powershell -ExecutionPolicy Bypass -File .\ops\windows\check-nara-health.ps1 -OperatorUsername admin -OperatorPassword "<password-from-env>"
 ```
 
-The unauthenticated checks cover Docker, PM2, backend `/health`, backend `/api/readiness`, and OpenClaw Control UI. Reminder execution is skipped unless credentials are provided.
+The unauthenticated checks cover Docker, backend `/health`, backend `/api/readiness`, and OpenClaw Control UI. Reminder execution is skipped unless credentials are provided.
+
+PM2 checks are optional because the recommended Windows launcher does not use PM2:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\ops\windows\check-nara-health.ps1 -ExpectPm2
+```
 
 ## Reminder Worker
 
@@ -210,7 +236,7 @@ Use `setup-openclaw-whatsapp.ps1` to update owner/self-phone setup safely. It cr
 6. Run `npm run infra:up`.
 7. Run `npm run db:migrate`.
 8. Run `npm run build`.
-9. Start backend with `start-nara-server.ps1` or PM2.
+9. Start services with `npm run start:server`.
 10. Run `check-nara-health.ps1`.
 11. Configure Cloudflare Tunnel to `http://127.0.0.1:4000`.
 12. Install and configure OpenClaw WhatsApp.

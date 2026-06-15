@@ -267,7 +267,7 @@ It covers the repeatable setup path for:
 * backend/admin process management on Windows
 * Cloudflare Tunnel routing to the backend
 * OpenClaw WhatsApp setup, self-phone development mode, and server migration notes
-* `start-nara-server.ps1` and `check-nara-health.ps1` for daily server operation
+* `start-nara-server.ps1`, `start-nara-services.ps1`, and `check-nara-health.ps1` for daily server operation
 
 The helper scripts in `ops/windows` intentionally do not commit secrets, Cloudflare tunnel tokens, OpenClaw config, or WhatsApp linked-device credentials.
 
@@ -275,10 +275,14 @@ Shortcut commands for the office server PC:
 
 ```powershell
 npm start
+npm run start:server
+npm run start:server:backend
 npm run start:pm2
 npm run start:pm2:backend
 npm run health-check
 ```
+
+For Windows server setup, use `npm run start:server` first. It avoids PM2's Windows argument parsing issues by starting the backend, OpenClaw gateway/dashboard, and 9router as hidden Windows processes. Logs are written to `.tmp\service-logs`.
 
 Backend structured logs are written as newline-delimited JSON:
 
@@ -498,4 +502,4 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
 
 ## License
 
-TBD
+MIT

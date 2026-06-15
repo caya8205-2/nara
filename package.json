@@ -10,6 +10,8 @@
   ],
   "scripts": {
     "start": "powershell -ExecutionPolicy Bypass -File ./ops/windows/start-nara-server.ps1",
+    "start:server": "powershell -ExecutionPolicy Bypass -File ./ops/windows/start-nara-services.ps1",
+    "start:server:backend": "powershell -ExecutionPolicy Bypass -File ./ops/windows/start-nara-services.ps1 -SkipOpenClaw -Skip9Router",
     "start:pm2": "powershell -ExecutionPolicy Bypass -File ./ops/windows/start-nara-server.ps1 -Mode pm2",
     "start:pm2:backend": "powershell -ExecutionPolicy Bypass -File ./ops/windows/start-nara-server.ps1 -Mode pm2 -SkipOpenClaw -Skip9Router",
     "health-check": "powershell -ExecutionPolicy Bypass -File ./ops/windows/check-nara-health.ps1",
