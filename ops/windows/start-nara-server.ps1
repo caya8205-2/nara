@@ -48,7 +48,7 @@ function Start-Pm2Command {
 
   pm2 delete $Name 2>$null | Out-Null
 
-  pm2 start node --name $Name -- ops/windows/pm2-service-runner.mjs $Name | Out-Host
+  pm2 start ".\ops\windows\pm2-ecosystem.config.cjs" --only $Name | Out-Host
 }
 
 Require-RepoRoot

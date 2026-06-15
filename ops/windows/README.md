@@ -83,7 +83,7 @@ The backend process runs compiled code directly with:
 node --env-file-if-exists=.env apps/backend/dist/index.js
 ```
 
-PM2 launches these services through `ops/windows/pm2-service-runner.mjs`. This avoids Windows PM2 argument parsing issues where commands can fail with errors such as `unknown option '--workspace'` or `unknown option '-N'`.
+PM2 launches these services through `ops/windows/pm2-ecosystem.config.cjs`, which calls `ops/windows/pm2-service-runner.mjs`. This avoids Windows PM2 argument parsing issues where commands can fail with errors such as `unknown option '--workspace'` or `unknown option '-N'`, and keeps process names stable for `pm2 describe`.
 
 For backend-only recovery:
 
