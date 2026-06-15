@@ -122,12 +122,13 @@ function Test-Pm2Process {
   }
 
   try {
-    $list = pm2 jlist | ConvertFrom-Json
-    $process = $list | Where-Object { $_.name -eq $ProcessName } | Select-Object -First 1
+    $description = pm2 describe $ProcessName 2>$null | Out-String
+    $isFound = $LASTEXITCODE -eq 0 -and $description -notmatch "doesn't exist"
+    $isOnline = $isFound -and $description -match "online"
     return [pscustomobject]@{
       name = "pm2 $ProcessName"
-      ok = $null -ne $process -and $process.pm2_env.status -eq "online"
-      detail = if ($null -eq $process) { "not found" } else { $process.pm2_env.status }
+      ok = $isOnline
+      detail = if (!$isFound) { "not found" } elseif ($isOnline) { "online" } else { "not online" }
     }
   } catch {
     return [pscustomobject]@{

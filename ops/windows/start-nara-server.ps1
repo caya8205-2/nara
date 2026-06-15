@@ -46,10 +46,7 @@ function Start-Pm2Command {
     [string]$Name
   )
 
-  $existing = pm2 jlist | ConvertFrom-Json | Where-Object { $_.name -eq $Name } | Select-Object -First 1
-  if ($null -ne $existing) {
-    pm2 delete $Name | Out-Host
-  }
+  pm2 delete $Name 2>$null | Out-Null
 
   pm2 start node --name $Name -- ops/windows/pm2-service-runner.mjs $Name | Out-Host
 }
