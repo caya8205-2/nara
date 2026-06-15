@@ -276,6 +276,7 @@ Shortcut commands for the office server PC:
 ```powershell
 npm start
 npm run start:pm2
+npm run start:pm2:backend
 npm run health-check
 ```
 

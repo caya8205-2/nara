@@ -105,7 +105,9 @@ function Test-DockerContainers {
   }
 }
 
-function Test-Pm2 {
+function Test-Pm2Process {
+  param([string]$ProcessName)
+
   $pm2 = Get-Command "pm2.cmd" -ErrorAction SilentlyContinue
   if ($null -eq $pm2) {
     $pm2 = Get-Command "pm2" -ErrorAction SilentlyContinue
@@ -113,7 +115,7 @@ function Test-Pm2 {
 
   if ($null -eq $pm2) {
     return [pscustomobject]@{
-      name = "pm2"
+      name = "pm2 $ProcessName"
       ok = $false
       detail = "not installed or not on PATH"
     }
@@ -121,15 +123,15 @@ function Test-Pm2 {
 
   try {
     $list = pm2 jlist | ConvertFrom-Json
-    $backend = $list | Where-Object { $_.name -eq "nara-backend" } | Select-Object -First 1
+    $process = $list | Where-Object { $_.name -eq $ProcessName } | Select-Object -First 1
     return [pscustomobject]@{
-      name = "pm2 nara-backend"
-      ok = $null -ne $backend -and $backend.pm2_env.status -eq "online"
-      detail = if ($null -eq $backend) { "not found" } else { $backend.pm2_env.status }
+      name = "pm2 $ProcessName"
+      ok = $null -ne $process -and $process.pm2_env.status -eq "online"
+      detail = if ($null -eq $process) { "not found" } else { $process.pm2_env.status }
     }
   } catch {
     return [pscustomobject]@{
-      name = "pm2 nara-backend"
+      name = "pm2 $ProcessName"
       ok = $false
       detail = $_.Exception.Message
     }
@@ -140,7 +142,10 @@ $checks = @()
 $operatorToken = Get-OperatorToken
 $authHeaders = if ($operatorToken) { @{ Authorization = "Bearer $operatorToken" } } else { $null }
 $checks += Test-DockerContainers
-$checks += Test-Pm2
+$checks += Test-Pm2Process "nara-backend"
+$checks += Test-Pm2Process "openclaw-gateway"
+$checks += Test-Pm2Process "openclaw-dashboard"
+$checks += Test-Pm2Process "9router"
 $checks += Test-HttpJson "backend health" "$BackendUrl/health"
 $checks += Test-HttpJson "backend readiness" "$BackendUrl/api/readiness"
 if ($authHeaders) {

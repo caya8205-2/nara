@@ -68,6 +68,29 @@ The same flow can be started through:
 npm run start:pm2
 ```
 
+`npm run start:pm2` starts these PM2 processes:
+
+```text
+nara-backend
+openclaw-gateway
+openclaw-dashboard
+9router
+```
+
+The backend process runs compiled code directly with:
+
+```powershell
+node --env-file-if-exists=.env apps/backend/dist/index.js
+```
+
+This avoids the Windows PM2 argument parsing issue where `pm2 start npm -- --workspace ...` can fail with `unknown option '--workspace'`.
+
+For backend-only recovery:
+
+```powershell
+npm run start:pm2:backend
+```
+
 For the local admin dashboard, prefer opening the Vite dev server only on the server PC while developing:
 
 ```powershell

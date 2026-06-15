@@ -5,6 +5,8 @@ param(
   [switch]$SkipInfra,
   [switch]$SkipMigrate,
   [switch]$SkipBuild,
+  [switch]$SkipOpenClaw,
+  [switch]$Skip9Router,
   [switch]$AdminDev,
   [int]$AdminPort = 5173
 )
@@ -26,6 +28,31 @@ function Invoke-Step {
   Write-Host ""
   Write-Host "==> $Name" -ForegroundColor Cyan
   & $Action
+}
+
+function Get-Pm2Command {
+  $pm2 = Get-Command "pm2.cmd" -ErrorAction SilentlyContinue
+  if ($null -eq $pm2) {
+    $pm2 = Get-Command "pm2" -ErrorAction SilentlyContinue
+  }
+  if ($null -eq $pm2) {
+    throw "PM2 is not installed or not on PATH. Install with: npm install -g pm2"
+  }
+  return $pm2
+}
+
+function Start-Pm2Command {
+  param(
+    [string]$Name,
+    [string]$Command
+  )
+
+  $existing = pm2 jlist | ConvertFrom-Json | Where-Object { $_.name -eq $Name } | Select-Object -First 1
+  if ($null -ne $existing) {
+    pm2 delete $Name | Out-Host
+  }
+
+  pm2 start powershell.exe --name $Name -- -NoProfile -ExecutionPolicy Bypass -Command $Command | Out-Host
 }
 
 Require-RepoRoot
@@ -66,16 +93,33 @@ if ($AdminDev) {
 }
 
 if ($Mode -eq "pm2") {
+  Invoke-Step "Checking PM2" {
+    Get-Pm2Command | Select-Object Source
+  }
+
   Invoke-Step "Starting backend with PM2" {
-    $pm2 = Get-Command "pm2.cmd" -ErrorAction SilentlyContinue
-    if ($null -eq $pm2) {
-      $pm2 = Get-Command "pm2" -ErrorAction SilentlyContinue
-    }
-    if ($null -eq $pm2) {
-      throw "PM2 is not installed or not on PATH. Install with: npm install -g pm2"
+    Start-Pm2Command `
+      -Name "nara-backend" `
+      -Command "node --env-file-if-exists=.env apps/backend/dist/index.js"
+  }
+
+  if (!$SkipOpenClaw) {
+    Invoke-Step "Starting OpenClaw gateway with PM2" {
+      Start-Pm2Command -Name "openclaw-gateway" -Command "openclaw gateway run"
     }
 
-    pm2 start npm --name nara-backend -- --workspace @nara/backend run start
+    Invoke-Step "Starting OpenClaw dashboard with PM2" {
+      Start-Pm2Command -Name "openclaw-dashboard" -Command "openclaw dashboard --no-open"
+    }
+  }
+
+  if (!$Skip9Router) {
+    Invoke-Step "Starting 9router with PM2" {
+      Start-Pm2Command -Name "9router" -Command "9router"
+    }
+  }
+
+  Invoke-Step "Saving PM2 process list" {
     pm2 save
   }
 
