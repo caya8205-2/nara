@@ -36,7 +36,7 @@ npm run build
 Or run the guided server bootstrap script:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\ops\windows\start-nara-server.ps1
+npm start
 ```
 
 Start backend for a quick foreground test:
@@ -65,7 +65,7 @@ pm2 save
 The same flow can be started through:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\ops\windows\start-nara-server.ps1 -Mode pm2
+npm run start:pm2
 ```
 
 For the local admin dashboard, prefer opening the Vite dev server only on the server PC while developing:
@@ -81,7 +81,7 @@ If the admin dashboard needs to run persistently, build it and serve the static 
 Use the health script after boot, after pulling new code, or after changing Cloudflare/OpenClaw settings:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\ops\windows\check-nara-health.ps1
+npm run health-check
 ```
 
 To include the authenticated reminder execution summary, pass local operator credentials:

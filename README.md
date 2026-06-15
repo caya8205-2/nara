@@ -271,6 +271,14 @@ It covers the repeatable setup path for:
 
 The helper scripts in `ops/windows` intentionally do not commit secrets, Cloudflare tunnel tokens, OpenClaw config, or WhatsApp linked-device credentials.
 
+Shortcut commands for the office server PC:
+
+```powershell
+npm start
+npm run start:pm2
+npm run health-check
+```
+
 Backend structured logs are written as newline-delimited JSON:
 
 ```text
