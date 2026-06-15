@@ -43,8 +43,7 @@ function Get-Pm2Command {
 
 function Start-Pm2Command {
   param(
-    [string]$Name,
-    [string]$Command
+    [string]$Name
   )
 
   $existing = pm2 jlist | ConvertFrom-Json | Where-Object { $_.name -eq $Name } | Select-Object -First 1
@@ -52,7 +51,7 @@ function Start-Pm2Command {
     pm2 delete $Name | Out-Host
   }
 
-  pm2 start powershell.exe --name $Name -- -NoProfile -ExecutionPolicy Bypass -Command $Command | Out-Host
+  pm2 start node --name $Name -- ops/windows/pm2-service-runner.mjs $Name | Out-Host
 }
 
 Require-RepoRoot
@@ -98,24 +97,22 @@ if ($Mode -eq "pm2") {
   }
 
   Invoke-Step "Starting backend with PM2" {
-    Start-Pm2Command `
-      -Name "nara-backend" `
-      -Command "node --env-file-if-exists=.env apps/backend/dist/index.js"
+    Start-Pm2Command -Name "nara-backend"
   }
 
   if (!$SkipOpenClaw) {
     Invoke-Step "Starting OpenClaw gateway with PM2" {
-      Start-Pm2Command -Name "openclaw-gateway" -Command "openclaw gateway run"
+      Start-Pm2Command -Name "openclaw-gateway"
     }
 
     Invoke-Step "Starting OpenClaw dashboard with PM2" {
-      Start-Pm2Command -Name "openclaw-dashboard" -Command "openclaw dashboard --no-open"
+      Start-Pm2Command -Name "openclaw-dashboard"
     }
   }
 
   if (!$Skip9Router) {
     Invoke-Step "Starting 9router with PM2" {
-      Start-Pm2Command -Name "9router" -Command "9router"
+      Start-Pm2Command -Name "9router"
     }
   }
 
