@@ -130,6 +130,10 @@ export const schedules = pgTable('schedules', {
   action: text('action').default('notify').notNull(),
   source: taskSource('source').default('manual').notNull(),
   enabled: boolean('enabled').default(true).notNull(),
+  nextRunAt: timestamp('next_run_at'),
+  lastTriggeredAt: timestamp('last_triggered_at'),
+  lastTriggerStatus: text('last_trigger_status'),
+  lastTriggerMessage: text('last_trigger_message'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 })

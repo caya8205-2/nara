@@ -33,6 +33,12 @@ npm run db:migrate
 npm run build
 ```
 
+Or run the guided server bootstrap script:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\ops\windows\start-nara-server.ps1
+```
+
 Start backend for a quick foreground test:
 
 ```powershell
@@ -56,6 +62,12 @@ pm2 start npm --name nara-backend -- --workspace @nara/backend run start
 pm2 save
 ```
 
+The same flow can be started through:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\ops\windows\start-nara-server.ps1 -Mode pm2
+```
+
 For the local admin dashboard, prefer opening the Vite dev server only on the server PC while developing:
 
 ```powershell
@@ -63,6 +75,33 @@ npm --workspace @nara/web-admin run dev -- --host 127.0.0.1 --port 5173
 ```
 
 If the admin dashboard needs to run persistently, build it and serve the static output behind a local-only server. Do not expose the admin dashboard publicly until auth and deployment boundaries are stricter.
+
+## Daily Server Checks
+
+Use the health script after boot, after pulling new code, or after changing Cloudflare/OpenClaw settings:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\ops\windows\check-nara-health.ps1
+```
+
+To include the authenticated reminder execution summary, pass local operator credentials:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\ops\windows\check-nara-health.ps1 -OperatorUsername admin -OperatorPassword "<password-from-env>"
+```
+
+The unauthenticated checks cover Docker, PM2, backend `/health`, backend `/api/readiness`, and OpenClaw Control UI. Reminder execution is skipped unless credentials are provided.
+
+## Reminder Worker
+
+The backend starts a lightweight reminder worker by default:
+
+```env
+REMINDER_WORKER_ENABLED=true
+REMINDER_WORKER_INTERVAL_MS=60000
+```
+
+The worker records due reminders, disables one-time reminders after they trigger, advances supported recurring schedules, and writes `reminder.triggered` audit events. WhatsApp/push/local notification delivery is still a later integration step.
 
 ## Cloudflare Tunnel
 
@@ -148,8 +187,10 @@ Use `setup-openclaw-whatsapp.ps1` to update owner/self-phone setup safely. It cr
 6. Run `npm run infra:up`.
 7. Run `npm run db:migrate`.
 8. Run `npm run build`.
-9. Configure Cloudflare Tunnel to `http://127.0.0.1:4000`.
-10. Install and configure OpenClaw WhatsApp.
-11. Link WhatsApp QR.
-12. Run `npm run agent:smoke -- --cleanup`.
-13. Confirm mobile app server URL points to the tunnel or LAN backend URL.
+9. Start backend with `start-nara-server.ps1` or PM2.
+10. Run `check-nara-health.ps1`.
+11. Configure Cloudflare Tunnel to `http://127.0.0.1:4000`.
+12. Install and configure OpenClaw WhatsApp.
+13. Link WhatsApp QR.
+14. Run `npm run agent:smoke -- --cleanup`.
+15. Confirm mobile app server URL points to the tunnel or LAN backend URL.

@@ -104,7 +104,25 @@ Reminder tools use the same user resolution and confirmation rules:
 - `POST /api/agent/reminders/update`
 - `POST /api/agent/reminders/delete`
 
-One-time reminders require `scheduledAt`. Recurring reminders require `cronExpr` and support a timezone. These tools persist reminder intent; Redis/BullMQ delivery execution is a separate worker milestone.
+One-time reminders require `scheduledAt`. Recurring reminders require `cronExpr` and support a timezone. Supported MVP cron presets are daily `0 9 * * *`, weekly `0 9 * * 1`, and monthly `0 9 1 * *`.
+
+### Reminder Execution
+
+**Status:** Implemented for backend-side due detection and audit recording.
+
+The backend starts a lightweight reminder worker when `REMINDER_WORKER_ENABLED=true`. The worker polls due reminders every `REMINDER_WORKER_INTERVAL_MS` milliseconds, defaults to 60 seconds, and calls `reminderService.processDue()`.
+
+Execution behavior:
+
+- one-time reminders trigger once, set `enabled=false`, clear `nextRunAt`, and record `lastTriggeredAt`
+- recurring reminders trigger, keep `enabled=true`, and advance `nextRunAt`
+- every trigger writes a `reminder.triggered` audit event with status `recorded`
+- delivery to WhatsApp, push notifications, or local notifications is still a separate follow-up
+
+Useful endpoints:
+
+- `GET /api/reminders/execution` returns user-scoped execution summary
+- `POST /api/reminders/process-due` lets an operator manually process due reminders
 
 ### Local Smoke Test
 

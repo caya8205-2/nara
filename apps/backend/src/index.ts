@@ -4,6 +4,7 @@ import jwt from '@fastify/jwt'
 import { ZodError } from 'zod'
 import { env } from './config/env.js'
 import { backendLogService } from './services/backend-log.service.js'
+import { reminderWorkerService } from './services/reminder-worker.service.js'
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -116,6 +117,16 @@ process.on('uncaughtException', (error) => {
   process.exit(1)
 })
 
+process.on('SIGINT', () => {
+  reminderWorkerService.stop()
+  process.exit(0)
+})
+
+process.on('SIGTERM', () => {
+  reminderWorkerService.stop()
+  process.exit(0)
+})
+
 // Health check
 app.get('/', async () => ({
   status: 'ok',
@@ -148,6 +159,7 @@ app.register(import('./routes/backup.js'), { prefix: '/api/backup' })
 const start = async () => {
   try {
     await app.listen({ port: env.PORT, host: '0.0.0.0' })
+    reminderWorkerService.start(app.log)
   } catch (err) {
     app.log.error(err)
     process.exit(1)

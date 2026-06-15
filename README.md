@@ -267,6 +267,7 @@ It covers the repeatable setup path for:
 * backend/admin process management on Windows
 * Cloudflare Tunnel routing to the backend
 * OpenClaw WhatsApp setup, self-phone development mode, and server migration notes
+* `start-nara-server.ps1` and `check-nara-health.ps1` for daily server operation
 
 The helper scripts in `ops/windows` intentionally do not commit secrets, Cloudflare tunnel tokens, OpenClaw config, or WhatsApp linked-device credentials.
 
@@ -301,12 +302,14 @@ These endpoints store user WhatsApp access intent in Nara's database. OpenClaw a
 Reminder endpoints:
 
 * `GET /api/reminders`
+* `GET /api/reminders/execution`
+* `POST /api/reminders/process-due` (operator only)
 * `GET /api/reminders/:id`
 * `POST /api/reminders`
 * `PATCH /api/reminders/:id`
 * `DELETE /api/reminders/:id`
 
-Reminder records are scoped to the signed-in mobile user. One-time reminders use `scheduledAt`; recurring reminders use a cron expression and timezone. Delivery execution through Redis/BullMQ remains the next backend milestone.
+Reminder records are scoped to the signed-in mobile user. One-time reminders use `scheduledAt`; recurring reminders use a cron expression and timezone. The backend worker records due reminders, disables completed one-time reminders, advances supported recurring schedules, and writes `reminder.triggered` audit events. Actual delivery through WhatsApp, push, or local notifications remains a follow-up milestone.
 
 Backup uses `BACKUP_DIR` for local backup files. Database export tries host `pg_dump` first and falls back to `docker exec` with `POSTGRES_CONTAINER_NAME`, which defaults to the Docker Compose container name:
 

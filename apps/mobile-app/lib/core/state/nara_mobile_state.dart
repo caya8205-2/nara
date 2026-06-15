@@ -110,6 +110,10 @@ class NaraReminder {
     this.description,
     this.scheduledAt,
     this.cronExpr,
+    this.nextRunAt,
+    this.lastTriggeredAt,
+    this.lastTriggerStatus,
+    this.lastTriggerMessage,
   });
 
   final String id;
@@ -118,12 +122,18 @@ class NaraReminder {
   final String kind;
   final DateTime? scheduledAt;
   final String? cronExpr;
+  final DateTime? nextRunAt;
+  final DateTime? lastTriggeredAt;
+  final String? lastTriggerStatus;
+  final String? lastTriggerMessage;
   final String timezone;
   final String source;
   final bool enabled;
 
   factory NaraReminder.fromJson(Map<String, dynamic> json) {
     final scheduledAtRaw = json['scheduledAt']?.toString();
+    final nextRunAtRaw = json['nextRunAt']?.toString();
+    final lastTriggeredAtRaw = json['lastTriggeredAt']?.toString();
     return NaraReminder(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? 'Untitled reminder',
@@ -132,6 +142,12 @@ class NaraReminder {
       scheduledAt:
           scheduledAtRaw == null ? null : DateTime.tryParse(scheduledAtRaw),
       cronExpr: json['cronExpr']?.toString(),
+      nextRunAt: nextRunAtRaw == null ? null : DateTime.tryParse(nextRunAtRaw),
+      lastTriggeredAt: lastTriggeredAtRaw == null
+          ? null
+          : DateTime.tryParse(lastTriggeredAtRaw),
+      lastTriggerStatus: json['lastTriggerStatus']?.toString(),
+      lastTriggerMessage: json['lastTriggerMessage']?.toString(),
       timezone: json['timezone']?.toString() ?? 'Asia/Jakarta',
       source: json['source']?.toString() ?? 'manual',
       enabled: json['enabled'] != false,
@@ -146,6 +162,10 @@ class NaraReminder {
       kind: kind,
       scheduledAt: scheduledAt,
       cronExpr: cronExpr,
+      nextRunAt: nextRunAt,
+      lastTriggeredAt: lastTriggeredAt,
+      lastTriggerStatus: lastTriggerStatus,
+      lastTriggerMessage: lastTriggerMessage,
       timezone: timezone,
       source: source,
       enabled: enabled ?? this.enabled,
@@ -393,9 +413,11 @@ class NaraMobileState {
       .where((reminder) => reminder.enabled && reminder.kind == 'once')
       .toList()
     ..sort((a, b) {
-      if (a.scheduledAt == null) return 1;
-      if (b.scheduledAt == null) return -1;
-      return a.scheduledAt!.compareTo(b.scheduledAt!);
+      final aDue = a.nextRunAt ?? a.scheduledAt;
+      final bDue = b.nextRunAt ?? b.scheduledAt;
+      if (aDue == null) return 1;
+      if (bDue == null) return -1;
+      return aDue.compareTo(bDue);
     });
 
   List<NaraReminder> get recurringReminders => reminders

@@ -127,6 +127,7 @@ Task rows include:
 Reminder data is stored in PostgreSQL and scoped to the signed-in mobile user through authenticated endpoints:
 
 - `GET /api/reminders`
+- `GET /api/reminders/execution`
 - `GET /api/reminders/:id`
 - `POST /api/reminders`
 - `PATCH /api/reminders/:id`
@@ -134,7 +135,7 @@ Reminder data is stored in PostgreSQL and scoped to the signed-in mobile user th
 
 The mobile screen supports creating, listing, pausing, resuming, deleting, and pull-to-refresh. One-time reminders use `scheduledAt`. Recurring reminders currently offer daily, weekly, and monthly presets backed by cron expressions and the `Asia/Jakarta` timezone.
 
-This milestone stores reminder intent only. Redis/BullMQ execution and local/push notification delivery are intentionally separate follow-up work.
+The backend now records due reminders through a lightweight worker. Mobile reads execution fields from reminder list responses, including `nextRunAt`, `lastTriggeredAt`, `lastTriggerStatus`, and `lastTriggerMessage`, and shows next/last recorded timing in the reminder list. WhatsApp, push, or local notification delivery remains a separate follow-up work item.
 
 ## Validation
 
@@ -214,6 +215,6 @@ Avoid copy themes:
 
 1. Move token storage from `shared_preferences` to secure storage before production hardening.
 2. Redesign the welcome/login/register surface using the Auth UI Redesign Handoff above.
-3. Add Redis/BullMQ reminder execution and decide the local/push notification strategy.
+3. Add WhatsApp, local, or push notification delivery for triggered reminders.
 4. Add approval queue once backend approval endpoints exist.
 5. Add reminder edit controls beyond pause/resume and the current recurrence presets.

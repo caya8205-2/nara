@@ -216,7 +216,7 @@ class _ReminderTile extends StatelessWidget {
           ? Icons.repeat_rounded
           : Icons.notifications_outlined),
       title: Text(reminder.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-      subtitle: Text(_scheduleLabel(reminder, isIndonesian)),
+      subtitle: Text(_reminderStatusLabel(reminder, isIndonesian)),
       trailing: PopupMenuButton<String>(
         onSelected: (value) {
           if (value == 'toggle') onSetEnabled(reminder, !reminder.enabled);
@@ -376,6 +376,26 @@ String _scheduleLabel(NaraReminder reminder, bool isIndonesian) {
     '0 9 * * *' => isIndonesian ? 'Setiap hari, 09.00' : 'Every day, 9:00 AM',
     _ => reminder.cronExpr ?? (isIndonesian ? 'Berulang' : 'Recurring'),
   };
+}
+
+String _reminderStatusLabel(NaraReminder reminder, bool isIndonesian) {
+  final parts = <String>[_scheduleLabel(reminder, isIndonesian)];
+  final nextRunAt = reminder.nextRunAt?.toLocal();
+  final lastTriggeredAt = reminder.lastTriggeredAt?.toLocal();
+
+  if (reminder.enabled && nextRunAt != null) {
+    parts.add(isIndonesian
+        ? 'Berikutnya ${_formatDateTime(nextRunAt)}'
+        : 'Next ${_formatDateTime(nextRunAt)}');
+  }
+
+  if (lastTriggeredAt != null) {
+    parts.add(isIndonesian
+        ? 'Terakhir tercatat ${_formatDateTime(lastTriggeredAt)}'
+        : 'Last recorded ${_formatDateTime(lastTriggeredAt)}');
+  }
+
+  return parts.join(' - ');
 }
 
 String _formatDateTime(DateTime value) {

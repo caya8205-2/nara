@@ -13,6 +13,8 @@ const EnvSchema = z.object({
   BACKEND_LOG_DIR: z.string().optional(),
   REPORTS_DIR: z.string().optional(),
   POSTGRES_CONTAINER_NAME: z.string().default('nara-postgres-1'),
+  REMINDER_WORKER_ENABLED: z.coerce.boolean().default(true),
+  REMINDER_WORKER_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
   JWT_SECRET: z.string().min(1, 'JWT_SECRET is required'),
   AGENT_API_SECRET: z.string().min(1, 'AGENT_API_SECRET is required'),
   OPERATOR_USERNAME: z.string().min(1, 'OPERATOR_USERNAME is required'),

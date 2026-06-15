@@ -56,8 +56,24 @@ const plugin: FastifyPluginAsync = async (app) => {
     id: req.reminderSession?.accountType === 'user' ? req.reminderSession.sub : null,
   })
 
+  const requireOperator = async (req: FastifyRequest, reply: FastifyReply) => {
+    await requireSession(req, reply)
+    if (reply.sent) return
+    if (req.reminderSession?.accountType === 'user') {
+      return reply.status(403).send({ error: 'Operator access required' })
+    }
+  }
+
   app.get('/', { preHandler: requireSession }, async (req) => {
     return reminderService.list(access(req))
+  })
+
+  app.get('/execution', { preHandler: requireSession }, async (req) => {
+    return reminderService.getExecutionSummary(access(req))
+  })
+
+  app.post('/process-due', { preHandler: requireOperator }, async () => {
+    return reminderService.processDue()
   })
 
   app.get('/:id', { preHandler: requireSession }, async (req, reply) => {

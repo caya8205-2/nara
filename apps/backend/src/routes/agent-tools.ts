@@ -150,11 +150,12 @@ const plugin: FastifyPluginAsync = async (app) => {
       const subject = await resolveSubject(parseSubject(req.body), reply)
       if (!subject) return
 
-      const [{ profile, instructions }, tasks, overdue, reminders] = await Promise.all([
+      const [{ profile, instructions }, tasks, overdue, reminders, reminderExecution] = await Promise.all([
         buildAgentInstructions(subject),
         taskService.list({ done: false, userId: subject.userId }),
         taskService.list({ done: false, dueBefore: new Date(), userId: subject.userId }),
         reminderService.list({ userId: subject.userId }),
+        reminderService.getExecutionSummary({ userId: subject.userId }),
       ])
 
       return ok({
@@ -172,6 +173,8 @@ const plugin: FastifyPluginAsync = async (app) => {
           activeReminders: reminders.filter((reminder) => reminder.enabled).length,
           pausedReminders: reminders.filter((reminder) => !reminder.enabled).length,
           recurringReminders: reminders.filter((reminder) => reminder.kind === 'recurring').length,
+          nextRunAt: reminderExecution.nextRunAt,
+          lastTriggeredAt: reminderExecution.lastTriggeredAt,
         },
         instructions,
         toolContext: {
