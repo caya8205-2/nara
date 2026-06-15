@@ -34,12 +34,23 @@ function Stop-ExistingCommandLine {
 function Resolve-Executable {
   param([string]$Command)
 
-  $resolved = Get-Command $Command -ErrorAction SilentlyContinue
+  $candidates = @(
+    "$Command.cmd",
+    "$Command.exe",
+    "$Command.bat",
+    $Command
+  )
+
+  foreach ($candidate in $candidates) {
+    $resolved = Get-Command $candidate -ErrorAction SilentlyContinue
+    if ($null -ne $resolved) {
+      return $resolved.Source
+    }
+  }
+
   if ($null -eq $resolved) {
     throw "$Command is not installed or not on PATH."
   }
-
-  return $resolved.Source
 }
 
 function Start-NaraProcess {
@@ -52,13 +63,19 @@ function Start-NaraProcess {
 
   Stop-ExistingCommandLine -Pattern $MatchPattern
   $resolvedFilePath = Resolve-Executable -Command $FilePath
+  $resolvedArgumentList = $ArgumentList
+
+  if ([System.IO.Path]::GetExtension($resolvedFilePath) -eq ".ps1") {
+    $resolvedArgumentList = @("-ExecutionPolicy", "Bypass", "-File", $resolvedFilePath) + $ArgumentList
+    $resolvedFilePath = (Get-Command "powershell.exe").Source
+  }
 
   $stdout = Join-Path $logDir "$Name.out.log"
   $stderr = Join-Path $logDir "$Name.err.log"
 
   $process = Start-Process `
     -FilePath $resolvedFilePath `
-    -ArgumentList $ArgumentList `
+    -ArgumentList $resolvedArgumentList `
     -WorkingDirectory (Get-Location).Path `
     -WindowStyle Hidden `
     -RedirectStandardOutput $stdout `
