@@ -310,7 +310,18 @@ Identity and Nara Bot access endpoints:
 * `GET /api/agent-access`
 * `PATCH /api/agent-access/:id`
 
-These endpoints store user WhatsApp access intent in Nara's database. OpenClaw allowlist sync is intentionally behind a future service/worker boundary.
+These endpoints store user WhatsApp access intent in Nara's database. WhatsApp access requests now sync allowed senders into the local OpenClaw config so the mobile flow can move from number registration to Nara Bot allowlist without manually editing `openclaw.json`.
+
+OpenClaw allowlist sync is controlled by:
+
+```text
+OPENCLAW_CONFIG_PATH
+OPENCLAW_WHATSAPP_ACCOUNT
+OPENCLAW_WHATSAPP_DM_POLICY
+OPENCLAW_AUTO_ALLOWLIST_REQUESTS
+```
+
+When `OPENCLAW_AUTO_ALLOWLIST_REQUESTS=true`, a mobile WhatsApp access request is promoted to `allowed` after the backend writes the sender number to `channels.whatsapp.accounts.<account>.allowFrom`. If the config cannot be written, the access status becomes `sync_failed` with `syncError` for admin diagnostics.
 
 Reminder endpoints:
 
@@ -424,7 +435,7 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
 * [x] Admin/dashboard authentication
 * [x] Build-time backend URL configuration for mobile clients
 * [x] Cloudflare Tunnel setup for backend API
-* [ ] Rate limiting for exposed endpoints
+* [x] Rate limiting for exposed endpoints
 * [x] Document backup and recovery basics
 
 ### Phase 3: Operational Core
@@ -494,7 +505,7 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
 ### Phase 8: Messaging Channels
 
 * [ ] WhatsApp integration
-* [ ] Nara Bot allowlist sync with OpenClaw
+* [x] Nara Bot allowlist sync with OpenClaw
 * [ ] Telegram integration (optional)
 * [ ] Messaging delivery for reminders and reports
 

@@ -101,7 +101,7 @@ Before using the tunnel for real operations:
 - keep `JWT_SECRET` strong and private
 - expose only the backend API, never Postgres or Redis
 - configure `CORS_ORIGINS` for any browser-based client URL
-- add rate limiting before wider use
+- keep `RATE_LIMIT_ENABLED=true` for exposed backend traffic
 - keep dashboard/admin features behind auth
 
 ## Suggested MVP Order

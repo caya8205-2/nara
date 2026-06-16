@@ -5,6 +5,7 @@ import { ZodError } from 'zod'
 import { env } from './config/env.js'
 import { backendLogService } from './services/backend-log.service.js'
 import { reminderWorkerService } from './services/reminder-worker.service.js'
+import { rateLimitService } from './services/rate-limit.service.js'
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -28,6 +29,33 @@ app.register(jwt, { secret: env.JWT_SECRET })
 
 app.addHook('onRequest', async (request) => {
   request.startTime = process.hrtime.bigint()
+})
+
+app.addHook('onRequest', async (request, reply) => {
+  if (rateLimitService.shouldSkip({
+    ip: request.ip,
+    method: request.method,
+    url: request.url,
+  })) {
+    return
+  }
+
+  const result = rateLimitService.check({
+    ip: request.ip,
+    method: request.method,
+    url: request.url,
+  })
+
+  reply.header('X-RateLimit-Limit', result.limit)
+  reply.header('X-RateLimit-Remaining', result.remaining)
+  reply.header('X-RateLimit-Reset', result.resetAt.toISOString())
+
+  if (!result.allowed) {
+    reply.header('Retry-After', result.retryAfterSeconds)
+    return reply.status(429).send({
+      error: 'Too many requests. Please try again shortly.',
+    })
+  }
 })
 
 app.addHook('onResponse', async (request, reply) => {

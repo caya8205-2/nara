@@ -164,6 +164,17 @@ Use `/health` as the tunnel check. Keep PostgreSQL, Redis, OpenClaw Control UI, 
 
 See `docs/deployment/cloudflare-tunnel.md`.
 
+The backend includes an in-memory rate limiter for tunnel-facing traffic. Tune these values in `.env` if the office PC sees too many legitimate requests:
+
+```env
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_WINDOW_MS=60000
+RATE_LIMIT_MAX=240
+AUTH_RATE_LIMIT_MAX=12
+AGENT_RATE_LIMIT_MAX=120
+MUTATION_RATE_LIMIT_MAX=80
+```
+
 ## OpenClaw WhatsApp Setup
 
 OpenClaw is machine state, not normal repo state. On a new server PC:
@@ -213,18 +224,43 @@ For real use, a dedicated host number is cleaner:
 - server PC links the host number once
 - users add their own WhatsApp numbers in the Nara app
 - backend stores access intent in PostgreSQL
-- a later sync worker updates OpenClaw allowlist from backend state
+- backend syncs allowed WhatsApp senders into the local OpenClaw allowlist
 
-## Current Manual Allowlist Contract
+## Current Allowlist Sync Contract
 
-Until backend-to-OpenClaw allowlist sync exists, allowed WhatsApp senders live in:
+Allowed WhatsApp senders live in:
 
 ```text
 C:\Users\<user>\.openclaw\openclaw.json
 channels.whatsapp.accounts.default.allowFrom
 ```
 
-Use `setup-openclaw-whatsapp.ps1` to update owner/self-phone setup safely. It creates a timestamped backup before editing OpenClaw config.
+Nara backend is now the normal source of access state. When a mobile user submits a WhatsApp number and requests Nara Bot access, the backend can write that allowed sender into the OpenClaw config automatically.
+
+Configure the sync path in `.env`:
+
+```env
+OPENCLAW_CONFIG_PATH=C:\Users\<user>\.openclaw\openclaw.json
+OPENCLAW_WHATSAPP_ACCOUNT=default
+OPENCLAW_WHATSAPP_DM_POLICY=allowlist
+OPENCLAW_AUTO_ALLOWLIST_REQUESTS=true
+```
+
+The sync writes a timestamped backup before replacing `openclaw.json`. Nara-managed senders are tracked in `meta.naraManagedAllowFrom`, so manually maintained `allowFrom` entries are preserved.
+
+Use `setup-openclaw-whatsapp.ps1` only for initial owner/host setup or recovery. It is no longer the normal way to add every mobile user number.
+
+## WhatsApp End-To-End Smoke Test
+
+After the dedicated host number is linked:
+
+1. Log in to the mobile app through the Cloudflare Tunnel backend.
+2. Add the user's WhatsApp number in Nara.
+3. Request Nara Bot access.
+4. Confirm the access status becomes `allowed`; if it becomes `sync_failed`, inspect `syncError` in the admin WhatsApp Access screen.
+5. Confirm the number appears under `channels.whatsapp.accounts.default.allowFrom`.
+6. Send a WhatsApp message from the user number to the linked host number.
+7. Confirm OpenClaw routes the sender context into the Nara backend agent tools.
 
 ## Migration Checklist To A New Server PC
 
@@ -241,5 +277,7 @@ Use `setup-openclaw-whatsapp.ps1` to update owner/self-phone setup safely. It cr
 11. Configure Cloudflare Tunnel to `http://127.0.0.1:4000`.
 12. Install and configure OpenClaw WhatsApp.
 13. Link WhatsApp QR.
-14. Run `npm run agent:smoke -- --cleanup`.
-15. Confirm mobile app server URL points to the tunnel or LAN backend URL.
+14. Confirm `.env` has the OpenClaw allowlist sync values.
+15. Run `npm run agent:smoke -- --cleanup`.
+16. Confirm mobile app server URL points to the tunnel or LAN backend URL.
+17. Run the WhatsApp end-to-end smoke test above.

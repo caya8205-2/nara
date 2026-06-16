@@ -8,6 +8,8 @@ This file combines the current planning, architecture, ADR, deployment, and desi
 - Mobile reminders are connected to user-scoped create, list, pause, resume, delete, and pull-to-refresh flows.
 - Reminder records support one-time schedules through `scheduledAt` and recurring schedules through `cronExpr` plus timezone.
 - OpenClaw-facing agent tools support user-scoped task and reminder lifecycles.
+- Nara Bot access requests can sync allowed WhatsApp senders into local OpenClaw config.
+- Backend tunnel-facing endpoints have basic in-memory rate limiting.
 - Agent-triggered reminder mutations are written to audit logs.
 - Redis/BullMQ reminder delivery, local/push notifications, and approval execution remain future milestones.
 
@@ -1679,4 +1681,6 @@ See **[Backend Integration Requirements](backend-integration.md)** for detailed 
 *OpenClaw integration now has user-context-first tool contracts. Agent tools resolve user context by userId or future WhatsApp contact value, load backend assistant profiles for per-user tone/autonomy/action permissions, and scope task create/list/complete/delete to that user. `npm run agent:smoke` verifies the no-WhatsApp simulation path.*
 *Reminder execution update: 2026-06-15*
 *Backend reminders now maintain `nextRunAt`, record due reminders through a lightweight worker, disable triggered one-time reminders, advance supported recurring schedules, and write `reminder.triggered` audit events. Delivery via WhatsApp, push, or local notifications remains the next reminder milestone.*
+*Server hardening and allowlist update: 2026-06-17*
+*Backend now has basic in-memory rate limiting for tunnel-facing traffic. Mobile WhatsApp access requests can auto-sync allowed sender numbers into local OpenClaw `allowFrom` through the configured `openclaw.json`, while preserving manually managed allowlist entries.*
 *Backend integration: MVP complete*

@@ -2,6 +2,7 @@ import { and, desc, eq } from 'drizzle-orm'
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto'
 import { promisify } from 'node:util'
 import { db } from '../db/index.js'
+import { env } from '../config/env.js'
 import {
   agentChannelAccess,
   agentChannels,
@@ -10,6 +11,7 @@ import {
   userContacts,
   users,
 } from '../db/schema.js'
+import { openClawAllowlistService } from './openclaw-allowlist.service.js'
 
 const scrypt = promisify(scryptCallback)
 const passwordKeyLength = 64
@@ -281,7 +283,7 @@ export class IdentityService {
         )
       )
 
-    if (existing) return existing
+    if (existing) return this.autoAllowlistRequest(existing)
 
     const [access] = await db
       .insert(agentChannelAccess)
@@ -299,7 +301,7 @@ export class IdentityService {
       contactId: input.contactId,
     })
 
-    return access
+    return this.autoAllowlistRequest(access)
   }
 
   async listAgentAccess() {
@@ -368,10 +370,12 @@ export class IdentityService {
       status: input.status,
     })
 
-    return access
+    const syncedAccess = await this.syncOpenClawAllowlistAfterStatusChange(access.id, input.status)
+    return syncedAccess ?? access
   }
 
   async deleteAgentAccess(id: string, scope?: { userId?: string }) {
+    const detail = await this.getAgentAccessDetail(id)
     const conditions = [eq(agentChannelAccess.id, id)]
     if (scope?.userId) {
       conditions.push(eq(agentChannelAccess.userId, scope.userId))
@@ -390,7 +394,137 @@ export class IdentityService {
       status: access.status,
     })
 
+    if (detail?.channel.type === 'whatsapp') {
+      try {
+        await this.syncOpenClawAllowlist()
+      } catch (error) {
+        await this.audit('system', 'agent_access.sync_failed', 'agent_channel_access', access.id, {
+          userId: access.userId,
+          contactId: access.contactId,
+          error: error instanceof Error ? error.message : 'OpenClaw allowlist sync failed',
+        })
+      }
+    }
+
     return access
+  }
+
+  private async autoAllowlistRequest<T extends { id: string; status: AgentAccessStatus }>(access: T) {
+    if (!env.OPENCLAW_AUTO_ALLOWLIST_REQUESTS) return access
+    if (access.status === 'allowed' || access.status === 'blocked') return access
+
+    const detail = await this.getAgentAccessDetail(access.id)
+    if (!detail || detail.channel.type !== 'whatsapp' || detail.contact.type !== 'whatsapp') {
+      return access
+    }
+
+    const now = new Date()
+    const [allowedAccess] = await db
+      .update(agentChannelAccess)
+      .set({
+        status: 'allowed',
+        syncError: null,
+        allowedAt: now,
+        updatedAt: now,
+      })
+      .where(eq(agentChannelAccess.id, access.id))
+      .returning()
+
+    if (!allowedAccess) return access
+
+    try {
+      await this.syncOpenClawAllowlist()
+      const [syncedAccess] = await db
+        .update(agentChannelAccess)
+        .set({
+          lastSyncAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(agentChannelAccess.id, allowedAccess.id))
+        .returning()
+      return syncedAccess ?? allowedAccess
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'OpenClaw allowlist sync failed'
+      const [failedAccess] = await db
+        .update(agentChannelAccess)
+        .set({
+          status: 'sync_failed',
+          syncError: message,
+          lastSyncAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(agentChannelAccess.id, allowedAccess.id))
+        .returning()
+      return failedAccess ?? allowedAccess
+    }
+  }
+
+  private async syncOpenClawAllowlistAfterStatusChange(accessId: string, status: AgentAccessStatus) {
+    const detail = await this.getAgentAccessDetail(accessId)
+    if (!detail || detail.channel.type !== 'whatsapp') return null
+
+    try {
+      await this.syncOpenClawAllowlist()
+      if (status === 'allowed') {
+        const [syncedAccess] = await db
+          .update(agentChannelAccess)
+          .set({
+            syncError: null,
+            lastSyncAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(agentChannelAccess.id, accessId))
+          .returning()
+        return syncedAccess ?? null
+      }
+    } catch (error) {
+      if (status !== 'allowed') throw error
+
+      const message = error instanceof Error ? error.message : 'OpenClaw allowlist sync failed'
+      const [failedAccess] = await db
+        .update(agentChannelAccess)
+        .set({
+          status: 'sync_failed',
+          syncError: message,
+          lastSyncAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(agentChannelAccess.id, accessId))
+        .returning()
+      return failedAccess ?? null
+    }
+
+    return null
+  }
+
+  private async syncOpenClawAllowlist() {
+    const rows = await db
+      .select({
+        status: agentChannelAccess.status,
+        channelType: agentChannels.type,
+        contactType: userContacts.type,
+        contactValue: userContacts.value,
+      })
+      .from(agentChannelAccess)
+      .innerJoin(agentChannels, eq(agentChannelAccess.channelId, agentChannels.id))
+      .innerJoin(userContacts, eq(agentChannelAccess.contactId, userContacts.id))
+
+    await openClawAllowlistService.syncWhatsApp(rows)
+  }
+
+  private async getAgentAccessDetail(id: string) {
+    const [row] = await db
+      .select({
+        access: agentChannelAccess,
+        channel: agentChannels,
+        contact: userContacts,
+      })
+      .from(agentChannelAccess)
+      .innerJoin(agentChannels, eq(agentChannelAccess.channelId, agentChannels.id))
+      .innerJoin(userContacts, eq(agentChannelAccess.contactId, userContacts.id))
+      .where(eq(agentChannelAccess.id, id))
+
+    return row ?? null
   }
 
   private async audit(
