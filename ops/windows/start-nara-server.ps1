@@ -136,6 +136,28 @@ if ($Mode -eq "services") {
     powershell -ExecutionPolicy Bypass -File ".\ops\windows\start-nara-services.ps1" @args
   }
 
+  # Give services a short window to spin up before running the full health check.
+  Write-Host "Waiting briefly for services to become ready..." -ForegroundColor Cyan
+  $maxWait = 30
+  $interval = 1
+  $deadline = (Get-Date).AddSeconds($maxWait)
+  while ((Get-Date) -lt $deadline) {
+    $ocOk = $false
+    $backendOk = $false
+    try {
+      $res = Invoke-WebRequest -Uri "http://127.0.0.1:18789/overview" -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
+      $ocOk = $res.StatusCode -eq 200
+    } catch { $ocOk = $false }
+
+    try {
+      $res2 = Invoke-WebRequest -Uri "http://127.0.0.1:4000/api/readiness" -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
+      $backendOk = $res2.StatusCode -eq 200
+    } catch { $backendOk = $false }
+
+    if ($ocOk -and $backendOk) { break }
+    Start-Sleep -Seconds $interval
+  }
+
   Invoke-Step "Checking Nara health" {
     powershell -ExecutionPolicy Bypass -File ".\ops\windows\check-nara-health.ps1"
   }

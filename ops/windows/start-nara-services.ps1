@@ -73,14 +73,24 @@ function Start-NaraProcess {
   $stdout = Join-Path $logDir "$Name.out.log"
   $stderr = Join-Path $logDir "$Name.err.log"
 
-  $process = Start-Process `
-    -FilePath $resolvedFilePath `
-    -ArgumentList $resolvedArgumentList `
-    -WorkingDirectory (Get-Location).Path `
-    -WindowStyle Hidden `
-    -RedirectStandardOutput $stdout `
-    -RedirectStandardError $stderr `
-    -PassThru
+  if ($null -eq $resolvedArgumentList -or ($resolvedArgumentList -is [System.Array] -and $resolvedArgumentList.Count -eq 0)) {
+    $process = Start-Process `
+      -FilePath $resolvedFilePath `
+      -WorkingDirectory (Get-Location).Path `
+      -WindowStyle Hidden `
+      -RedirectStandardOutput $stdout `
+      -RedirectStandardError $stderr `
+      -PassThru
+  } else {
+    $process = Start-Process `
+      -FilePath $resolvedFilePath `
+      -ArgumentList $resolvedArgumentList `
+      -WorkingDirectory (Get-Location).Path `
+      -WindowStyle Hidden `
+      -RedirectStandardOutput $stdout `
+      -RedirectStandardError $stderr `
+      -PassThru
+  }
 
   [pscustomobject]@{
     name = $Name
