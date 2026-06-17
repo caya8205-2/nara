@@ -6,6 +6,7 @@ Flutter mobile app for the main user-facing Nara experience.
 
 - Mobile app shell with bottom navigation
 - Backend server URL setup
+- Secure auth token storage with `flutter_secure_storage`
 - Readiness check against the Nara backend
 - Operator login against the backend
 - Home, Tasks, Reminders, Assistant, and Settings screens
@@ -31,7 +32,6 @@ http://192.168.x.x:4000
 
 ## Next Implementation Steps
 
-1. Persist backend URL and operator token securely.
-2. Add task creation and completion actions.
-3. Connect WhatsApp number and Nara Bot access flow.
-4. Add approval queue once backend approval endpoints exist.
+1. Polish auth/welcome UI for production.
+2. Add richer reminder edit controls.
+3. Add push, local, or WhatsApp delivery for reminder notifications.

@@ -213,6 +213,18 @@ class NaraApiClient {
     await _decodeRaw(response);
   }
 
+  Future<List<dynamic>> listApprovals() {
+    return getList('/api/approvals');
+  }
+
+  Future<Map<String, dynamic>> approveApproval(String id) {
+    return postJson('/api/approvals/$id/approve', {});
+  }
+
+  Future<Map<String, dynamic>> rejectApproval(String id) {
+    return postJson('/api/approvals/$id/reject', {});
+  }
+
   Future<List<dynamic>> listUserContacts(String userId) {
     return getList('/api/users/$userId/contacts');
   }

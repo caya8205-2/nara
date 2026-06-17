@@ -11,7 +11,7 @@ import {
   userContacts,
   users,
 } from '../db/schema.js'
-import { openClawAllowlistService } from './openclaw-allowlist.service.js'
+import { openClawService } from './openclaw.service.js'
 
 const scrypt = promisify(scryptCallback)
 const passwordKeyLength = 64
@@ -357,7 +357,12 @@ export class IdentityService {
         status: input.status,
         syncError: input.syncError ?? null,
         updatedAt: now,
-        lastSyncAt: input.status === 'allowed' || input.status === 'sync_failed' ? now : undefined,
+        lastSyncAt: input.status === 'allowed' ||
+          input.status === 'sync_failed' ||
+          input.status === 'blocked' ||
+          input.syncError !== undefined
+          ? now
+          : undefined,
         allowedAt: input.status === 'allowed' ? now : undefined,
         blockedAt: input.status === 'blocked' ? now : undefined,
       })
@@ -370,8 +375,59 @@ export class IdentityService {
       status: input.status,
     })
 
-    const syncedAccess = await this.syncOpenClawAllowlistAfterStatusChange(access.id, input.status)
-    return syncedAccess ?? access
+    return access
+  }
+
+  async approveAgentAccess(id: string) {
+    const sync = await openClawService.syncWhatsAppAllowlist({
+      override: { accessId: id, status: 'allowed' },
+    })
+
+    const access = await this.updateAgentAccess(id, {
+      status: sync.ok ? 'allowed' : 'sync_failed',
+      syncError: sync.ok ? undefined : sync.message,
+    })
+    if (!access) return null
+
+    await this.audit('system', 'agent_access.allowlist_sync', 'agent_channel_access', access.id, {
+      requestedStatus: 'allowed',
+      sync,
+    })
+
+    return access
+  }
+
+  async retryAgentAccessSync(id: string) {
+    return this.approveAgentAccess(id)
+  }
+
+  async blockAgentAccess(id: string) {
+    const access = await this.updateAgentAccess(id, { status: 'blocked' })
+    if (!access) return null
+
+    const sync = await openClawService.syncWhatsAppAllowlist({
+      override: { accessId: id, status: 'blocked' },
+    })
+
+    if (!sync.ok) {
+      const updated = await this.updateAgentAccess(id, {
+        status: 'blocked',
+        syncError: sync.message,
+      })
+      if (!updated) return null
+      await this.audit('system', 'agent_access.allowlist_sync', 'agent_channel_access', updated.id, {
+        requestedStatus: 'blocked',
+        sync,
+      })
+      return updated
+    }
+
+    await this.audit('system', 'agent_access.allowlist_sync', 'agent_channel_access', access.id, {
+      requestedStatus: 'blocked',
+      sync,
+    })
+
+    return access
   }
 
   async deleteAgentAccess(id: string, scope?: { userId?: string }) {
@@ -509,7 +565,10 @@ export class IdentityService {
       .innerJoin(agentChannels, eq(agentChannelAccess.channelId, agentChannels.id))
       .innerJoin(userContacts, eq(agentChannelAccess.contactId, userContacts.id))
 
-    await openClawAllowlistService.syncWhatsApp(rows)
+    const sync = await openClawService.syncWhatsAppAllowlist()
+    if (!sync.ok) {
+      throw new Error(sync.message)
+    }
   }
 
   private async getAgentAccessDetail(id: string) {

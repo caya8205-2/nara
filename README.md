@@ -284,6 +284,15 @@ npm run health-check
 
 For Windows server setup, use `npm run start:server` first. It avoids PM2's Windows argument parsing issues by starting the backend, OpenClaw gateway/dashboard, and 9router as hidden Windows processes. Logs are written to `.tmp\service-logs`.
 
+Useful hidden-process service helpers:
+
+```powershell
+npm run server:status
+npm run server:logs
+npm run server:restart
+npm run server:stop
+```
+
 Backend structured logs are written as newline-delimited JSON:
 
 ```text
@@ -310,7 +319,7 @@ Identity and Nara Bot access endpoints:
 * `GET /api/agent-access`
 * `PATCH /api/agent-access/:id`
 
-These endpoints store user WhatsApp access intent in Nara's database. WhatsApp access requests now sync allowed senders into the local OpenClaw config so the mobile flow can move from number registration to Nara Bot allowlist without manually editing `openclaw.json`.
+These endpoints store user WhatsApp access intent in Nara's database. Admin approve/retry/block actions now sync the OpenClaw WhatsApp allowlist through the backend, while the database access state remains the source of truth. WhatsApp access requests can also be auto-allowlisted when enabled.
 
 OpenClaw allowlist sync is controlled by:
 
@@ -319,6 +328,9 @@ OPENCLAW_CONFIG_PATH
 OPENCLAW_WHATSAPP_ACCOUNT
 OPENCLAW_WHATSAPP_DM_POLICY
 OPENCLAW_AUTO_ALLOWLIST_REQUESTS
+OPENCLAW_ALLOWLIST_SYNC_MODE
+OPENCLAW_ALLOWLIST_SYNC_PATH
+OPENCLAW_WHATSAPP_SEND_PATH
 ```
 
 When `OPENCLAW_AUTO_ALLOWLIST_REQUESTS=true`, a mobile WhatsApp access request is promoted to `allowed` after the backend writes the sender number to `channels.whatsapp.accounts.<account>.allowFrom`. If the config cannot be written, the access status becomes `sync_failed` with `syncError` for admin diagnostics.
@@ -333,7 +345,7 @@ Reminder endpoints:
 * `PATCH /api/reminders/:id`
 * `DELETE /api/reminders/:id`
 
-Reminder records are scoped to the signed-in mobile user. One-time reminders use `scheduledAt`; recurring reminders use a cron expression and timezone. The backend worker records due reminders, disables completed one-time reminders, advances supported recurring schedules, and writes `reminder.triggered` audit events. Actual delivery through WhatsApp, push, or local notifications remains a follow-up milestone.
+Reminder records are scoped to the signed-in mobile user. One-time reminders use `scheduledAt`; recurring reminders use a cron expression and timezone. The backend worker records due reminders, disables completed one-time reminders, advances supported recurring schedules, and sends user reminders through the OpenClaw WhatsApp delivery adapter when an allowed WhatsApp contact exists. Delivery success/failure is stored in `lastTriggerStatus` and `lastTriggerMessage`; push or local notification delivery remains a follow-up milestone.
 
 Backup uses `BACKUP_DIR` for local backup files. Database export tries host `pg_dump` first and falls back to `docker exec` with `POSTGRES_CONTAINER_NAME`, which defaults to the Docker Compose container name:
 
@@ -443,7 +455,7 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
 * [x] Task management CRUD
 * [x] User-scoped task ownership for mobile app data
 * [x] User-scoped reminder and schedule CRUD
-* [ ] Reminder worker with Redis/BullMQ
+* [x] Reminder worker with Redis/BullMQ
 * [ ] Reporting service
 * [ ] Client/contact management
 * [x] Basic user registration and mobile login
@@ -507,7 +519,8 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
 * [ ] WhatsApp integration
 * [x] Nara Bot allowlist sync with OpenClaw
 * [ ] Telegram integration (optional)
-* [ ] Messaging delivery for reminders and reports
+* [x] OpenClaw WhatsApp delivery for due reminders
+* [ ] Push/local delivery for reminders and reports
 
 ---
 

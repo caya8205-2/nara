@@ -11,7 +11,7 @@ This file combines the current planning, architecture, ADR, deployment, and desi
 - Nara Bot access requests can sync allowed WhatsApp senders into local OpenClaw config.
 - Backend tunnel-facing endpoints have basic in-memory rate limiting.
 - Agent-triggered reminder mutations are written to audit logs.
-- Redis/BullMQ reminder delivery, local/push notifications, and approval execution remain future milestones.
+- Redis/BullMQ reminder delivery and approval execution are implemented for the MVP; local/push/WhatsApp reminder notifications remain future milestones.
 
 ---
 
@@ -171,9 +171,9 @@ The backend should not hardcode OpenClaw internals throughout the app. Use an ad
 
 Implementation options to verify:
 
-- OpenClaw CLI command for pairing approval or allowlist mutation.
+- Backend service syncs approved WhatsApp contacts into OpenClaw allowlist state.
 - OpenClaw Gateway/API support for access management.
-- Controlled update of local OpenClaw allowlist files, followed by runtime reload if required.
+- Controlled update of local OpenClaw allowlist files, with timestamped backups before edits.
 
 Until the exact OpenClaw interface is confirmed, Nara DB should be treated as the source of intended access state and OpenClaw as the runtime enforcement layer.
 
@@ -189,7 +189,7 @@ Until the exact OpenClaw interface is confirmed, Nara DB should be treated as th
 
 - Add database schema for users, contacts, channel access, approvals, and audit logs.
 - Add an `AgentAccessService` abstraction.
-- Research the safest OpenClaw CLI/API mechanism for allowlist sync.
+- Keep validating the safest OpenClaw gateway API path for allowlist sync as the runtime evolves.
 - Add app UI for adding a WhatsApp number.
 - Add web admin UI for reviewing users and Nara Bot access status.
 - Add open source attribution/settings section.

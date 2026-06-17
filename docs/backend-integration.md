@@ -93,7 +93,7 @@ Task tools are user-scoped:
 - `POST /api/agent/tasks/delete`
 - `POST /api/agent/summary`
 
-Mutating tools respect `assistantProfile.autonomy`. For `Suggest` and `Confirm`, the backend returns `409` until the request includes `confirmed: true`.
+Mutating tools respect `assistantProfile.autonomy`. For `Suggest` and `Confirm`, the backend creates a pending approval request unless the request includes `confirmed: true`. The mobile Approvals tab can approve or reject those pending requests.
 
 ### Reminder Tools
 
@@ -106,23 +106,47 @@ Reminder tools use the same user resolution and confirmation rules:
 
 One-time reminders require `scheduledAt`. Recurring reminders require `cronExpr` and support a timezone. Supported MVP cron presets are daily `0 9 * * *`, weekly `0 9 * * 1`, and monthly `0 9 1 * *`.
 
+### Approval Requests
+
+**Status:** Implemented for agent tool confirmation paths and mobile review.
+
+Approval endpoints require a normal mobile user or operator JWT:
+
+- `GET /api/approvals`
+- `POST /api/approvals/:id/approve`
+- `POST /api/approvals/:id/reject`
+
+Agent tool calls store pending records in `approval_requests` with the action type, risk level, source, and payload needed to run the action later. Approval executes the stored payload through the existing task/reminder services. Rejection closes the request without running the action. The current supported actions are task create/complete/delete and reminder create/update/delete.
+
 ### Reminder Execution
 
-**Status:** Implemented for backend-side due detection and audit recording.
+**Status:** Implemented for backend-side due detection, BullMQ scheduling, and OpenClaw WhatsApp delivery attempts.
 
-The backend starts a lightweight reminder worker when `REMINDER_WORKER_ENABLED=true`. The worker polls due reminders every `REMINDER_WORKER_INTERVAL_MS` milliseconds, defaults to 60 seconds, and calls `reminderService.processDue()`.
+The backend starts a BullMQ reminder worker when `REMINDER_WORKER_ENABLED=true`. It requires `REDIS_URL`, schedules a repeat job every `REMINDER_WORKER_INTERVAL_MS` milliseconds, defaults to 60 seconds, and calls `reminderService.processDue()`.
 
 Execution behavior:
 
 - one-time reminders trigger once, set `enabled=false`, clear `nextRunAt`, and record `lastTriggeredAt`
 - recurring reminders trigger, keep `enabled=true`, and advance `nextRunAt`
-- every trigger writes a `reminder.triggered` audit event with status `recorded`
-- delivery to WhatsApp, push notifications, or local notifications is still a separate follow-up
+- every trigger writes `reminder.delivery.recorded` and `reminder.triggered` audit events with the delivery status
+- user reminders are sent through the OpenClaw WhatsApp delivery adapter when an allowed WhatsApp recipient exists
+- delivery failures are stored in `lastTriggerStatus=delivery_failed` and `lastTriggerMessage` for admin visibility
+- push or local notification delivery is still a separate follow-up
 
 Useful endpoints:
 
 - `GET /api/reminders/execution` returns user-scoped execution summary
 - `POST /api/reminders/process-due` lets an operator manually process due reminders
+
+Local worker verification:
+
+```powershell
+npm run infra:up
+npm --workspace @nara/backend run db:migrate
+npm --workspace @nara/backend run dev
+```
+
+Create a one-time reminder due in the near future, then watch backend logs for `reminder worker started` and `processed due reminders`. For manual verification without waiting for the repeat job, sign in as an operator and call `POST /api/reminders/process-due`.
 
 ### Local Smoke Test
 
@@ -339,7 +363,7 @@ GET /api/backup/history
 
 **Screen:** `/whatsapp-access` (`apps/web-admin/src/pages/WhatsAppAccess.tsx`)
 
-**Status:** Implemented. Endpoint returns joined user and contact data.
+**Status:** Implemented. Endpoint returns joined user and contact data, and admin actions sync OpenClaw allowlist state.
 
 ### Previous State
 
@@ -399,6 +423,9 @@ Array<{
 - `apps/backend/src/services/identity.service.ts` joins `agent_channel_access` with `users` and `user_contacts`
 - `GET /api/users/:id/agent-access` returns the same joined data scoped to one user for the mobile app
 - `apps/web-admin/src/pages/WhatsAppAccess.tsx` displays user names and WhatsApp numbers from the joined response
+- `PATCH /api/agent-access/:id` with `status=allowed` syncs the contact into OpenClaw before storing `allowed`; sync failures store `sync_failed`, `lastSyncAt`, and `syncError`
+- `POST /api/agent-access/:id/retry-sync` retries an allowlist sync for failed approvals
+- `PATCH /api/agent-access/:id` with `status=blocked` removes the contact from the generated allowlist and persists any sync error for admin visibility
 
 **SQL Example:**
 ```sql
@@ -422,6 +449,7 @@ ORDER BY aca.requested_at DESC
 - Better UX: Shows actual user names and phone numbers
 - Fewer API calls: No need for client to fetch users separately
 - Easier filtering: Can filter by user name or phone number
+- Safer operations: PostgreSQL remains the source of truth and OpenClaw sync failure is visible in admin state
 
 ---
 

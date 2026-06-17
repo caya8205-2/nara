@@ -64,6 +64,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       loadTasks(silent: true);
       loadReminders(silent: true);
       loadAssistantProfile(silent: true);
+      loadApprovals(silent: true);
     }
   }
 
@@ -120,6 +121,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     loadTasks(silent: true);
     loadReminders(silent: true);
     loadAssistantProfile(silent: true);
+    loadApprovals(silent: true);
   }
 
   void handleAuthenticated(
@@ -143,6 +145,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     loadTasks();
     loadReminders();
     loadAssistantProfile(forceWhatsAppPrompt: isNewUser);
+    loadApprovals();
   }
 
   void handleTryAsGuest() {
@@ -155,6 +158,8 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       appState.tasks = [];
       appState.reminders = [];
       appState.approvals = [];
+      appState.approvalsError = null;
+      appState.approvalsLoading = false;
       appState.activity = [];
       appState.connectionState = NaraConnectionState.unknown;
       appState.connectionMessage = 'Guest mode';
@@ -183,6 +188,8 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       appState.remindersError = null;
       appState.remindersLoading = false;
       appState.approvals = [];
+      appState.approvalsError = null;
+      appState.approvalsLoading = false;
       appState.activity = [];
       appState.assistantLoading = false;
       appState.assistantSaving = false;
@@ -292,6 +299,33 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     } finally {
       if (!silent && mounted) {
         setState(() => appState.remindersLoading = false);
+      }
+    }
+  }
+
+  Future<void> loadApprovals({bool silent = false}) async {
+    if (isGuest) return;
+    if (!silent) {
+      setState(() {
+        appState.approvalsLoading = true;
+        appState.approvalsError = null;
+      });
+    }
+
+    try {
+      final result = await apiClient.listApprovals();
+      final approvals = result
+          .whereType<Map<String, dynamic>>()
+          .map(NaraApproval.fromJson)
+          .toList();
+      if (!mounted) return;
+      setState(() => appState.approvals = approvals);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => appState.approvalsError = 'Could not load approvals');
+    } finally {
+      if (!silent && mounted) {
+        setState(() => appState.approvalsLoading = false);
       }
     }
   }
@@ -655,9 +689,8 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     final previous = List<NaraReminder>.from(appState.reminders);
     setState(() {
       appState.reminders = appState.reminders
-          .map((item) => item.id == reminder.id
-              ? item.copyWith(enabled: enabled)
-              : item)
+          .map((item) =>
+              item.id == reminder.id ? item.copyWith(enabled: enabled) : item)
           .toList();
     });
     try {
@@ -710,6 +743,41 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       appState.approvals =
           appState.approvals.where((a) => a.id != approval.id).toList();
     });
+  }
+
+  Future<void> processApproval(
+    NaraApproval approval, {
+    required bool approve,
+  }) async {
+    final previous = List<NaraApproval>.from(appState.approvals);
+    setState(() {
+      appState.approvals =
+          appState.approvals.where((a) => a.id != approval.id).toList();
+      appState.approvalsError = null;
+    });
+
+    try {
+      if (approve) {
+        await apiClient.approveApproval(approval.id);
+        await Future.wait([
+          loadTasks(silent: true),
+          loadReminders(silent: true),
+          loadApprovals(silent: true),
+        ]);
+      } else {
+        await apiClient.rejectApproval(approval.id);
+        await loadApprovals(silent: true);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        appState.approvals = previous;
+        appState.approvalsError = approve
+            ? 'Could not approve this request'
+            : 'Could not reject this request';
+      });
+      rethrow;
+    }
   }
 
   void openTab(int index) {
@@ -801,8 +869,9 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       // 4 — Approvals
       ApprovalsScreen(
         state: appState,
-        onApprove: handleApprove,
-        onReject: handleReject,
+        onRefresh: loadApprovals,
+        onApprove: (approval) => processApproval(approval, approve: true),
+        onReject: (approval) => processApproval(approval, approve: false),
       ),
       // 5 — Settings (hidden tab)
       SettingsScreen(

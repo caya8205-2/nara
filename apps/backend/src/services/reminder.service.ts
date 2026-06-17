@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, isNull, lte } from 'drizzle-orm'
 import { db } from '../db/index.js'
 import { auditLogs, schedules } from '../db/schema.js'
+import { notificationService } from './notification.service.js'
 import type { TaskSource } from './task.service.js'
 
 export type ReminderKind = 'once' | 'recurring'
@@ -254,7 +255,7 @@ export class ReminderService {
   }
 
   private async trigger(reminder: ReminderRow, now: Date) {
-    const message = `Reminder "${reminder.name}" became due.`
+    const delivery = await this.deliver(reminder, now)
     const nextRunAt = reminder.kind === 'recurring'
       ? this.computeNextRunAt({
         kind: reminder.kind,
@@ -273,8 +274,8 @@ export class ReminderService {
         enabled: reminder.kind === 'once' ? false : reminder.enabled,
         nextRunAt,
         lastTriggeredAt: now,
-        lastTriggerStatus: 'recorded',
-        lastTriggerMessage: message,
+        lastTriggerStatus: delivery.status,
+        lastTriggerMessage: delivery.message,
         updatedAt: now,
       })
       .where(eq(schedules.id, reminder.id))
@@ -284,11 +285,36 @@ export class ReminderService {
       userId: reminder.userId,
       kind: reminder.kind,
       action: reminder.action,
-      status: 'recorded',
+      status: delivery.status,
       nextRunAt,
     })
 
     return updated
+  }
+
+  private async deliver(reminder: ReminderRow, now: Date) {
+    const delivery = await notificationService.deliverReminder({
+      reminderId: reminder.id,
+      userId: reminder.userId,
+      title: reminder.name,
+      description: reminder.description,
+      dueAt: now,
+    })
+
+    await this.audit({ type: 'system' }, 'reminder.delivery.recorded', reminder.id, {
+      userId: reminder.userId,
+      kind: reminder.kind,
+      action: reminder.action,
+      deliveredAt: now,
+      status: delivery.status,
+      recipient: delivery.recipient ?? null,
+      message: delivery.message,
+    })
+
+    return {
+      status: delivery.status,
+      message: delivery.message,
+    }
   }
 
   private shouldRecomputeNextRunAt(input: UpdateReminderInput) {

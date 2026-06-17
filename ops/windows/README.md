@@ -67,6 +67,22 @@ For backend-only recovery:
 npm run start:server:backend
 ```
 
+Manage the hidden-process services with:
+
+```powershell
+npm run server:status
+npm run server:logs
+npm run server:restart
+npm run server:stop
+```
+
+For a single service, call the helper directly:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\ops\windows\manage-nara-services.ps1 -Action logs -Service backend -Tail 120
+powershell -ExecutionPolicy Bypass -File .\ops\windows\manage-nara-services.ps1 -Action stop -Service openclaw-gateway
+```
+
 ## Suggested PM2 Commands
 
 Install PM2 globally if the server does not have it:
@@ -143,14 +159,14 @@ powershell -ExecutionPolicy Bypass -File .\ops\windows\check-nara-health.ps1 -Ex
 
 ## Reminder Worker
 
-The backend starts a lightweight reminder worker by default:
+The backend starts a BullMQ reminder worker by default:
 
 ```env
 REMINDER_WORKER_ENABLED=true
 REMINDER_WORKER_INTERVAL_MS=60000
 ```
 
-The worker records due reminders, disables one-time reminders after they trigger, advances supported recurring schedules, and writes `reminder.triggered` audit events. WhatsApp/push/local notification delivery is still a later integration step.
+The worker records due reminders, disables one-time reminders after they trigger, advances supported recurring schedules, and writes `reminder.triggered` audit events. The current delivery adapter sends user reminders through OpenClaw WhatsApp when an allowed WhatsApp contact exists. Delivery status is stored in `lastTriggerStatus` and `lastTriggerMessage`.
 
 ## Cloudflare Tunnel
 
@@ -225,10 +241,11 @@ For real use, a dedicated host number is cleaner:
 - users add their own WhatsApp numbers in the Nara app
 - backend stores access intent in PostgreSQL
 - backend syncs allowed WhatsApp senders into the local OpenClaw allowlist
+- backend admin approve/retry/block actions update OpenClaw allowlist from backend state
 
-## Current Allowlist Sync Contract
+## OpenClaw Allowlist Sync
 
-Allowed WhatsApp senders live in:
+Nara keeps the database access state as the source of truth. Admin approve/retry/block actions sync the allowed WhatsApp contacts into:
 
 ```text
 C:\Users\<user>\.openclaw\openclaw.json
@@ -244,6 +261,9 @@ OPENCLAW_CONFIG_PATH=C:\Users\<user>\.openclaw\openclaw.json
 OPENCLAW_WHATSAPP_ACCOUNT=default
 OPENCLAW_WHATSAPP_DM_POLICY=allowlist
 OPENCLAW_AUTO_ALLOWLIST_REQUESTS=true
+OPENCLAW_ALLOWLIST_SYNC_MODE=auto
+OPENCLAW_ALLOWLIST_SYNC_PATH=
+OPENCLAW_WHATSAPP_SEND_PATH=/api/channels/whatsapp/send
 ```
 
 The sync writes a timestamped backup before replacing `openclaw.json`. Nara-managed senders are tracked in `meta.naraManagedAllowFrom`, so manually maintained `allowFrom` entries are preserved.
@@ -261,6 +281,8 @@ After the dedicated host number is linked:
 5. Confirm the number appears under `channels.whatsapp.accounts.default.allowFrom`.
 6. Send a WhatsApp message from the user number to the linked host number.
 7. Confirm OpenClaw routes the sender context into the Nara backend agent tools.
+
+Use `setup-openclaw-whatsapp.ps1` to update owner/self-phone setup safely. It creates a timestamped backup before editing OpenClaw config. The backend sync also creates timestamped backups before editing `openclaw.json`.
 
 ## Migration Checklist To A New Server PC
 

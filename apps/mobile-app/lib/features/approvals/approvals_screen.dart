@@ -8,12 +8,14 @@ import '../../core/widgets/nara_empty_state.dart';
 class ApprovalsScreen extends StatelessWidget {
   const ApprovalsScreen({
     required this.state,
+    required this.onRefresh,
     required this.onApprove,
     required this.onReject,
     super.key,
   });
 
   final NaraMobileState state;
+  final Future<void> Function({bool silent}) onRefresh;
   final Future<void> Function(NaraApproval approval) onApprove;
   final Future<void> Function(NaraApproval approval) onReject;
 
@@ -21,64 +23,84 @@ class ApprovalsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final approvals = state.approvals;
 
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
-      children: [
-        // Header
-        Text(
-          'Approvals',
-          style: Theme.of(context).textTheme.headlineMedium,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          approvals.isEmpty
-              ? 'Actions that need your review will appear here.'
-              : '${approvals.length} pending action${approvals.length == 1 ? '' : 's'} need your review.',
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w400,
-            color: NaraColors.textSecondary,
-            height: 1.45,
+    return RefreshIndicator(
+      onRefresh: () => onRefresh(silent: false),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+        children: [
+          // Header
+          Text(
+            'Approvals',
+            style: Theme.of(context).textTheme.headlineMedium,
           ),
-        ),
-        const SizedBox(height: 18),
-
-        // Empty state
-        if (approvals.isEmpty)
-          NaraCard(
-            child: const NaraEmptyState(
-              icon: Icons.checklist_outlined,
-              title: 'No pending approvals',
-              body:
-                  'Actions that need your review will appear here — like tasks from WhatsApp or bot suggestions.',
+          const SizedBox(height: 4),
+          Text(
+            approvals.isEmpty
+                ? 'Actions that need your review will appear here.'
+                : '${approvals.length} pending action${approvals.length == 1 ? '' : 's'} need your review.',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w400,
+              color: NaraColors.textSecondary,
+              height: 1.45,
             ),
           ),
+          const SizedBox(height: 18),
 
-        // Approval list
-        if (approvals.isNotEmpty)
-          NaraCard(
-            padding: EdgeInsets.zero,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (int i = 0; i < approvals.length; i++) ...[
-                  if (i > 0)
-                    const Divider(height: 1, indent: 52, endIndent: 16),
-                  _ApprovalTile(
-                    approval: approvals[i],
-                    onTap: () => _showApprovalDetail(
-                      context,
-                      approvals[i],
-                      onApprove,
-                      onReject,
+          if (state.approvalsLoading)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 12),
+              child: LinearProgressIndicator(minHeight: 2),
+            ),
+
+          if (state.approvalsError != null) ...[
+            Text(
+              state.approvalsError!,
+              style: const TextStyle(
+                fontSize: 12,
+                color: NaraColors.danger,
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          // Empty state
+          if (approvals.isEmpty)
+            const NaraCard(
+              child: NaraEmptyState(
+                icon: Icons.checklist_outlined,
+                title: 'No pending approvals',
+                body:
+                    'Actions that need your review will appear here — like tasks from WhatsApp or bot suggestions.',
+              ),
+            ),
+
+          // Approval list
+          if (approvals.isNotEmpty)
+            NaraCard(
+              padding: EdgeInsets.zero,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (int i = 0; i < approvals.length; i++) ...[
+                    if (i > 0)
+                      const Divider(height: 1, indent: 52, endIndent: 16),
+                    _ApprovalTile(
+                      approval: approvals[i],
+                      onTap: () => _showApprovalDetail(
+                        context,
+                        approvals[i],
+                        onApprove,
+                        onReject,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -113,8 +135,7 @@ class _ApprovalTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final (IconData icon, Color iconColor, Color iconBg) =
         _actionTypeVisual(approval.actionType);
-    final (Color riskColor, String riskLabel) =
-        _riskVisual(approval.riskLevel);
+    final (Color riskColor, String riskLabel) = _riskVisual(approval.riskLevel);
 
     return ListTile(
       onTap: onTap,
@@ -222,8 +243,7 @@ class _ApprovalDetailSheetState extends State<_ApprovalDetailSheet> {
     final a = widget.approval;
     final (IconData icon, Color iconColor, Color iconBg) =
         _actionTypeVisual(a.actionType);
-    final (Color riskColor, String riskLabel) =
-        _riskVisual(a.riskLevel);
+    final (Color riskColor, String riskLabel) = _riskVisual(a.riskLevel);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),

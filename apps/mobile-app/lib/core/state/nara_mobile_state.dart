@@ -383,6 +383,8 @@ class NaraMobileState {
   List<NaraReminder> reminders = [];
 
   List<NaraApproval> approvals = [];
+  bool approvalsLoading = false;
+  String? approvalsError;
   List<NaraActivity> activity = [];
 
   NaraAssistantPreferences assistantPreferences =

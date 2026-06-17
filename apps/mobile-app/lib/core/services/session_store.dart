@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../state/nara_mobile_state.dart';
@@ -17,6 +18,10 @@ class StoredNaraSession {
 }
 
 class NaraSessionStore {
+  NaraSessionStore({
+    FlutterSecureStorage? secureStorage,
+  }) : _secureStorage = secureStorage ?? const FlutterSecureStorage();
+
   static const _serverUrlKey = 'nara.serverUrl';
   static const _authTokenKey = 'nara.authToken';
   static const _userKey = 'nara.user';
@@ -25,10 +30,12 @@ class NaraSessionStore {
   static const _languagePreferenceKey = 'nara.languagePreference';
   static const _whatsAppPromptPrefix = 'nara.whatsAppPromptSeen.';
 
+  final FlutterSecureStorage _secureStorage;
+
   Future<StoredNaraSession?> load() async {
     final prefs = await SharedPreferences.getInstance();
     final serverUrl = prefs.getString(_serverUrlKey);
-    final authToken = prefs.getString(_authTokenKey);
+    final authToken = await _readAuthToken(prefs);
     final userRaw = prefs.getString(_userKey);
 
     if (serverUrl == null || authToken == null || userRaw == null) {
@@ -52,7 +59,8 @@ class NaraSessionStore {
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_serverUrlKey, serverUrl);
-    await prefs.setString(_authTokenKey, authToken);
+    await _secureStorage.write(key: _authTokenKey, value: authToken);
+    await prefs.remove(_authTokenKey);
     await prefs.setString(_userKey, jsonEncode(user));
   }
 
@@ -126,5 +134,18 @@ class NaraSessionStore {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_authTokenKey);
     await prefs.remove(_userKey);
+    await _secureStorage.delete(key: _authTokenKey);
+  }
+
+  Future<String?> _readAuthToken(SharedPreferences prefs) async {
+    final secureToken = await _secureStorage.read(key: _authTokenKey);
+    if (secureToken != null && secureToken.isNotEmpty) return secureToken;
+
+    final legacyToken = prefs.getString(_authTokenKey);
+    if (legacyToken == null || legacyToken.isEmpty) return null;
+
+    await _secureStorage.write(key: _authTokenKey, value: legacyToken);
+    await prefs.remove(_authTokenKey);
+    return legacyToken;
   }
 }

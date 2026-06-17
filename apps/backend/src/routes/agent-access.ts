@@ -34,7 +34,18 @@ const plugin: FastifyPluginAsync = async (app) => {
   app.patch('/:id', { preHandler: requireOperator }, async (req, reply) => {
     const { id } = req.params as { id: string }
     const body = UpdateAccessSchema.parse(req.body)
-    const access = await identityService.updateAgentAccess(id, body)
+    const access = body.status === 'allowed'
+      ? await identityService.approveAgentAccess(id)
+      : body.status === 'blocked'
+        ? await identityService.blockAgentAccess(id)
+        : await identityService.updateAgentAccess(id, body)
+    if (!access) return reply.status(404).send({ error: 'Agent access record not found' })
+    return access
+  })
+
+  app.post('/:id/retry-sync', { preHandler: requireOperator }, async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const access = await identityService.retryAgentAccessSync(id)
     if (!access) return reply.status(404).send({ error: 'Agent access record not found' })
     return access
   })

@@ -259,6 +259,11 @@ export const updateAgentAccess = async (id: string, input: UpdateAgentAccessInpu
   return response.data
 }
 
+export const retryAgentAccessSync = async (id: string) => {
+  const response = await api.post<AgentChannelAccess>('/agent-access/' + id + '/retry-sync')
+  return response.data
+}
+
 export const deleteAgentAccess = async (id: string) => {
   await api.delete('/agent-access/' + id)
 }

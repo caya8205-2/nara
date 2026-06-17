@@ -25,7 +25,7 @@ The mobile app is the main user-facing Nara app. The backend remains the source 
 - Production-facing default API URL: `https://narabot.web.id`
 - Animated welcome screen before login/register, with smooth transition into auth and app shell
 - Shared in-memory app state for current user, tasks, and silent backend health
-- Persisted auth token and user profile through `shared_preferences`
+- Persisted auth token through `flutter_secure_storage`; non-sensitive local cache such as user profile, theme, language, assistant preferences, and WhatsApp prompt state remains in `shared_preferences`
 - Home dashboard with task summary, completable Today tasks, quick add task, Nara Bot status, and inline WhatsApp access request
 - Auto server health refresh when the app opens/resumes and every few minutes
 - Pull-to-refresh for Home, Tasks, and Nara data
@@ -52,7 +52,7 @@ flutter run
 
 If Flutter says `No pubspec.yaml file found`, the command was run from the monorepo root instead of `apps/mobile-app`.
 
-When dependencies change, stop the running app and start `flutter run` again. Hot reload is not enough for newly added plugins such as `shared_preferences`.
+When dependencies change, stop the running app and start `flutter run` again. Hot reload is not enough for newly added plugins such as `shared_preferences` or `flutter_secure_storage`.
 
 ## Backend URL
 
@@ -98,6 +98,8 @@ Mobile auth uses database-backed user accounts:
 
 Admin/operator credentials from `.env` remain for the local web admin dashboard and are not the mobile user login path.
 
+The mobile auth token is stored with `flutter_secure_storage`. On first launch after upgrading from older builds, the app migrates the legacy `shared_preferences` token into secure storage and removes the old preference key. Non-sensitive app preferences stay in `shared_preferences`.
+
 ## Nara Bot and WhatsApp Access
 
 The current mobile MVP uses existing identity endpoints:
@@ -135,7 +137,17 @@ Reminder data is stored in PostgreSQL and scoped to the signed-in mobile user th
 
 The mobile screen supports creating, listing, pausing, resuming, deleting, and pull-to-refresh. One-time reminders use `scheduledAt`. Recurring reminders currently offer daily, weekly, and monthly presets backed by cron expressions and the `Asia/Jakarta` timezone.
 
-The backend now records due reminders through a lightweight worker. Mobile reads execution fields from reminder list responses, including `nextRunAt`, `lastTriggeredAt`, `lastTriggerStatus`, and `lastTriggerMessage`, and shows next/last recorded timing in the reminder list. WhatsApp, push, or local notification delivery remains a separate follow-up work item.
+The backend now records due reminders through a BullMQ worker backed by Redis. Mobile reads execution fields from reminder list responses, including `nextRunAt`, `lastTriggeredAt`, `lastTriggerStatus`, and `lastTriggerMessage`, and shows next/last recorded timing in the reminder list. The first delivery path sends due user reminders through OpenClaw WhatsApp when an allowed WhatsApp contact exists; push or local notification delivery remains a separate follow-up work item.
+
+## Approvals
+
+The Approvals tab is connected to backend approval records:
+
+- `GET /api/approvals`
+- `POST /api/approvals/:id/approve`
+- `POST /api/approvals/:id/reject`
+
+Agent tool calls that need confirmation now create pending approval records. Approving a record runs the stored action payload, then refreshes tasks, reminders, and approvals in the app. Rejecting a record closes it without running the action.
 
 ## Validation
 
@@ -213,8 +225,6 @@ Avoid copy themes:
 
 ## Next Work
 
-1. Move token storage from `shared_preferences` to secure storage before production hardening.
-2. Redesign the welcome/login/register surface using the Auth UI Redesign Handoff above.
-3. Add WhatsApp, local, or push notification delivery for triggered reminders.
-4. Add approval queue once backend approval endpoints exist.
-5. Add reminder edit controls beyond pause/resume and the current recurrence presets.
+1. Redesign the welcome/login/register surface using the Auth UI Redesign Handoff above.
+2. Add local or push notification delivery for triggered reminders.
+3. Add reminder edit controls beyond pause/resume and the current recurrence presets.

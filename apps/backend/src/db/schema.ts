@@ -1,4 +1,4 @@
-import { boolean, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
+import { boolean, index, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 
 export const userRole = pgEnum('user_role', ['admin', 'user'])
 
@@ -21,6 +21,8 @@ export const taskPriority = pgEnum('task_priority', ['low', 'normal', 'high', 'u
 export const taskSource = pgEnum('task_source', ['manual', 'admin', 'agent', 'scheduled'])
 
 export const reminderKind = pgEnum('reminder_kind', ['once', 'recurring'])
+
+export const approvalStatus = pgEnum('approval_status', ['pending', 'approved', 'rejected'])
 
 export const users = pgTable(
   'users',
@@ -137,6 +139,32 @@ export const schedules = pgTable('schedules', {
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 })
+
+export const approvalRequests = pgTable(
+  'approval_requests',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id').references(() => users.id),
+    title: text('title').notNull(),
+    actionType: text('action_type').notNull(),
+    source: text('source').default('nara_bot').notNull(),
+    riskLevel: text('risk_level').default('low').notNull(),
+    status: approvalStatus('status').default('pending').notNull(),
+    payload: text('payload').notNull(),
+    result: text('result'),
+    requestedByType: auditActorType('requested_by_type').default('agent').notNull(),
+    requestedById: uuid('requested_by_id'),
+    decidedByType: auditActorType('decided_by_type'),
+    decidedById: uuid('decided_by_id'),
+    decidedAt: timestamp('decided_at'),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => ({
+    userStatusCreated: index('approval_requests_user_status_created_idx')
+      .on(table.userId, table.status, table.createdAt),
+  }),
+)
 
 export const clients = pgTable('clients', {
   id: uuid('id').defaultRandom().primaryKey(),

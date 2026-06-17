@@ -2,6 +2,7 @@ import type { FastifyPluginAsync, FastifyReply } from 'fastify'
 import { z } from 'zod'
 import { env } from '../config/env.js'
 import { identityService, type AgentChannelType } from '../services/identity.service.js'
+import { approvalService, type ApprovalActionType, type ApprovalPayload } from '../services/approval.service.js'
 import { reminderService, type ReminderKind } from '../services/reminder.service.js'
 import { taskService, type TaskPriority } from '../services/task.service.js'
 
@@ -135,6 +136,29 @@ const resolveSubject = async (
 const shouldRequireConfirmation = (autonomy: string) =>
   autonomy === 'Confirm' || autonomy === 'Suggest'
 
+const requestApproval = async (input: {
+  subject: ResolvedAgentSubject
+  title: string
+  actionType: ApprovalActionType
+  payload: ApprovalPayload
+  riskLevel?: 'low' | 'medium' | 'high'
+}) => {
+  const approval = await approvalService.create({
+    userId: input.subject.userId,
+    title: input.title,
+    actionType: input.actionType,
+    source: input.subject.channelType === 'whatsapp' ? 'whatsapp' : 'nara_bot',
+    riskLevel: input.riskLevel ?? 'low',
+    payload: input.payload,
+  }, { type: 'agent', id: input.subject.userId })
+
+  return ok({
+    approvalRequired: true,
+    approval,
+    message: 'Approval request created. The user can approve or reject it in Nara.',
+  })
+}
+
 const plugin: FastifyPluginAsync = async (app) => {
   app.addHook('preHandler', async (req, reply) => {
     const secret = req.headers['x-agent-secret']
@@ -217,7 +241,22 @@ const plugin: FastifyPluginAsync = async (app) => {
         return reply.status(403).send(fail('Reminder creation is disabled for this user'))
       }
       if (shouldRequireConfirmation(profile.autonomy) && body.confirmed !== true) {
-        return reply.status(409).send(fail('Confirmation required before creating a reminder'))
+        return reply.status(202).send(await requestApproval({
+          subject,
+          title: `Create reminder: ${body.name}`,
+          actionType: 'create_reminder',
+          payload: {
+            actionType: 'create_reminder',
+            input: {
+              name: body.name,
+              description: body.description,
+              kind: body.kind as ReminderKind,
+              scheduledAt: body.scheduledAt,
+              cronExpr: body.cronExpr ?? null,
+              timezone: body.timezone,
+            },
+          },
+        }))
       }
 
       const reminder = await reminderService.create({
@@ -272,7 +311,24 @@ const plugin: FastifyPluginAsync = async (app) => {
       if (!subject) return
       const profile = await identityService.getAssistantProfile(subject.userId)
       if (shouldRequireConfirmation(profile.autonomy) && body.confirmed !== true) {
-        return reply.status(409).send(fail('Confirmation required before updating a reminder'))
+        return reply.status(202).send(await requestApproval({
+          subject,
+          title: 'Update reminder',
+          actionType: 'update_reminder',
+          payload: {
+            actionType: 'update_reminder',
+            input: {
+              id: body.id,
+              name: body.name,
+              description: body.description,
+              scheduledAt: body.scheduledAt,
+              cronExpr: body.cronExpr,
+              timezone: body.timezone,
+              enabled: body.enabled,
+            },
+          },
+          riskLevel: body.enabled === false ? 'medium' : 'low',
+        }))
       }
 
       const reminder = await reminderService.update(body.id, {
@@ -297,10 +353,22 @@ const plugin: FastifyPluginAsync = async (app) => {
     try {
       const body = AgentSubjectSchema.extend({
         id: z.string().uuid(),
-        confirmed: z.literal(true),
+        confirmed: z.boolean().optional(),
       }).parse(req.body)
       const subject = await resolveSubject(body, reply)
       if (!subject) return
+      if (body.confirmed !== true) {
+        return reply.status(202).send(await requestApproval({
+          subject,
+          title: 'Delete reminder',
+          actionType: 'delete_reminder',
+          payload: {
+            actionType: 'delete_reminder',
+            input: { id: body.id },
+          },
+          riskLevel: 'high',
+        }))
+      }
 
       const reminder = await reminderService.delete(
         body.id,
@@ -333,7 +401,20 @@ const plugin: FastifyPluginAsync = async (app) => {
         return reply.status(403).send(fail('Task creation is disabled for this user'))
       }
       if (shouldRequireConfirmation(profile.autonomy) && body.confirmed !== true) {
-        return reply.status(409).send(fail('Confirmation required before creating a task'))
+        return reply.status(202).send(await requestApproval({
+          subject,
+          title: `Create task: ${body.title}`,
+          actionType: 'create_task',
+          payload: {
+            actionType: 'create_task',
+            input: {
+              title: body.title,
+              description: body.description,
+              dueAt: body.dueAt,
+              priority: body.priority as TaskPriority | undefined,
+            },
+          },
+        }))
       }
 
       const task = await taskService.create({
@@ -386,7 +467,15 @@ const plugin: FastifyPluginAsync = async (app) => {
 
       const profile = await identityService.getAssistantProfile(subject.userId)
       if (shouldRequireConfirmation(profile.autonomy) && body.confirmed !== true) {
-        return reply.status(409).send(fail('Confirmation required before completing a task'))
+        return reply.status(202).send(await requestApproval({
+          subject,
+          title: 'Complete task',
+          actionType: 'complete_task',
+          payload: {
+            actionType: 'complete_task',
+            input: { id: body.id },
+          },
+        }))
       }
 
       const task = await taskService.complete(body.id, { userId: subject.userId })
@@ -409,7 +498,16 @@ const plugin: FastifyPluginAsync = async (app) => {
       if (!subject) return
 
       if (body.confirmed !== true) {
-        return reply.status(409).send(fail('Confirmation required before deleting a task'))
+        return reply.status(202).send(await requestApproval({
+          subject,
+          title: 'Delete task',
+          actionType: 'delete_task',
+          payload: {
+            actionType: 'delete_task',
+            input: { id: body.id },
+          },
+          riskLevel: 'high',
+        }))
       }
 
       const task = await taskService.delete(body.id, { userId: subject.userId })
