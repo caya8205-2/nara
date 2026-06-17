@@ -25,7 +25,7 @@ The mobile app is the main user-facing Nara app. The backend remains the source 
 - Production-facing default API URL: `https://narabot.web.id`
 - Animated welcome screen before login/register, with smooth transition into auth and app shell
 - Shared in-memory app state for current user, tasks, and silent backend health
-- Persisted auth token through `flutter_secure_storage`; non-sensitive local cache such as user profile, theme, language, assistant preferences, and WhatsApp prompt state remains in `shared_preferences`
+- Persisted auth token through an Android Keystore-backed local secure store; non-sensitive local cache such as user profile, theme, language, assistant preferences, and WhatsApp prompt state remains in `shared_preferences`
 - Home dashboard with task summary, completable Today tasks, quick add task, Nara Bot status, and inline WhatsApp access request
 - Auto server health refresh when the app opens/resumes and every few minutes
 - Pull-to-refresh for Home, Tasks, and Nara data
@@ -52,7 +52,7 @@ flutter run
 
 If Flutter says `No pubspec.yaml file found`, the command was run from the monorepo root instead of `apps/mobile-app`.
 
-When dependencies change, stop the running app and start `flutter run` again. Hot reload is not enough for newly added plugins such as `shared_preferences` or `flutter_secure_storage`.
+When dependencies change, stop the running app and start `flutter run` again. Hot reload is not enough for newly added plugins such as `shared_preferences`.
 
 ## Backend URL
 
@@ -98,7 +98,7 @@ Mobile auth uses database-backed user accounts:
 
 Admin/operator credentials from `.env` remain for the local web admin dashboard and are not the mobile user login path.
 
-The mobile auth token is stored with `flutter_secure_storage`. On first launch after upgrading from older builds, the app migrates the legacy `shared_preferences` token into secure storage and removes the old preference key. Non-sensitive app preferences stay in `shared_preferences`.
+The mobile auth token is stored with an Android Keystore-backed MethodChannel store implemented in the app's Android host code. On first launch after upgrading from older builds, the app migrates the legacy `shared_preferences` token into secure storage and removes the old preference key. Non-sensitive app preferences stay in `shared_preferences`.
 
 ## Nara Bot and WhatsApp Access
 

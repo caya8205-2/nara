@@ -1,6 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../state/nara_mobile_state.dart';
@@ -18,10 +19,6 @@ class StoredNaraSession {
 }
 
 class NaraSessionStore {
-  NaraSessionStore({
-    FlutterSecureStorage? secureStorage,
-  }) : _secureStorage = secureStorage ?? const FlutterSecureStorage();
-
   static const _serverUrlKey = 'nara.serverUrl';
   static const _authTokenKey = 'nara.authToken';
   static const _userKey = 'nara.user';
@@ -29,8 +26,7 @@ class NaraSessionStore {
   static const _themePreferenceKey = 'nara.themePreference';
   static const _languagePreferenceKey = 'nara.languagePreference';
   static const _whatsAppPromptPrefix = 'nara.whatsAppPromptSeen.';
-
-  final FlutterSecureStorage _secureStorage;
+  final _secureTokenStore = const NaraSecureTokenStore();
 
   Future<StoredNaraSession?> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -59,7 +55,7 @@ class NaraSessionStore {
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_serverUrlKey, serverUrl);
-    await _secureStorage.write(key: _authTokenKey, value: authToken);
+    await _secureTokenStore.write(_authTokenKey, authToken);
     await prefs.remove(_authTokenKey);
     await prefs.setString(_userKey, jsonEncode(user));
   }
@@ -134,18 +130,42 @@ class NaraSessionStore {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_authTokenKey);
     await prefs.remove(_userKey);
-    await _secureStorage.delete(key: _authTokenKey);
+    await _secureTokenStore.delete(_authTokenKey);
   }
 
   Future<String?> _readAuthToken(SharedPreferences prefs) async {
-    final secureToken = await _secureStorage.read(key: _authTokenKey);
+    final secureToken = await _secureTokenStore.read(_authTokenKey);
     if (secureToken != null && secureToken.isNotEmpty) return secureToken;
 
     final legacyToken = prefs.getString(_authTokenKey);
     if (legacyToken == null || legacyToken.isEmpty) return null;
 
-    await _secureStorage.write(key: _authTokenKey, value: legacyToken);
+    await _secureTokenStore.write(_authTokenKey, legacyToken);
     await prefs.remove(_authTokenKey);
     return legacyToken;
+  }
+}
+
+class NaraSecureTokenStore {
+  const NaraSecureTokenStore();
+
+  static const _channel = MethodChannel('nara/secure_store');
+
+  Future<String?> read(String key) async {
+    if (!Platform.isAndroid) return null;
+    return _channel.invokeMethod<String>('read', {'key': key});
+  }
+
+  Future<void> write(String key, String value) async {
+    if (!Platform.isAndroid) return;
+    await _channel.invokeMethod<void>('write', {
+      'key': key,
+      'value': value,
+    });
+  }
+
+  Future<void> delete(String key) async {
+    if (!Platform.isAndroid) return;
+    await _channel.invokeMethod<void>('delete', {'key': key});
   }
 }

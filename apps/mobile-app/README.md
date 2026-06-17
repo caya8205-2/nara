@@ -6,7 +6,7 @@ Flutter mobile app for the main user-facing Nara experience.
 
 - Mobile app shell with bottom navigation
 - Backend server URL setup
-- Secure auth token storage with `flutter_secure_storage`
+- Secure auth token storage with the Android Keystore-backed local secure store
 - Readiness check against the Nara backend
 - Operator login against the backend
 - Home, Tasks, Reminders, Assistant, and Settings screens
