@@ -1,4 +1,4 @@
-﻿import { FormEvent, useMemo, useState } from 'react'
+﻿import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Activity,
@@ -76,17 +76,38 @@ export default function Dashboard() {
     refetchInterval: 15_000,
   })
 
-  const tasksQuery = useQuery({
-    queryKey: ['tasks'],
-    queryFn: listTasks,
-  })
-
   const operatorQuery = useQuery({
     queryKey: ['operator'],
     queryFn: getCurrentOperator,
     enabled: hasToken,
     retry: false,
+    refetchOnMount: 'always',
   })
+
+  const tasksQuery = useQuery({
+    queryKey: ['tasks'],
+    queryFn: listTasks,
+    enabled: hasToken && operatorQuery.isSuccess,
+    retry: false,
+  })
+
+  useEffect(() => {
+    if (operatorQuery.isError && (operatorQuery.error as any)?.response?.status === 401) {
+      logoutOperator()
+      setHasToken(false)
+      queryClient.removeQueries({ queryKey: ['operator'] })
+      queryClient.removeQueries({ queryKey: ['tasks'] })
+    }
+  }, [operatorQuery.error, operatorQuery.isError, queryClient])
+
+  useEffect(() => {
+    if (tasksQuery.isError && (tasksQuery.error as any)?.response?.status === 401) {
+      logoutOperator()
+      setHasToken(false)
+      queryClient.removeQueries({ queryKey: ['operator'] })
+      queryClient.removeQueries({ queryKey: ['tasks'] })
+    }
+  }, [queryClient, tasksQuery.error, tasksQuery.isError])
 
   const loginMutation = useMutation({
     mutationFn: loginOperator,

@@ -1,4 +1,4 @@
-﻿import { ReactNode } from 'react'
+﻿import { ReactNode, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -17,7 +17,7 @@ import {
   Users,
   Wrench,
 } from 'lucide-react'
-import { getCurrentOperator, logoutOperator } from '../lib/api'
+import { getCurrentOperator, logoutOperator, type Operator } from '../lib/api'
 
 type LayoutProps = {
   children: ReactNode
@@ -44,12 +44,21 @@ export default function Layout({ children }: LayoutProps) {
 
   const hasToken = Boolean(localStorage.getItem('token'))
 
-  const operatorQuery = useQuery({
+  const operatorQuery = useQuery<Operator, any>({
     queryKey: ['operator'],
     queryFn: getCurrentOperator,
     enabled: hasToken,
     retry: false,
+    refetchOnMount: 'always',
   })
+
+  useEffect(() => {
+    if (operatorQuery.isError && (operatorQuery.error as any)?.response?.status === 401) {
+      logoutOperator()
+      queryClient.removeQueries({ queryKey: ['operator'] })
+      navigate('/')
+    }
+  }, [operatorQuery.error, operatorQuery.isError, queryClient, navigate])
 
   const operator = operatorQuery.data
 
