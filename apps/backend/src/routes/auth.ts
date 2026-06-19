@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { z } from 'zod'
 import { env } from '../config/env.js'
+import { authzService } from '../services/authz.service.js'
 import { identityService } from '../services/identity.service.js'
 
 const LoginSchema = z.object({
@@ -77,27 +78,22 @@ const plugin: FastifyPluginAsync = async (app) => {
   })
 
   app.get('/me', async (req, reply) => {
-    try {
-      const payload = await req.jwtVerify<{
-        sub: string
-        role: string
-        accountType?: string
-      }>()
+    await authzService.requireSession(req, reply)
+    if (reply.sent) return
 
-      if (payload.accountType === 'user') {
-        const user = await identityService.getUserById(payload.sub)
-        if (!user) return reply.status(401).send({ error: 'User not found' })
-        return { user }
-      }
+    const session = authzService.session(req)
 
-      return {
-        operator: {
-          username: payload.sub,
-          role: payload.role,
-        },
-      }
-    } catch {
-      return reply.status(401).send({ error: 'Authentication required' })
+    if (session.accountType === 'user') {
+      const user = await identityService.getUserById(session.sub)
+      if (!user) return reply.status(401).send({ error: 'User not found' })
+      return { user }
+    }
+
+    return {
+      operator: {
+        username: session.sub,
+        role: session.role,
+      },
     }
   })
 }

@@ -12,6 +12,9 @@ import Backup from './pages/Backup'
 import Attribution from './pages/Attribution'
 import Tasks from './pages/Tasks'
 import Schedules from './pages/Schedules'
+import Reports from './pages/Reports'
+import Clients from './pages/Clients'
+import Context from './pages/Context'
 
 const queryClient = new QueryClient()
 
@@ -24,10 +27,13 @@ export default function App() {
           <Route path="/health" element={<Layout><Health /></Layout>} />
           <Route path="/agent-tools" element={<Layout><AgentTools /></Layout>} />
           <Route path="/users" element={<Layout><Users /></Layout>} />
+          <Route path="/clients" element={<Layout><Clients /></Layout>} />
+          <Route path="/context" element={<Layout><Context /></Layout>} />
           <Route path="/whatsapp-access" element={<Layout><WhatsAppAccess /></Layout>} />
           <Route path="/logs" element={<Layout><Logs /></Layout>} />
           <Route path="/config" element={<Layout><Config /></Layout>} />
           <Route path="/backup" element={<Layout><Backup /></Layout>} />
+          <Route path="/reports" element={<Layout><Reports /></Layout>} />
           <Route path="/attribution" element={<Layout><Attribution /></Layout>} />
           <Route path="/tasks" element={<Layout><Tasks /></Layout>} />
           <Route path="/schedules" element={<Layout><Schedules /></Layout>} />

@@ -251,7 +251,7 @@ The dashboard reads:
 
 Task endpoints require authentication. Normal mobile users receive only their own tasks, while the local operator dashboard sees global/admin tasks by default.
 
-Use `/health` for Cloudflare Tunnel checks, uptime checks, and app connectivity tests. Use `/api/readiness` for detailed dependency status; it can be degraded when OpenClaw is not reachable while the backend API is still running.
+Use `/health` for Cloudflare Tunnel checks, uptime checks, and app connectivity tests. Use `/api/readiness` for detailed dependency status; it reports PostgreSQL, Redis, OpenClaw Gateway, and WhatsApp bridge readiness. The report can be degraded when OpenClaw or WhatsApp is not reachable while the backend API is still running.
 
 ## Windows Server Setup
 
@@ -346,6 +346,41 @@ Reminder endpoints:
 * `DELETE /api/reminders/:id`
 
 Reminder records are scoped to the signed-in mobile user. One-time reminders use `scheduledAt`; recurring reminders use a cron expression and timezone. The backend worker records due reminders, disables completed one-time reminders, advances supported recurring schedules, and sends user reminders through the OpenClaw WhatsApp delivery adapter when an allowed WhatsApp contact exists. Delivery success/failure is stored in `lastTriggerStatus` and `lastTriggerMessage`; push or local notification delivery remains a follow-up milestone.
+
+Report endpoints:
+
+* `GET /api/reports`
+* `POST /api/reports/generate`
+* `GET /api/reports/schedules`
+* `POST /api/reports/schedules`
+* `PATCH /api/reports/schedules/:id`
+* `DELETE /api/reports/schedules/:id`
+* `POST /api/reports/process-due` (operator only)
+
+Reports summarize task, reminder, approval, and audit activity for a daily, weekly, or manual period. Scheduled reports are processed by a BullMQ worker when `REPORT_WORKER_ENABLED=true`; the worker requires `REDIS_URL` and runs every `REPORT_WORKER_INTERVAL_MS` milliseconds. Delivered reports use the same OpenClaw WhatsApp allowlist path as reminders, and delivery status is stored on the report record.
+
+Client endpoints:
+
+* `GET /api/clients`
+* `POST /api/clients`
+* `GET /api/clients/:id`
+* `PATCH /api/clients/:id`
+* `DELETE /api/clients/:id`
+* `POST /api/clients/:id/contacts`
+* `PATCH /api/clients/:id/contacts/:contactId`
+* `DELETE /api/clients/:id/contacts/:contactId`
+
+Clients support ownership via `userId`, status tracking, notes, quick contact text, and structured contact rows for email, phone, WhatsApp, or other contact methods. User sessions are scoped to their own client records; operators can manage all records from the web admin Clients page.
+
+Context endpoints:
+
+* `GET /api/context`
+* `POST /api/context`
+* `GET /api/context/:id`
+* `PATCH /api/context/:id`
+* `DELETE /api/context/:id`
+
+Business context entries store user/client scoped notes, preferences, summaries, and instructions that Nara Bot can read during `get_user_context`. Entries support `importance`, `pinned`, and optional metadata for later workflow expansion. Normal users only see their own context; app admins and operators can manage context across users from the web admin Context page.
 
 Backup uses `BACKUP_DIR` for local backup files. Database export tries host `pg_dump` first and falls back to `docker exec` with `POSTGRES_CONTAINER_NAME`, which defaults to the Docker Compose container name:
 
@@ -456,10 +491,10 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
 * [x] User-scoped task ownership for mobile app data
 * [x] User-scoped reminder and schedule CRUD
 * [x] Reminder worker with Redis/BullMQ
-* [ ] Reporting service
-* [ ] Client/contact management
+* [x] Reporting service
+* [x] Client/contact management
 * [x] Basic user registration and mobile login
-* [ ] Role-aware user access control beyond the MVP auth gate
+* [x] Role-aware user access control beyond the MVP auth gate
 * [x] User WhatsApp contact and Nara Bot allowlist model
 * [x] Audit logs foundation for identity and access changes
 * [x] Audit logs for agent-triggered reminder actions
@@ -479,7 +514,7 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
 * [x] WhatsApp number and Nara Bot access request screen
 * [x] Home Nara Bot status backed by user contact and agent access data
 * [ ] Push or local notification strategy
-* [ ] Approval screen for agent-triggered actions
+* [x] Approval screen for agent-triggered actions
 
 ### Phase 5: Desktop App
 
@@ -496,6 +531,7 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
 * [x] Tool endpoint debugging (Agent Tools screen)
 * [x] Users and WhatsApp access API foundation
 * [x] Users and WhatsApp access management UI (Users + WhatsApp Access screens)
+* [x] Client/contact management UI
 * [x] Logs backend integration from audit events
 * [x] WhatsApp Access joined user/contact data
 * [x] Server configuration checks (Config screen)
@@ -510,9 +546,9 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
 * [x] Backend assistant profile for user-specific agent personality
 * [x] No-WhatsApp agent smoke test with user-scoped task lifecycle
 * [x] User-scoped reminder tools and smoke-test lifecycle
-* [ ] Scheduled report generation
-* [ ] Agent-safe confirmation flow for destructive actions
-* [ ] Memory/context storage for business workflows
+* [x] Scheduled report generation
+* [x] Agent-safe confirmation flow for destructive actions
+* [x] Memory/context storage for business workflows
 
 ### Phase 8: Messaging Channels
 

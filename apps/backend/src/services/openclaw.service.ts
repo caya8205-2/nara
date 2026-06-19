@@ -20,6 +20,47 @@ const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : String(error)
 
 export class OpenClawService {
+  async getWhatsAppReadiness() {
+    if (!env.OPENCLAW_GATEWAY_URL) {
+      return {
+        ok: false,
+        status: 'missing' as const,
+        message: 'OPENCLAW_GATEWAY_URL is not configured',
+      }
+    }
+
+    if (!env.OPENCLAW_WHATSAPP_ACCOUNT) {
+      return {
+        ok: false,
+        status: 'missing' as const,
+        message: 'OPENCLAW_WHATSAPP_ACCOUNT is not configured',
+      }
+    }
+
+    if (!env.OPENCLAW_WHATSAPP_SEND_PATH) {
+      return {
+        ok: false,
+        status: 'missing' as const,
+        message: 'OPENCLAW_WHATSAPP_SEND_PATH is not configured',
+      }
+    }
+
+    try {
+      const allowedNumbers = await this.getAllowedWhatsAppNumbers()
+      return {
+        ok: true,
+        status: 'ok' as const,
+        message: `${allowedNumbers.length} allowed WhatsApp recipient(s); account=${env.OPENCLAW_WHATSAPP_ACCOUNT}; policy=${env.OPENCLAW_WHATSAPP_DM_POLICY}`,
+      }
+    } catch (error) {
+      return {
+        ok: false,
+        status: 'error' as const,
+        message: `WhatsApp readiness failed: ${errorMessage(error)}`,
+      }
+    }
+  }
+
   async syncWhatsAppAllowlist(input: { override?: AllowlistOverride } = {}) {
     const numbers = await this.getAllowedWhatsAppNumbers(input.override)
     if (env.OPENCLAW_ALLOWLIST_SYNC_MODE !== 'config') {

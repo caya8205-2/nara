@@ -4,6 +4,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Activity,
   Bot,
+  Brain,
+  Building2,
   Database,
   FileText,
   HardDrive,
@@ -26,10 +28,13 @@ const navItems = [
   { path: '/health', label: 'Health', icon: Database },
   { path: '/agent-tools', label: 'Agent Tools', icon: Wrench },
   { path: '/users', label: 'Users', icon: Users },
+  { path: '/clients', label: 'Clients', icon: Building2 },
+  { path: '/context', label: 'Context', icon: Brain },
   { path: '/whatsapp-access', label: 'WhatsApp Access', icon: MessageSquare },
   { path: '/logs', label: 'Logs', icon: FileText },
   { path: '/config', label: 'Config', icon: Settings },
   { path: '/backup', label: 'Backup', icon: HardDrive },
+  { path: '/reports', label: 'Reports', icon: FileText },
   { path: '/attribution', label: 'Attribution', icon: Info },
 ]
 

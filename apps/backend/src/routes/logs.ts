@@ -1,6 +1,7 @@
-import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify'
+import type { FastifyPluginAsync } from 'fastify'
 import { z } from 'zod'
 import { logService } from '../services/log.service.js'
+import { authzService } from '../services/authz.service.js'
 
 const ListLogsQuerySchema = z.object({
   source: z.enum(['backend', 'database', 'redis', 'openclaw', 'agent', 'system']).optional(),
@@ -12,13 +13,7 @@ const ListLogsQuerySchema = z.object({
 })
 
 const plugin: FastifyPluginAsync = async (app) => {
-  const requireOperator = async (req: FastifyRequest, reply: FastifyReply) => {
-    try {
-      await req.jwtVerify()
-    } catch {
-      return reply.status(401).send({ error: 'Authentication required' })
-    }
-  }
+  const requireOperator = authzService.requireOperator.bind(authzService)
 
   app.get('/', { preHandler: requireOperator }, async (req) => {
     const query = ListLogsQuerySchema.parse(req.query)

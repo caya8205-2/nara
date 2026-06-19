@@ -148,6 +148,40 @@ npm --workspace @nara/backend run dev
 
 Create a one-time reminder due in the near future, then watch backend logs for `reminder worker started` and `processed due reminders`. For manual verification without waiting for the repeat job, sign in as an operator and call `POST /api/reminders/process-due`.
 
+### Reporting Service
+
+**Status:** Implemented for manual generation, scheduled generation, and OpenClaw WhatsApp delivery attempts.
+
+Report endpoints require a normal mobile user or operator JWT:
+
+- `GET /api/reports`
+- `POST /api/reports/generate`
+- `GET /api/reports/:id`
+- `GET /api/reports/schedules`
+- `POST /api/reports/schedules`
+- `PATCH /api/reports/schedules/:id`
+- `DELETE /api/reports/schedules/:id`
+
+Operator-only endpoint:
+
+- `POST /api/reports/process-due`
+
+Report records are stored in PostgreSQL and summarize task, reminder, approval, and audit activity for the selected daily, weekly, or manual period. If `deliver=true`, the report service sends the summary through the same OpenClaw WhatsApp adapter used by reminders. Delivery outcome is stored on `reports.status`, `deliveryStatus`, `deliveryMessage`, and `deliveredAt`.
+
+Scheduled reports use `report_schedules`. Daily and weekly schedules run at 17:00 in the configured timezone. The current MVP supports `Asia/Jakarta` and `UTC`.
+
+The backend starts a BullMQ report worker when `REPORT_WORKER_ENABLED=true`. It requires `REDIS_URL`, schedules a repeat job every `REPORT_WORKER_INTERVAL_MS` milliseconds, defaults to 5 minutes, and calls `reportService.processDue()`.
+
+Local worker verification:
+
+```powershell
+npm run infra:up
+npm --workspace @nara/backend run db:migrate
+npm --workspace @nara/backend run dev
+```
+
+Sign in as an operator, open `/reports` in the web admin, create a daily report schedule, then use **Process Due** or `POST /api/reports/process-due` after the schedule is due. Watch backend logs for `report worker started` and `processed due report schedules`. Confirm the report row shows `delivered`, `delivery_failed`, or `delivery_skipped`.
+
 ### Local Smoke Test
 
 ```powershell
@@ -157,6 +191,102 @@ npm --workspace @nara/backend run agent:smoke -- --user-id <user-uuid>
 ```
 
 The smoke test does not require a WhatsApp host number.
+
+## Access Control Matrix
+
+**Status:** Implemented with shared backend authorization helpers in `authz.service.ts`.
+
+Session roles:
+
+- `operator`: local office-server admin from environment credentials.
+- `user` with role `admin`: database-backed app admin.
+- `user` with role `user`: normal app user.
+
+Access rules:
+
+- Server operations are operator-only: logs, backup/export, OpenClaw allowlist admin actions, and manual worker triggers.
+- App admin users can manage app data across users: users, approvals, reports, and clients.
+- Normal users can only access owner-scoped data: their own tasks, reminders, approvals, clients, contacts, assistant profile, and Nara Bot access records.
+- Agent tool endpoints keep using `x-agent-secret` and resolve user scope from `userId` or allowed WhatsApp contact context.
+
+Route implementation should use `authzService.requireSession`, `requireOperator`, `requirePrivileged`, or `requireUserOwnerOrPrivileged` instead of route-local `jwtVerify` logic.
+
+## WhatsApp Readiness
+
+**Screen:** `/health` (`apps/web-admin/src/pages/Health.tsx`)
+
+**Status:** Implemented for Nara-side WhatsApp bridge readiness.
+
+`GET /api/readiness` returns:
+
+- `dependencies.database`
+- `dependencies.redis`
+- `dependencies.openclaw`
+- `dependencies.whatsapp`
+
+The WhatsApp readiness check is intentionally non-mutating. It verifies required OpenClaw WhatsApp environment values and counts allowed WhatsApp recipients from the Nara database. It does not send a message, pair WhatsApp, or rewrite OpenClaw config.
+
+Server-side E2E verification still needs to be run on the PC that has the active OpenClaw WhatsApp session:
+
+1. Pull this branch and run `npm --workspace @nara/backend run db:migrate`.
+2. Restart Nara services.
+3. Confirm `/api/readiness` shows healthy OpenClaw and WhatsApp rows.
+4. Add or approve a user WhatsApp contact in Nara.
+5. Send a WhatsApp message from the allowlisted number to the linked host number.
+6. Confirm OpenClaw routes to `/api/agent/users/context` or task/reminder tools and backend audit logs record the action.
+
+## Business Context Storage
+
+**Screen:** `/context` (`apps/web-admin/src/pages/Context.tsx`)
+
+**Status:** Implemented for manual context entry management and agent context reads.
+
+Context endpoints require a normal mobile user, DB-admin user, or operator JWT:
+
+- `GET /api/context`
+- `POST /api/context`
+- `GET /api/context/:id`
+- `PATCH /api/context/:id`
+- `DELETE /api/context/:id`
+
+Context records are stored in `context_entries` and can be scoped to a user, a client, or both. Supported kinds are `note`, `preference`, `summary`, and `instruction`. Entries include `importance`, `pinned`, `source`, and optional JSON metadata.
+
+Agent integration:
+
+- `POST /api/agent/users/context` now includes `businessContext`.
+- Agent instructions tell Nara Bot to use context entries when relevant without exposing private notes unnecessarily.
+- The current MVP uses pinned/importance/update time ordering, not vector search. Embeddings can be added later without changing the API shape.
+
+Security behavior:
+
+- normal user JWTs can only access context where `context_entries.user_id` matches their user id
+- operator and DB-admin user JWTs can list and manage all context entries
+- create, update, and delete operations write audit events
+
+## Client And Contact Management
+
+**Screen:** `/clients` (`apps/web-admin/src/pages/Clients.tsx`)
+
+**Status:** Implemented for backend CRUD and web admin management.
+
+Client endpoints require a normal mobile user or operator JWT:
+
+- `GET /api/clients`
+- `POST /api/clients`
+- `GET /api/clients/:id`
+- `PATCH /api/clients/:id`
+- `DELETE /api/clients/:id`
+- `POST /api/clients/:id/contacts`
+- `PATCH /api/clients/:id/contacts/:contactId`
+- `DELETE /api/clients/:id/contacts/:contactId`
+
+Client records are stored in `clients` and can be scoped to a normal app user through `userId`. Contacts are stored in `client_contacts` and support `email`, `phone`, `whatsapp`, and `other` types. A client can have one primary contact; setting a new primary contact clears the previous primary flag for that client.
+
+Security behavior:
+
+- normal user JWTs can only access client records where `clients.user_id` matches their user id
+- operator and DB-admin user JWTs can list and manage all client records
+- all create, update, and delete operations write audit events
 
 ## Logs Screen Integration
 

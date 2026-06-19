@@ -22,6 +22,8 @@ const EnvSchema = z.object({
   POSTGRES_CONTAINER_NAME: z.string().default('nara-postgres-1'),
   REMINDER_WORKER_ENABLED: z.coerce.boolean().default(true),
   REMINDER_WORKER_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
+  REPORT_WORKER_ENABLED: z.coerce.boolean().default(true),
+  REPORT_WORKER_INTERVAL_MS: z.coerce.number().int().positive().default(300_000),
   RATE_LIMIT_ENABLED: z.coerce.boolean().default(true),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(240),

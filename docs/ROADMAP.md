@@ -11,7 +11,7 @@ This file combines the current planning, architecture, ADR, deployment, and desi
 - Nara Bot access requests can sync allowed WhatsApp senders into local OpenClaw config.
 - Backend tunnel-facing endpoints have basic in-memory rate limiting.
 - Agent-triggered reminder mutations are written to audit logs.
-- Redis/BullMQ reminder delivery and approval execution are implemented for the MVP; local/push/WhatsApp reminder notifications remain future milestones.
+- Redis/BullMQ reminder delivery, OpenClaw WhatsApp reminder delivery, approval execution, and scheduled report generation are implemented for the MVP; local/push notification delivery remains a future milestone.
 
 ---
 
@@ -1683,4 +1683,12 @@ See **[Backend Integration Requirements](backend-integration.md)** for detailed 
 *Backend reminders now maintain `nextRunAt`, record due reminders through a lightweight worker, disable triggered one-time reminders, advance supported recurring schedules, and write `reminder.triggered` audit events. Delivery via WhatsApp, push, or local notifications remains the next reminder milestone.*
 *Server hardening and allowlist update: 2026-06-17*
 *Backend now has basic in-memory rate limiting for tunnel-facing traffic. Mobile WhatsApp access requests can auto-sync allowed sender numbers into local OpenClaw `allowFrom` through the configured `openclaw.json`, while preserving manually managed allowlist entries.*
+*Reporting update: 2026-06-19*
+*Backend reports now store generated summaries in PostgreSQL, expose `/api/reports` endpoints, support daily/weekly report schedules through a BullMQ worker, and can deliver summaries through the existing OpenClaw WhatsApp allowlist adapter. Web admin includes a Reports screen for manual generation, schedule creation, due processing, and delivery status review.*
+*Client/contact update: 2026-06-19*
+*Backend client/contact management now extends the existing `clients` table, adds structured `client_contacts`, exposes protected `/api/clients` CRUD endpoints, scopes normal users to their own records, and adds a web admin Clients screen for client creation and contact management.*
+*Access control update: 2026-06-19*
+*Backend authorization now uses shared helpers for session, operator-only, privileged admin, and owner-scoped routes. Server operations remain operator-only, database admin users can manage app data across users, and normal users stay scoped to their own records.*
+*Business context update: 2026-06-19*
+*Backend now stores user/client scoped business context in `context_entries`, exposes protected `/api/context` CRUD endpoints, adds a web admin Context screen, and includes relevant context entries in agent `get_user_context` responses.*
 *Backend integration: MVP complete*

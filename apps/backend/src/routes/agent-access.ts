@@ -1,6 +1,7 @@
-import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify'
+import type { FastifyPluginAsync } from 'fastify'
 import { z } from 'zod'
 import { identityService } from '../services/identity.service.js'
+import { authzService } from '../services/authz.service.js'
 
 const UpdateAccessSchema = z.object({
   status: z.enum([
@@ -13,21 +14,8 @@ const UpdateAccessSchema = z.object({
   syncError: z.string().optional(),
 })
 
-type AuthPayload = {
-  accountType?: string
-}
-
 const plugin: FastifyPluginAsync = async (app) => {
-  const requireOperator = async (req: FastifyRequest, reply: FastifyReply) => {
-    try {
-      const payload = await req.jwtVerify<AuthPayload>()
-      if (payload.accountType !== 'operator') {
-        return reply.status(403).send({ error: 'Operator access required' })
-      }
-    } catch {
-      return reply.status(401).send({ error: 'Authentication required' })
-    }
-  }
+  const requireOperator = authzService.requireOperator.bind(authzService)
 
   app.get('/', { preHandler: requireOperator }, async () => identityService.listAgentAccess())
 

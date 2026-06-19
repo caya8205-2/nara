@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import Redis from 'ioredis'
 import { env } from '../config/env.js'
 import { db } from '../db/index.js'
+import { openClawService } from './openclaw.service.js'
 
 export type DependencyStatus = {
   ok: boolean
@@ -13,11 +14,12 @@ export type ReadinessReport = {
   ok: boolean
   service: 'nara-backend'
   timestamp: string
-  dependencies: {
-    database: DependencyStatus
-    redis: DependencyStatus
-    openclaw: DependencyStatus
-  }
+    dependencies: {
+      database: DependencyStatus
+      redis: DependencyStatus
+      openclaw: DependencyStatus
+      whatsapp: DependencyStatus
+    }
 }
 
 const errorMessage = (error: unknown) =>
@@ -96,17 +98,18 @@ export class ReadinessService {
   }
 
   async getReport(): Promise<ReadinessReport> {
-    const [database, redis, openclaw] = await Promise.all([
+    const [database, redis, openclaw, whatsapp] = await Promise.all([
       this.checkDatabase(),
       this.checkRedis(),
       this.checkOpenClaw(),
+      openClawService.getWhatsAppReadiness(),
     ])
 
     return {
-      ok: database.ok && redis.ok && openclaw.ok,
+      ok: database.ok && redis.ok && openclaw.ok && whatsapp.ok,
       service: 'nara-backend',
       timestamp: new Date().toISOString(),
-      dependencies: { database, redis, openclaw },
+      dependencies: { database, redis, openclaw, whatsapp },
     }
   }
 }

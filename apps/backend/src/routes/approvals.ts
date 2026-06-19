@@ -1,34 +1,20 @@
-import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify'
+import type { FastifyPluginAsync, FastifyRequest } from 'fastify'
 import { z } from 'zod'
+import { authzService } from '../services/authz.service.js'
 import type { ApprovalAccess, ApprovalActor } from '../services/approval.service.js'
 import { approvalService, type ApprovalStatus } from '../services/approval.service.js'
-
-type SessionPayload = {
-  sub: string
-  role: string
-  accountType?: 'operator' | 'user'
-}
 
 const ApprovalStatusSchema = z.enum(['pending', 'approved', 'rejected'])
 
 const plugin: FastifyPluginAsync = async (app) => {
-  const requireSession = async (req: FastifyRequest, reply: FastifyReply) => {
-    try {
-      req.approvalSession = await req.jwtVerify<SessionPayload>()
-    } catch {
-      return reply.status(401).send({ error: 'Authentication required' })
-    }
-  }
+  const requireSession = authzService.requireSession.bind(authzService)
 
   const access = (req: FastifyRequest): ApprovalAccess => ({
-    userId: req.approvalSession?.accountType === 'user'
-      ? req.approvalSession.sub
-      : null,
+    ...authzService.userOwnedAccess(authzService.session(req)),
   })
 
   const actor = (req: FastifyRequest): ApprovalActor => ({
-    type: req.approvalSession?.accountType === 'user' ? 'user' : 'admin',
-    id: req.approvalSession?.accountType === 'user' ? req.approvalSession.sub : null,
+    ...authzService.actor(authzService.session(req)),
   })
 
   app.get('/', { preHandler: requireSession }, async (req) => {
@@ -55,9 +41,3 @@ const plugin: FastifyPluginAsync = async (app) => {
 }
 
 export default plugin
-
-declare module 'fastify' {
-  interface FastifyRequest {
-    approvalSession?: SessionPayload
-  }
-}

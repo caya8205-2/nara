@@ -1,6 +1,7 @@
-import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify'
+import type { FastifyPluginAsync } from 'fastify'
 import { z } from 'zod'
 import { backupService } from '../services/backup.service.js'
+import { authzService } from '../services/authz.service.js'
 
 const BackupTypeSchema = z.enum(['database', 'reports', 'config', 'full'])
 
@@ -13,13 +14,7 @@ const HistoryQuerySchema = z.object({
 })
 
 const plugin: FastifyPluginAsync = async (app) => {
-  const requireOperator = async (req: FastifyRequest, reply: FastifyReply) => {
-    try {
-      await req.jwtVerify()
-    } catch {
-      return reply.status(401).send({ error: 'Authentication required' })
-    }
-  }
+  const requireOperator = authzService.requireOperator.bind(authzService)
 
   app.post('/', { preHandler: requireOperator }, async () => {
     return backupService.createBackup('full')

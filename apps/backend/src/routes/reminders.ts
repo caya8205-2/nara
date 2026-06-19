@@ -1,13 +1,8 @@
-import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify'
+import type { FastifyPluginAsync, FastifyRequest } from 'fastify'
 import { z } from 'zod'
+import { authzService } from '../services/authz.service.js'
 import type { ReminderAccess, ReminderActor } from '../services/reminder.service.js'
 import { reminderService } from '../services/reminder.service.js'
-
-type SessionPayload = {
-  sub: string
-  role: string
-  accountType?: 'operator' | 'user'
-}
 
 const ReminderKindSchema = z.enum(['once', 'recurring'])
 
@@ -37,32 +32,16 @@ const UpdateReminderSchema = z.object({
 })
 
 const plugin: FastifyPluginAsync = async (app) => {
-  const requireSession = async (req: FastifyRequest, reply: FastifyReply) => {
-    try {
-      req.reminderSession = await req.jwtVerify<SessionPayload>()
-    } catch {
-      return reply.status(401).send({ error: 'Authentication required' })
-    }
-  }
+  const requireSession = authzService.requireSession.bind(authzService)
+  const requireOperator = authzService.requireOperator.bind(authzService)
 
   const access = (req: FastifyRequest): ReminderAccess => ({
-    userId: req.reminderSession?.accountType === 'user'
-      ? req.reminderSession.sub
-      : null,
+    ...authzService.legacyOperatorGlobalAccess(authzService.session(req)),
   })
 
   const actor = (req: FastifyRequest): ReminderActor => ({
-    type: req.reminderSession?.accountType === 'user' ? 'user' : 'admin',
-    id: req.reminderSession?.accountType === 'user' ? req.reminderSession.sub : null,
+    ...authzService.actor(authzService.session(req)),
   })
-
-  const requireOperator = async (req: FastifyRequest, reply: FastifyReply) => {
-    await requireSession(req, reply)
-    if (reply.sent) return
-    if (req.reminderSession?.accountType === 'user') {
-      return reply.status(403).send({ error: 'Operator access required' })
-    }
-  }
 
   app.get('/', { preHandler: requireSession }, async (req) => {
     return reminderService.list(access(req))
@@ -85,7 +64,7 @@ const plugin: FastifyPluginAsync = async (app) => {
 
   app.post('/', { preHandler: requireSession }, async (req, reply) => {
     const body = CreateReminderSchema.parse(req.body)
-    const session = req.reminderSession!
+    const session = authzService.session(req)
     const reminder = await reminderService.create({
       name: body.name,
       description: body.description,
@@ -125,9 +104,3 @@ const plugin: FastifyPluginAsync = async (app) => {
 }
 
 export default plugin
-
-declare module 'fastify' {
-  interface FastifyRequest {
-    reminderSession?: SessionPayload
-  }
-}

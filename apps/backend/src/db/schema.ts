@@ -24,6 +24,22 @@ export const reminderKind = pgEnum('reminder_kind', ['once', 'recurring'])
 
 export const approvalStatus = pgEnum('approval_status', ['pending', 'approved', 'rejected'])
 
+export const clientContactType = pgEnum('client_contact_type', ['email', 'phone', 'whatsapp', 'other'])
+
+export const contextKind = pgEnum('context_kind', ['note', 'preference', 'summary', 'instruction'])
+
+export const reportKind = pgEnum('report_kind', ['manual', 'daily', 'weekly'])
+
+export const reportStatus = pgEnum('report_status', [
+  'generated',
+  'delivered',
+  'delivery_failed',
+  'delivery_skipped',
+  'failed',
+])
+
+export const reportScheduleFrequency = pgEnum('report_schedule_frequency', ['daily', 'weekly'])
+
 export const users = pgTable(
   'users',
   {
@@ -166,9 +182,110 @@ export const approvalRequests = pgTable(
   }),
 )
 
-export const clients = pgTable('clients', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  name: text('name').notNull(),
-  contactInfo: text('contact_info'),
-  createdAt: timestamp('created_at').defaultNow(),
-})
+export const reports = pgTable(
+  'reports',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id').references(() => users.id),
+    title: text('title').notNull(),
+    kind: reportKind('kind').default('manual').notNull(),
+    periodStart: timestamp('period_start').notNull(),
+    periodEnd: timestamp('period_end').notNull(),
+    summary: text('summary').notNull(),
+    payload: text('payload').notNull(),
+    status: reportStatus('status').default('generated').notNull(),
+    deliveryStatus: text('delivery_status'),
+    deliveryMessage: text('delivery_message'),
+    deliveredAt: timestamp('delivered_at'),
+    generatedAt: timestamp('generated_at').defaultNow(),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => ({
+    userCreated: index('reports_user_created_idx').on(table.userId, table.createdAt),
+    period: index('reports_period_idx').on(table.periodStart, table.periodEnd),
+  }),
+)
+
+export const reportSchedules = pgTable(
+  'report_schedules',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id').references(() => users.id),
+    name: text('name').notNull(),
+    frequency: reportScheduleFrequency('frequency').default('daily').notNull(),
+    timezone: text('timezone').default('Asia/Jakarta').notNull(),
+    enabled: boolean('enabled').default(true).notNull(),
+    deliver: boolean('deliver').default(true).notNull(),
+    nextRunAt: timestamp('next_run_at'),
+    lastRunAt: timestamp('last_run_at'),
+    lastRunStatus: text('last_run_status'),
+    lastRunMessage: text('last_run_message'),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => ({
+    due: index('report_schedules_due_idx').on(table.enabled, table.nextRunAt),
+    userCreated: index('report_schedules_user_created_idx').on(table.userId, table.createdAt),
+  }),
+)
+
+export const clients = pgTable(
+  'clients',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id').references(() => users.id),
+    name: text('name').notNull(),
+    company: text('company'),
+    contactInfo: text('contact_info'),
+    notes: text('notes'),
+    status: text('status').default('active').notNull(),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => ({
+    userCreated: index('clients_user_created_idx').on(table.userId, table.createdAt),
+    status: index('clients_status_idx').on(table.status),
+  }),
+)
+
+export const clientContacts = pgTable(
+  'client_contacts',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    clientId: uuid('client_id').references(() => clients.id).notNull(),
+    type: clientContactType('type').notNull(),
+    value: text('value').notNull(),
+    label: text('label'),
+    isPrimary: boolean('is_primary').default(false).notNull(),
+    notes: text('notes'),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => ({
+    clientCreated: index('client_contacts_client_created_idx').on(table.clientId, table.createdAt),
+  }),
+)
+
+export const contextEntries = pgTable(
+  'context_entries',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id').references(() => users.id),
+    clientId: uuid('client_id').references(() => clients.id),
+    kind: contextKind('kind').default('note').notNull(),
+    title: text('title').notNull(),
+    body: text('body').notNull(),
+    source: text('source').default('manual').notNull(),
+    importance: text('importance').default('normal').notNull(),
+    pinned: boolean('pinned').default(false).notNull(),
+    metadata: text('metadata'),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => ({
+    userCreated: index('context_entries_user_created_idx').on(table.userId, table.createdAt),
+    clientCreated: index('context_entries_client_created_idx').on(table.clientId, table.createdAt),
+    kind: index('context_entries_kind_idx').on(table.kind),
+  }),
+)

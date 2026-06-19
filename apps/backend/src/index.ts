@@ -5,6 +5,7 @@ import { ZodError } from 'zod'
 import { env } from './config/env.js'
 import { backendLogService } from './services/backend-log.service.js'
 import { reminderWorkerService } from './services/reminder-worker.service.js'
+import { reportWorkerService } from './services/report-worker.service.js'
 import { rateLimitService } from './services/rate-limit.service.js'
 
 declare module 'fastify' {
@@ -147,11 +148,13 @@ process.on('uncaughtException', (error) => {
 
 process.on('SIGINT', () => {
   reminderWorkerService.stop()
+  reportWorkerService.stop()
   process.exit(0)
 })
 
 process.on('SIGTERM', () => {
   reminderWorkerService.stop()
+  reportWorkerService.stop()
   process.exit(0)
 })
 
@@ -180,15 +183,17 @@ app.register(import('./routes/agent-access.js'), { prefix: '/api/agent-access' }
 app.register(import('./routes/agent-tools.js'), { prefix: '/api/agent' })
 app.register(import('./routes/logs.js'), { prefix: '/api/logs' })
 app.register(import('./routes/backup.js'), { prefix: '/api/backup' })
+app.register(import('./routes/reports.js'), { prefix: '/api/reports' })
+app.register(import('./routes/clients.js'), { prefix: '/api/clients' })
+app.register(import('./routes/context.js'), { prefix: '/api/context' })
 
 // Stubs - uncomment as implemented
-// app.register(import('./routes/reports.js'), { prefix: '/api/reports' })
-// app.register(import('./routes/clients.js'), { prefix: '/api/clients' })
 
 const start = async () => {
   try {
     await app.listen({ port: env.PORT, host: '0.0.0.0' })
     reminderWorkerService.start(app.log)
+    reportWorkerService.start(app.log)
   } catch (err) {
     app.log.error(err)
     process.exit(1)

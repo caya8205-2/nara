@@ -1,13 +1,8 @@
-import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify'
+import type { FastifyPluginAsync, FastifyRequest } from 'fastify'
 import { z } from 'zod'
+import { authzService } from '../services/authz.service.js'
 import type { TaskAccess, TaskPriority } from '../services/task.service.js'
 import { taskService } from '../services/task.service.js'
-
-type SessionPayload = {
-  sub: string
-  role: string
-  accountType?: 'operator' | 'user'
-}
 
 const TaskPrioritySchema = z.enum(['low', 'normal', 'high', 'urgent'])
 
@@ -27,19 +22,10 @@ const UpdateTaskSchema = z.object({
 })
 
 const plugin: FastifyPluginAsync = async (app) => {
-  const requireSession = async (req: FastifyRequest, reply: FastifyReply) => {
-    try {
-      const payload = await req.jwtVerify<SessionPayload>()
-      req.taskSession = payload
-    } catch {
-      return reply.status(401).send({ error: 'Authentication required' })
-    }
-  }
+  const requireSession = authzService.requireSession.bind(authzService)
 
   const getAccess = (req: FastifyRequest): TaskAccess | undefined => {
-    return req.taskSession?.accountType === 'user'
-      ? { userId: req.taskSession.sub }
-      : { userId: null }
+    return authzService.legacyOperatorGlobalAccess(authzService.session(req))
   }
 
   // GET /api/tasks
@@ -82,8 +68,8 @@ const plugin: FastifyPluginAsync = async (app) => {
   // POST /api/tasks
   app.post('/', { preHandler: requireSession }, async (req, reply) => {
     const body = CreateTaskSchema.parse(req.body)
-    const session = req.taskSession
-    const isUser = session?.accountType === 'user'
+    const session = authzService.session(req)
+    const isUser = session.accountType === 'user'
     const task = await taskService.create({
       title: body.title,
       description: body.description,
@@ -134,9 +120,3 @@ const plugin: FastifyPluginAsync = async (app) => {
 }
 
 export default plugin
-
-declare module 'fastify' {
-  interface FastifyRequest {
-    taskSession?: SessionPayload
-  }
-}

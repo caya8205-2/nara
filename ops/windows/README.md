@@ -149,7 +149,7 @@ To include the authenticated reminder execution summary, pass local operator cre
 powershell -ExecutionPolicy Bypass -File .\ops\windows\check-nara-health.ps1 -OperatorUsername admin -OperatorPassword "<password-from-env>"
 ```
 
-The unauthenticated checks cover Docker, backend `/health`, backend `/api/readiness`, and OpenClaw Control UI. Reminder execution is skipped unless credentials are provided.
+The unauthenticated checks cover Docker, backend `/health`, backend `/api/readiness`, and OpenClaw Control UI. The readiness response includes PostgreSQL, Redis, OpenClaw Gateway, and WhatsApp bridge checks. Reminder execution is skipped unless credentials are provided.
 
 PM2 checks are optional because the recommended Windows launcher does not use PM2:
 
@@ -159,14 +159,31 @@ powershell -ExecutionPolicy Bypass -File .\ops\windows\check-nara-health.ps1 -Ex
 
 ## Reminder Worker
 
-The backend starts a BullMQ reminder worker by default:
+The backend starts BullMQ reminder and report workers by default:
 
 ```env
 REMINDER_WORKER_ENABLED=true
 REMINDER_WORKER_INTERVAL_MS=60000
+REPORT_WORKER_ENABLED=true
+REPORT_WORKER_INTERVAL_MS=300000
 ```
 
 The worker records due reminders, disables one-time reminders after they trigger, advances supported recurring schedules, and writes `reminder.triggered` audit events. The current delivery adapter sends user reminders through OpenClaw WhatsApp when an allowed WhatsApp contact exists. Delivery status is stored in `lastTriggerStatus` and `lastTriggerMessage`.
+
+The report worker processes due report schedules, generates daily or weekly summaries, and can deliver them through the same OpenClaw WhatsApp allowlist path. Delivery status is stored on each report row. Use the web admin `/reports` page or `POST /api/reports/process-due` with an operator token to verify processing without waiting for the repeat interval.
+
+## WhatsApp Readiness
+
+The web admin Health screen shows a WhatsApp Bridge row from `/api/readiness`. It checks Nara-side configuration and database allowlist state without sending a WhatsApp message or mutating OpenClaw config.
+
+Before live testing, verify:
+
+```powershell
+npm run server:status
+npm run health-check
+```
+
+Then open `/health` in the web admin and confirm PostgreSQL, Redis, OpenClaw Gateway, and WhatsApp Bridge are all healthy or have actionable messages.
 
 ## Cloudflare Tunnel
 

@@ -17,6 +17,7 @@ const dependencyLabels = {
   database: 'PostgreSQL',
   redis: 'Redis',
   openclaw: 'OpenClaw Gateway',
+  whatsapp: 'WhatsApp Bridge',
 } as const
 
 const dependencyIcons = {
@@ -24,12 +25,14 @@ const dependencyIcons = {
   database: Database,
   redis: Activity,
   openclaw: Bot,
+  whatsapp: Bot,
 } as const
 
 const suggestedFixes = {
   database: 'Check Docker container: docker ps | grep postgres',
   redis: 'Check Docker container: docker ps | grep redis',
   openclaw: 'Verify OPENCLAW_GATEWAY_URL, gateway token, and OpenClaw Gateway is running',
+  whatsapp: 'Verify OpenClaw WhatsApp account, send path, Nara Bot allowlist, and paired session',
 } as const
 
 export default function Health() {
@@ -58,6 +61,7 @@ export default function Health() {
       { key: 'database', status: readiness.dependencies.database },
       { key: 'redis', status: readiness.dependencies.redis },
       { key: 'openclaw', status: readiness.dependencies.openclaw },
+      { key: 'whatsapp', status: readiness.dependencies.whatsapp },
     ]
   }, [readiness, backendStatus])
 
@@ -76,6 +80,7 @@ export default function Health() {
       'Database: ' + readiness.dependencies.database.status.toUpperCase() + ' ' + (readiness.dependencies.database.message || ''),
       'Redis: ' + readiness.dependencies.redis.status.toUpperCase() + ' ' + (readiness.dependencies.redis.message || ''),
       'OpenClaw: ' + readiness.dependencies.openclaw.status.toUpperCase() + ' ' + (readiness.dependencies.openclaw.message || ''),
+      'WhatsApp: ' + readiness.dependencies.whatsapp.status.toUpperCase() + ' ' + (readiness.dependencies.whatsapp.message || ''),
       '',
       'Last Checked: ' + lastChecked,
     ].join('\n')

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { env } from '../config/env.js'
 import { identityService, type AgentChannelType } from '../services/identity.service.js'
 import { approvalService, type ApprovalActionType, type ApprovalPayload } from '../services/approval.service.js'
+import { contextService } from '../services/context.service.js'
 import { reminderService, type ReminderKind } from '../services/reminder.service.js'
 import { taskService, type TaskPriority } from '../services/task.service.js'
 
@@ -43,7 +44,10 @@ const accessStatus = (access: unknown) => {
 }
 
 const buildAgentInstructions = async (subject: ResolvedAgentSubject) => {
-  const profile = await identityService.getAssistantProfile(subject.userId)
+  const [profile, contextEntries] = await Promise.all([
+    identityService.getAssistantProfile(subject.userId),
+    contextService.getAgentContext(subject.userId, 10),
+  ])
   const custom = profile.customPersonality.trim()
   const autonomyRules = {
     Suggest: 'Suggest actions and explain the next step. Do not call mutating tools unless the user explicitly asks again.',
@@ -69,6 +73,9 @@ const buildAgentInstructions = async (subject: ResolvedAgentSubject) => {
         ? 'Sensitive actions are allowed only when the user request is explicit.'
         : 'Sensitive actions must stay disabled and require a future approval flow.',
       'Always use Nara backend tools for stored data. Never claim a task was created, completed, or deleted unless the tool returned ok: true.',
+      contextEntries.length > 0
+        ? 'Use the provided business context entries when relevant, but do not reveal private notes unless needed to answer the user.'
+        : null,
       'Respond in the same language the user uses.',
     ].filter(Boolean),
   }
@@ -174,12 +181,13 @@ const plugin: FastifyPluginAsync = async (app) => {
       const subject = await resolveSubject(parseSubject(req.body), reply)
       if (!subject) return
 
-      const [{ profile, instructions }, tasks, overdue, reminders, reminderExecution] = await Promise.all([
+      const [{ profile, instructions }, tasks, overdue, reminders, reminderExecution, contextEntries] = await Promise.all([
         buildAgentInstructions(subject),
         taskService.list({ done: false, userId: subject.userId }),
         taskService.list({ done: false, dueBefore: new Date(), userId: subject.userId }),
         reminderService.list({ userId: subject.userId }),
         reminderService.getExecutionSummary({ userId: subject.userId }),
+        contextService.getAgentContext(subject.userId, 12),
       ])
 
       return ok({
@@ -188,6 +196,7 @@ const plugin: FastifyPluginAsync = async (app) => {
         contact: subject.contact ?? null,
         access: subject.access,
         assistantProfile: profile,
+        businessContext: contextEntries,
         taskSummary: {
           pendingTasks: tasks.length,
           overdueTasks: overdue.length,

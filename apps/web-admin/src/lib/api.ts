@@ -19,6 +19,7 @@ export type ReadinessReport = {
     database: DependencyStatus
     redis: DependencyStatus
     openclaw: DependencyStatus
+    whatsapp: DependencyStatus
   }
 }
 
@@ -152,6 +153,120 @@ export type BackupRecord = {
 
 export type BackupHistoryResponse = {
   backups: BackupRecord[]
+}
+
+export type Report = {
+  id: string
+  userId: string | null
+  title: string
+  kind: 'manual' | 'daily' | 'weekly'
+  periodStart: string
+  periodEnd: string
+  summary: string
+  payload: string
+  status: 'generated' | 'delivered' | 'delivery_failed' | 'delivery_skipped' | 'failed'
+  deliveryStatus: string | null
+  deliveryMessage: string | null
+  deliveredAt: string | null
+  generatedAt: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type ReportSchedule = {
+  id: string
+  userId: string | null
+  name: string
+  frequency: 'daily' | 'weekly'
+  timezone: string
+  enabled: boolean
+  deliver: boolean
+  nextRunAt: string | null
+  lastRunAt: string | null
+  lastRunStatus: string | null
+  lastRunMessage: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type GenerateReportInput = {
+  kind?: 'manual' | 'daily' | 'weekly'
+  deliver?: boolean
+}
+
+export type CreateReportScheduleInput = {
+  name: string
+  frequency: 'daily' | 'weekly'
+  timezone?: string
+  enabled?: boolean
+  deliver?: boolean
+}
+
+export type ClientContact = {
+  id: string
+  clientId: string
+  type: 'email' | 'phone' | 'whatsapp' | 'other'
+  value: string
+  label: string | null
+  isPrimary: boolean
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type Client = {
+  id: string
+  userId: string | null
+  name: string
+  company: string | null
+  contactInfo: string | null
+  notes: string | null
+  status: 'active' | 'inactive' | 'lead' | 'archived'
+  createdAt: string
+  updatedAt: string
+  contacts: ClientContact[]
+}
+
+export type CreateClientInput = {
+  name: string
+  company?: string
+  contactInfo?: string
+  notes?: string
+  status?: 'active' | 'inactive' | 'lead' | 'archived'
+}
+
+export type CreateClientContactInput = {
+  type: 'email' | 'phone' | 'whatsapp' | 'other'
+  value: string
+  label?: string
+  isPrimary?: boolean
+  notes?: string
+}
+
+export type ContextEntry = {
+  id: string
+  userId: string | null
+  clientId: string | null
+  kind: 'note' | 'preference' | 'summary' | 'instruction'
+  title: string
+  body: string
+  source: string
+  importance: 'low' | 'normal' | 'high'
+  pinned: boolean
+  metadata: unknown | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type CreateContextInput = {
+  userId?: string | null
+  clientId?: string | null
+  kind?: 'note' | 'preference' | 'summary' | 'instruction'
+  title: string
+  body: string
+  source?: string
+  importance?: 'low' | 'normal' | 'high'
+  pinned?: boolean
 }
 
 export type RequestAgentAccessInput = {
@@ -293,4 +408,69 @@ export const exportBackup = async (type: BackupType) => {
     blob: response.data as Blob,
     filename,
   }
+}
+
+export const listReports = async () => {
+  const response = await api.get<Report[]>('/reports')
+  return response.data
+}
+
+export const generateReport = async (input: GenerateReportInput = {}) => {
+  const response = await api.post<Report>('/reports/generate', input)
+  return response.data
+}
+
+export const listReportSchedules = async () => {
+  const response = await api.get<ReportSchedule[]>('/reports/schedules')
+  return response.data
+}
+
+export const createReportSchedule = async (input: CreateReportScheduleInput) => {
+  const response = await api.post<ReportSchedule>('/reports/schedules', input)
+  return response.data
+}
+
+export const updateReportSchedule = async (id: string, input: Partial<CreateReportScheduleInput>) => {
+  const response = await api.patch<ReportSchedule>('/reports/schedules/' + id, input)
+  return response.data
+}
+
+export const processDueReports = async () => {
+  const response = await api.post('/reports/process-due', {})
+  return response.data
+}
+
+export const listClients = async () => {
+  const response = await api.get<Client[]>('/clients')
+  return response.data
+}
+
+export const createClient = async (input: CreateClientInput) => {
+  const response = await api.post<Client>('/clients', input)
+  return response.data
+}
+
+export const updateClient = async (id: string, input: Partial<CreateClientInput>) => {
+  const response = await api.patch<Client>('/clients/' + id, input)
+  return response.data
+}
+
+export const addClientContact = async (clientId: string, input: CreateClientContactInput) => {
+  const response = await api.post<ClientContact>('/clients/' + clientId + '/contacts', input)
+  return response.data
+}
+
+export const listContextEntries = async () => {
+  const response = await api.get<ContextEntry[]>('/context')
+  return response.data
+}
+
+export const createContextEntry = async (input: CreateContextInput) => {
+  const response = await api.post<ContextEntry>('/context', input)
+  return response.data
+}
+
+export const updateContextEntry = async (id: string, input: Partial<CreateContextInput>) => {
+  const response = await api.patch<ContextEntry>('/context/' + id, input)
+  return response.data
 }
