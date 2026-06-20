@@ -65,6 +65,26 @@ async function ensureUser() {
   return payload.user
 }
 
+function resolveSmokeContext(user: User | null) {
+  const contactValue = argValue('--contact-value')
+  if (contactValue) {
+    return {
+      label: `WhatsApp contact ${contactValue}`,
+      context: {
+        channelType: 'whatsapp',
+        contactValue,
+      },
+    }
+  }
+
+  if (!user) throw new Error('Agent smoke test needs either --contact-value or a user')
+
+  return {
+    label: `user ${user.id}`,
+    context: { userId: user.id },
+  }
+}
+
 async function callTool<T>(path: string, body: unknown = {}) {
   const response = await fetch(`${backendUrl}/api/agent${path}`, {
     method: 'POST',
@@ -86,18 +106,24 @@ async function callTool<T>(path: string, body: unknown = {}) {
 }
 
 async function main() {
-  const user = await ensureUser()
-  const context = { userId: user.id }
+  const contactValue = argValue('--contact-value')
+  const user = contactValue ? null : await ensureUser()
+  const { context, label } = resolveSmokeContext(user)
   const title = `Agent smoke test ${new Date().toISOString()}`
 
   console.log(`Backend: ${backendUrl}`)
-  console.log(`Agent user: ${user.id}`)
+  console.log(`Agent subject: ${label}`)
 
-  const agentContext = await callTool<{ instructions: string[]; taskSummary: unknown }>(
+  const agentContext = await callTool<{
+    instructions: string[]
+    taskSummary: unknown
+    toolContext?: { userId?: string; channelType?: string; contactValue?: string | null }
+  }>(
     '/users/context',
     context,
   )
   console.log(`Instructions: ${agentContext.instructions.length}`)
+  console.log(`Resolved context: ${JSON.stringify(agentContext.toolContext ?? {})}`)
 
   const created = await callTool<{ task: Task; message: string }>('/tasks/create', {
     ...context,
@@ -121,7 +147,9 @@ async function main() {
     confirmed: true,
   })
   if (!completed.task.done) throw new Error('Completed task is not marked done')
-  if (completed.task.userId !== user.id) throw new Error('Completed task is not scoped to smoke user')
+  if (!contactValue && user && completed.task.userId !== user.id) {
+    throw new Error('Completed task is not scoped to smoke user')
+  }
   console.log(`Completed: ${completed.task.id}`)
 
   const reminderName = `Agent reminder ${new Date().toISOString()}`

@@ -171,7 +171,7 @@ export class IdentityService {
   }
 
   async findUserByContact(input: { type: ContactType; value: string }) {
-    const [row] = await db
+    const [exactRow] = await db
       .select({
         user: users,
         contact: userContacts,
@@ -184,6 +184,31 @@ export class IdentityService {
           eq(userContacts.value, input.value),
         )
       )
+
+    if (exactRow) {
+      return {
+        user: this.toPublicUser(exactRow.user),
+        contact: exactRow.contact,
+      }
+    }
+
+    if (input.type !== 'whatsapp') return null
+
+    const normalizedInput = this.normalizeWhatsAppContact(input.value)
+    if (!normalizedInput) return null
+
+    const rows = await db
+      .select({
+        user: users,
+        contact: userContacts,
+      })
+      .from(userContacts)
+      .innerJoin(users, eq(userContacts.userId, users.id))
+      .where(eq(userContacts.type, input.type))
+
+    const row = rows.find((candidate) =>
+      this.normalizeWhatsAppContact(candidate.contact.value) === normalizedInput
+    )
 
     if (!row) return null
 
@@ -617,6 +642,18 @@ export class IdentityService {
     if (storedBuffer.length !== derivedKey.length) return false
 
     return timingSafeEqual(storedBuffer, derivedKey)
+  }
+
+  private normalizeWhatsAppContact(value: string) {
+    const compact = value.trim().replace(/[\s().-]/g, '')
+    if (!compact) return null
+
+    if (compact.startsWith('+')) return compact
+    if (compact.startsWith('00')) return `+${compact.slice(2)}`
+    if (compact.startsWith('0')) return `+62${compact.slice(1)}`
+    if (/^[1-9][0-9]{7,14}$/.test(compact)) return `+${compact}`
+
+    return compact
   }
 
   private toPublicUser<T extends { passwordHash?: string | null }>(user: T) {

@@ -23,7 +23,7 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "agent:smoke": "npm --workspace @nara/backend run agent:smoke",
+    "agent:smoke": "npm --workspace @nara/backend run agent:smoke --",
     "infra:up": "docker compose up -d postgres redis",
     "infra:down": "docker compose stop postgres redis",
     "infra:logs": "docker compose logs -f postgres redis",

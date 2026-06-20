@@ -403,6 +403,14 @@ npm --workspace @nara/backend run agent:smoke -- --user-id <user-uuid>
 npm --workspace @nara/backend run agent:smoke -- --cleanup
 ```
 
+After WhatsApp access is allowed, test the real sender-number path before chatting with the OpenClaw agent:
+
+```powershell
+npm run agent:smoke -- --contact-value +62812xxxxxxx --cleanup
+```
+
+The OpenClaw WhatsApp agent must use the Nara Bot runtime contract in `agent/prompts/system.md` and `agent/config/tools.json`. Its first tool call should be `get_user_context` with the WhatsApp sender phone number, and task/reminder actions should go through `/api/agent/*` Nara backend tools rather than OpenClaw internal task or sub-agent behavior.
+
 Useful checks:
 
 ```powershell

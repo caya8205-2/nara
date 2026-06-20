@@ -21,6 +21,15 @@ Web admin dashboard screens are built and ready. Logs, enhanced WhatsApp Access,
 
 Nara backend remains the source of truth. OpenClaw should orchestrate through Nara backend tools instead of writing tasks or user state directly.
 
+For live WhatsApp usage, install the Nara Bot runtime contract into the OpenClaw WhatsApp agent:
+
+- system prompt: `agent/prompts/system.md`
+- tool manifest: `agent/config/tools.json`
+- backend tool base: `http://127.0.0.1:4000`
+- auth header: `x-agent-secret: <AGENT_API_SECRET>`
+
+The OpenClaw WhatsApp agent must not create OpenClaw-native tasks, spawn sub-agents, or run OpenClaw project automation for normal Nara user requests. It should call `get_user_context` first with the WhatsApp sender number, then call Nara backend tools for task, reminder, approval, context, and summary behavior.
+
 ### Authentication
 
 All agent tool endpoints require:
@@ -41,7 +50,7 @@ Every agent tool call must resolve a Nara user by one of these inputs:
 }
 ```
 
-Use `userId` for local simulation or app-driven testing. Use `channelType + contactValue` later when OpenClaw receives a WhatsApp sender number.
+Use `userId` for local simulation or app-driven testing. Use `channelType + contactValue` when OpenClaw receives a WhatsApp sender number. The backend accepts common WhatsApp phone variants such as `+628...`, `628...`, and local `08...` when resolving a contact.
 
 ### Required First Tool
 
@@ -82,6 +91,8 @@ Returns:
 ```
 
 OpenClaw should merge `instructions` into the runtime prompt for that conversation. This is what makes Nara Bot follow each user's personality and autonomy settings.
+
+The response also includes `toolContext`. OpenClaw should copy that object into later tool calls so all actions remain scoped to the resolved Nara user.
 
 ### Task Tools
 
