@@ -38,6 +38,11 @@ const dependencyIcons = {
   openclaw: Bot,
 } as const
 
+const formatDependencyKey = (key: string) =>
+  key
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+
 const statusClasses = (status?: DependencyStatus) => {
   if (status?.ok) return 'border-emerald-200 bg-emerald-50 text-emerald-700'
   if (status?.status === 'missing') return 'border-amber-200 bg-amber-50 text-amber-700'
@@ -300,8 +305,8 @@ export default function Dashboard() {
 
           {readiness &&
             Object.entries(readiness.dependencies).map(([key, value]) => {
-              const Icon = dependencyIcons[key as keyof typeof dependencyIcons]
-              const label = dependencyLabels[key as keyof typeof dependencyLabels]
+              const Icon = dependencyIcons[key as keyof typeof dependencyIcons] ?? Server
+              const label = dependencyLabels[key as keyof typeof dependencyLabels] ?? formatDependencyKey(key)
               return (
                 <div key={key} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex items-center justify-between gap-3">

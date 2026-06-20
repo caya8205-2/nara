@@ -28,6 +28,11 @@ const dependencyIcons = {
   whatsapp: Bot,
 } as const
 
+const formatDependencyKey = (key: string) =>
+  key
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+
 const suggestedFixes = {
   database: 'Check Docker container: docker ps | grep postgres',
   redis: 'Check Docker container: docker ps | grep redis',
@@ -144,9 +149,9 @@ export default function Health() {
 
         <div className="space-y-3">
           {allDependencies.map(({ key, status }) => {
-            const Icon = dependencyIcons[key as keyof typeof dependencyIcons]
+            const Icon = dependencyIcons[key as keyof typeof dependencyIcons] ?? Server
             const StatusIcon = getStatusIcon(status)
-            const label = dependencyLabels[key as keyof typeof dependencyLabels]
+            const label = dependencyLabels[key as keyof typeof dependencyLabels] ?? formatDependencyKey(key)
             const suggestedFix = status && !status.ok && key !== 'backend'
               ? suggestedFixes[key as keyof typeof suggestedFixes]
               : null
