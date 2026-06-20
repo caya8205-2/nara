@@ -23,7 +23,7 @@ The mobile app is the main user-facing Nara app. The backend remains the source 
 - Backend API client using Dart `HttpClient`
 - Login/register screen backed by database users
 - Production-facing default API URL: `https://narabot.web.id`
-- Animated welcome screen before login/register, with smooth transition into auth and app shell
+- Polished Nara-branded onboarding and welcome/login/register flow, with smooth transition into auth and app shell
 - Shared in-memory app state for current user, tasks, and silent backend health
 - Persisted auth token through an Android Keystore-backed local secure store; non-sensitive local cache such as user profile, theme, language, assistant preferences, and WhatsApp prompt state remains in `shared_preferences`
 - Home dashboard with task summary, completable Today tasks, quick add task, Nara Bot status, and inline WhatsApp access request
@@ -225,6 +225,5 @@ Avoid copy themes:
 
 ## Next Work
 
-1. Redesign the welcome/login/register surface using the Auth UI Redesign Handoff above.
-2. Add local or push notification delivery for triggered reminders.
-3. Add reminder edit controls beyond pause/resume and the current recurrence presets.
+1. Add local or push notification delivery for triggered reminders.
+2. Add reminder edit controls beyond pause/resume and the current recurrence presets.

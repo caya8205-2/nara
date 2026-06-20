@@ -35,6 +35,7 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _isRegister = false;
   bool _showingForm = false;
   bool _loading = false;
+  bool _obscurePassword = true;
   String? _error;
 
   final _pageController = PageController();
@@ -144,6 +145,48 @@ class _AuthScreenState extends State<AuthScreen> {
   // ── Onboarding ─────────────────────────────────────────────────────────
 
   Widget _buildOnboarding() {
+    final slides = _isIndonesian
+        ? const [
+            _OnboardingSlide(
+              icon: Icons.checklist_rounded,
+              title: 'Mulai hari dengan daftar yang jelas',
+              body:
+                  'Tugas dan pengingat dirapikan agar kamu tahu apa yang perlu diselesaikan lebih dulu.',
+            ),
+            _OnboardingSlide(
+              icon: Icons.chat_bubble_outline_rounded,
+              title: 'Siapkan bantuan dari Nara Bot',
+              body:
+                  'Hubungkan WhatsApp saat sudah siap, lalu pakai Nara untuk menjaga follow-up tetap rapi.',
+            ),
+            _OnboardingSlide(
+              icon: Icons.tune_rounded,
+              title: 'Atur sesuai gaya kerja kamu',
+              body:
+                  'Pilih cara Nara merespons, seberapa mandiri ia membantu, dan kapan ia perlu meminta izin.',
+            ),
+          ]
+        : const [
+            _OnboardingSlide(
+              icon: Icons.checklist_rounded,
+              title: 'Start the day with a clear list',
+              body:
+                  'Tasks and reminders stay organized so you know what needs attention first.',
+            ),
+            _OnboardingSlide(
+              icon: Icons.chat_bubble_outline_rounded,
+              title: 'Prepare help from Nara Bot',
+              body:
+                  'Connect WhatsApp when you are ready, then let Nara keep follow-ups tidy.',
+            ),
+            _OnboardingSlide(
+              icon: Icons.tune_rounded,
+              title: 'Match your working style',
+              body:
+                  'Choose how Nara responds, how independently it helps, and when it should ask first.',
+            ),
+          ];
+
     return Column(
       children: [
         // Skip button (top-right)
@@ -153,7 +196,7 @@ class _AuthScreenState extends State<AuthScreen> {
             padding: const EdgeInsets.only(right: 16, top: 8),
             child: TextButton(
               onPressed: () => setState(() => _onboardingDone = true),
-              child: const Text('Skip'),
+              child: Text(_isIndonesian ? 'Lewati' : 'Skip'),
             ),
           ),
         ),
@@ -163,26 +206,7 @@ class _AuthScreenState extends State<AuthScreen> {
           child: PageView(
             controller: _pageController,
             onPageChanged: (page) => setState(() => _onboardingPage = page),
-            children: const [
-              _OnboardingSlide(
-                icon: Icons.checklist_rounded,
-                title: 'Stay on top of\nyour day',
-                body:
-                    'Tasks and reminders in one place —\nno clutter, just what needs attention.',
-              ),
-              _OnboardingSlide(
-                icon: Icons.smart_toy_outlined,
-                title: 'Nara Bot works\nthrough WhatsApp',
-                body:
-                    'Connect your WhatsApp number and\nlet Nara help you manage things from chat.',
-              ),
-              _OnboardingSlide(
-                icon: Icons.verified_user_outlined,
-                title: 'Private by design',
-                body:
-                    'Your tasks stay in your Nara space.\nYou decide what the assistant can access.',
-              ),
-            ],
+            children: slides,
           ),
         ),
 
@@ -205,7 +229,11 @@ class _AuthScreenState extends State<AuthScreen> {
                     setState(() => _onboardingDone = true);
                   }
                 },
-                child: Text(_onboardingPage < 2 ? 'Next' : 'Get Started'),
+                child: Text(
+                  _onboardingPage < 2
+                      ? (_isIndonesian ? 'Lanjut' : 'Next')
+                      : (_isIndonesian ? 'Mulai' : 'Get Started'),
+                ),
               ),
             ],
           ),
@@ -231,12 +259,13 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Widget _buildWelcome() {
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
     return ListView(
       key: const ValueKey('welcome'),
       padding: const EdgeInsets.fromLTRB(22, 28, 22, 24),
       children: [
         Container(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
@@ -270,16 +299,51 @@ class _AuthScreenState extends State<AuthScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const NaraLogoMark(size: 58, showWordmark: false, pulse: 0),
-              const SizedBox(height: 28),
+              Row(
+                children: [
+                  const NaraLogoMark(size: 54, showWordmark: false, pulse: 0),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Nara',
+                          style: theme.textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0,
+                            color: dark
+                                ? const Color(0xFFF1F7F5)
+                                : NaraColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _isIndonesian
+                              ? 'Asisten kerja pribadi'
+                              : 'Personal work assistant',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: dark
+                                ? const Color(0xFFC5D6D2)
+                                : NaraColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 26),
               Text(
                 _isIndonesian
-                    ? 'Nara bantu harimu tetap jalan.'
-                    : 'Nara keeps your day moving.',
+                    ? 'Tugas, pengingat, dan follow-up tetap rapi.'
+                    : 'Keep tasks, reminders, and follow-ups tidy.',
                 style: TextStyle(
-                  fontSize: 30,
+                  fontSize: 29,
                   fontWeight: FontWeight.w900,
-                  letterSpacing: -0.6,
+                  letterSpacing: 0,
                   height: 1.08,
                   color:
                       dark ? const Color(0xFFF1F7F5) : NaraColors.textPrimary,
@@ -288,8 +352,8 @@ class _AuthScreenState extends State<AuthScreen> {
               const SizedBox(height: 10),
               Text(
                 _isIndonesian
-                    ? 'Ubah tugas, pengingat, dan catatan WhatsApp jadi satu antrean yang rapi.'
-                    : 'Turn scattered tasks, reminders, and WhatsApp notes into one calm queue.',
+                    ? 'Catat yang perlu dikerjakan, siapkan pengingat, dan atur cara Nara membantu sesuai ritme kerja kamu.'
+                    : 'Capture what needs doing, prepare reminders, and tune Nara to support your working rhythm.',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w400,
@@ -298,19 +362,24 @@ class _AuthScreenState extends State<AuthScreen> {
                       dark ? const Color(0xFFC5D6D2) : NaraColors.textSecondary,
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 20),
+              const _MiniAgendaPreview(),
+              const SizedBox(height: 16),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: const [
-                  _WelcomePill(icon: Icons.checklist_rounded, label: 'Tasks'),
+                children: [
                   _WelcomePill(
-                    icon: Icons.notifications_active_outlined,
-                    label: 'Reminders',
+                    icon: Icons.checklist_rounded,
+                    label: _isIndonesian ? 'Tugas' : 'Tasks',
                   ),
                   _WelcomePill(
+                    icon: Icons.notifications_active_outlined,
+                    label: _isIndonesian ? 'Pengingat' : 'Reminders',
+                  ),
+                  const _WelcomePill(
                     icon: Icons.chat_bubble_outline_rounded,
-                    label: 'WhatsApp bot',
+                    label: 'Nara Bot',
                   ),
                 ],
               ),
@@ -354,76 +423,21 @@ class _AuthScreenState extends State<AuthScreen> {
               TextButton(
                 onPressed: widget.onTryAsGuest,
                 child: Text(
-                  _isIndonesian ? 'Coba tanpa akun' : 'Preview without account',
+                  _isIndonesian
+                      ? 'Lihat tampilan dulu'
+                      : 'Preview the app first',
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
-      ],
-    );
-  }
-
-  // ignore: unused_element
-  Widget _buildWelcomeLegacy() {
-    return ListView(
-      key: const ValueKey('welcome'),
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-      children: [
-        const SizedBox(height: 20),
-        NaraLogoMark(
-          size: 72,
-          showWordmark: false,
-          pulse: 0,
+        const SizedBox(height: 14),
+        _TrustRow(
+          icon: Icons.verified_user_outlined,
+          text: _isIndonesian
+              ? 'Akses Nara Bot dan tindakan penting tetap meminta izin sesuai pengaturan kamu.'
+              : 'Nara Bot access and sensitive actions stay permission-based.',
         ),
-        const SizedBox(height: 20),
-        Text(
-          'Nara',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 32,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -0.8,
-            height: 1.15,
-            color: NaraColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'Tasks, reminders, and a personal bot —\non your own server.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w400,
-            height: 1.55,
-            color: NaraColors.textSecondary,
-          ),
-        ),
-        const SizedBox(height: 36),
-
-        // CTAs
-        FilledButton.icon(
-          onPressed: () => _openForm(register: true),
-          icon: const Icon(Icons.person_add_alt_rounded, size: 20),
-          label: const Text('Get Started'),
-        ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: () => _openForm(register: false),
-          icon: const Icon(Icons.login_rounded, size: 20),
-          label: const Text('I have an account'),
-        ),
-        const SizedBox(height: 20),
-
-        // Guest mode
-        Center(
-          child: TextButton(
-            onPressed: widget.onTryAsGuest,
-            child: const Text('Try without account'),
-          ),
-        ),
-        const SizedBox(height: 16),
       ],
     );
   }
@@ -561,14 +575,22 @@ class _AuthScreenState extends State<AuthScreen> {
               TextFormField(
                 controller: _passwordController,
                 textInputAction: TextInputAction.done,
-                obscureText: true,
+                obscureText: _obscurePassword,
                 decoration: InputDecoration(
                   labelText: 'Kata sandi',
                   prefixIcon: const Icon(Icons.lock_outline, size: 20),
                   suffixIcon: IconButton(
-                    icon: const Icon(Icons.visibility_outlined, size: 20),
-                    tooltip: 'Lihat kata sandi',
-                    onPressed: () {},
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                      size: 20,
+                    ),
+                    tooltip:
+                        _obscurePassword ? 'Lihat kata sandi' : 'Sembunyikan',
+                    onPressed: () => setState(
+                      () => _obscurePassword = !_obscurePassword,
+                    ),
                   ),
                 ),
                 validator: (v) =>
@@ -601,9 +623,11 @@ class _AuthScreenState extends State<AuthScreen> {
                         : Icons.login_rounded,
                     size: 20,
                   ),
-            label: Text(_loading
-                ? (_isRegister ? 'Membuat akun…' : 'Masuk…')
-                : (_isRegister ? 'Buat Akun' : 'Masuk')),
+            label: Text(
+              _loading
+                  ? (_isRegister ? 'Membuat akun...' : 'Masuk...')
+                  : (_isRegister ? 'Buat Akun' : 'Masuk'),
+            ),
           ),
         ),
         const SizedBox(height: 14),
@@ -644,11 +668,166 @@ class _AuthScreenState extends State<AuthScreen> {
       _displayNameController.clear();
       _emailController.clear();
       _passwordController.clear();
+      _obscurePassword = true;
     });
   }
 }
 
 // ── Background & Floating Elements ─────────────────────────────────────
+
+class _MiniAgendaPreview extends StatelessWidget {
+  const _MiniAgendaPreview();
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final surface = dark
+        ? Colors.white.withValues(alpha: 0.08)
+        : NaraColors.surface.withValues(alpha: 0.86);
+    final border =
+        dark ? Colors.white.withValues(alpha: 0.1) : NaraColors.border;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: border),
+      ),
+      child: const Column(
+        children: [
+          _PreviewRow(
+            icon: Icons.check_circle_outline_rounded,
+            title: 'Follow up pesanan klien',
+            meta: 'Hari ini',
+            color: NaraColors.primary,
+          ),
+          SizedBox(height: 10),
+          _PreviewRow(
+            icon: Icons.notifications_none_rounded,
+            title: 'Ingatkan pembayaran DP',
+            meta: 'Besok 09.00',
+            color: NaraColors.warning,
+          ),
+          SizedBox(height: 10),
+          _PreviewRow(
+            icon: Icons.chat_bubble_outline_rounded,
+            title: 'Nara Bot siap bantu follow-up',
+            meta: 'Minta izin dulu',
+            color: NaraColors.agent,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreviewRow extends StatelessWidget {
+  const _PreviewRow({
+    required this.icon,
+    required this.title,
+    required this.meta,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String title;
+  final String meta;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+
+    return Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: dark ? 0.22 : 0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: color, size: 18),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color:
+                      dark ? const Color(0xFFF1F7F5) : NaraColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                meta,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: dark ? const Color(0xFF91AAA5) : NaraColors.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TrustRow extends StatelessWidget {
+  const _TrustRow({
+    required this.icon,
+    required this.text,
+  });
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: dark
+            ? Colors.white.withValues(alpha: 0.06)
+            : NaraColors.surface.withValues(alpha: 0.78),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: dark ? const Color(0xFF23423E) : NaraColors.border,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.45,
+                fontWeight: FontWeight.w600,
+                color:
+                    dark ? const Color(0xFFC5D6D2) : NaraColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _WelcomePill extends StatelessWidget {
   const _WelcomePill({

@@ -9,7 +9,7 @@ Flutter mobile app for the main user-facing Nara experience.
 - Secure auth token storage with the Android Keystore-backed local secure store
 - Readiness check against the Nara backend
 - Operator login against the backend
-- Home, Tasks, Reminders, Assistant, and Settings screens
+- Nara-branded onboarding, auth, Home, Tasks, Reminders, Assistant, and Settings screens
 - Physical Android device run through wireless debugging
 
 ## Local Setup
@@ -32,6 +32,5 @@ http://192.168.x.x:4000
 
 ## Next Implementation Steps
 
-1. Polish auth/welcome UI for production.
+1. Add local or push notification delivery for reminder notifications.
 2. Add richer reminder edit controls.
-3. Add push, local, or WhatsApp delivery for reminder notifications.
