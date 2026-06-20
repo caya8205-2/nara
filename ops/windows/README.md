@@ -291,24 +291,46 @@ Use `setup-openclaw-whatsapp.ps1` only for initial owner/host setup or recovery.
 
 After the dedicated host number is linked:
 
-1. Install the Nara Bot runtime contract into the OpenClaw WhatsApp agent:
+1. Validate or export the Nara Bot runtime contract:
+
+   ```powershell
+   npm run openclaw:nara:validate
+   npm run openclaw:nara:export
+   ```
+
+   The export writes `.tmp\openclaw-nara-bot-contract.json` plus `.system.md` and `.tools.json` sidecar files for manual import/paste into OpenClaw when the exact agent schema is managed through the OpenClaw UI.
+
+2. Install the Nara Bot runtime contract into the OpenClaw WhatsApp agent:
    - system prompt: `agent/prompts/system.md`
    - tool manifest: `agent/config/tools.json`
    - backend tool base: `http://127.0.0.1:4000`
    - header: `x-agent-secret: <AGENT_API_SECRET>`
-2. Log in to the mobile app through the Cloudflare Tunnel backend.
-3. Add the user's WhatsApp number in Nara.
-4. Request Nara Bot access.
-5. Confirm the access status becomes `allowed`; if it becomes `sync_failed`, inspect `syncError` in the admin WhatsApp Access screen.
-6. Confirm the number appears under `channels.whatsapp.accounts.default.allowFrom`.
-7. Verify Nara backend contact resolution directly:
+
+   To write contract metadata into `openclaw.json` with a timestamped backup:
+
+   ```powershell
+   npm run openclaw:nara:sync
+   ```
+
+   If the exact OpenClaw agent object path is known, patch it with Nara Bot prompt/tool pointers and diagnostics:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\ops\windows\sync-openclaw-nara-bot.ps1 -Action sync -AgentPath "agents.nara"
+   ```
+
+3. Log in to the mobile app through the Cloudflare Tunnel backend.
+4. Add the user's WhatsApp number in Nara.
+5. Request Nara Bot access.
+6. Confirm the access status becomes `allowed`; if it becomes `sync_failed`, inspect `syncError` in the admin WhatsApp Access screen.
+7. Confirm the number appears under `channels.whatsapp.accounts.default.allowFrom`.
+8. Verify Nara backend contact resolution directly:
 
    ```powershell
    npm run agent:smoke -- --contact-value +62812xxxxxxx --cleanup
    ```
 
-8. Send a WhatsApp message from the user number to the linked host number.
-9. Confirm OpenClaw calls `get_user_context` first, then routes task/reminder actions into `/api/agent/*` Nara backend tools.
+9. Send a WhatsApp message from the user number to the linked host number.
+10. Confirm OpenClaw calls `get_user_context` first, then routes task/reminder actions into `/api/agent/*` Nara backend tools.
 
 If the WhatsApp agent tries to create an OpenClaw task, spawn a sub-agent, or act like an OpenClaw operator, the OpenClaw agent prompt/tool setup is not using the Nara Bot runtime contract yet.
 

@@ -39,6 +39,30 @@ Keep `AGENT_API_SECRET` in `.env` and in the server-local OpenClaw agent/tool co
 
 ## Verification
 
+Validate the local OpenClaw config and current Nara Bot runtime contract:
+
+```powershell
+npm run openclaw:nara:validate
+```
+
+Export an index plus prompt/tools files that can be pasted or imported into an OpenClaw agent UI:
+
+```powershell
+npm run openclaw:nara:export
+```
+
+Write Nara Bot contract metadata into `openclaw.json` with a timestamped backup:
+
+```powershell
+npm run openclaw:nara:sync
+```
+
+If you know the exact agent object path inside `openclaw.json`, pass it to patch that agent with Nara Bot prompt/tool pointers, hashes, `toolBaseUrl`, and the required first tool marker:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\ops\windows\sync-openclaw-nara-bot.ps1 -Action sync -AgentPath "agents.nara"
+```
+
 Use a user ID for no-WhatsApp local simulation:
 
 ```powershell
