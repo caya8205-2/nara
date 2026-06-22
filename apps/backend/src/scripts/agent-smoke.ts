@@ -15,6 +15,7 @@ type User = {
   id: string
   displayName: string
   email?: string
+  token?: string
 }
 
 type Reminder = {
@@ -27,6 +28,7 @@ type Reminder = {
 
 const backendUrl = process.env.NARA_BACKEND_URL ?? `http://127.0.0.1:${env.PORT}`
 const cleanup = process.argv.includes('--cleanup')
+const approvalFlow = process.argv.includes('--approval-flow')
 
 const argValue = (name: string) => {
   const prefix = `${name}=`
@@ -46,13 +48,13 @@ async function callJson<T>(path: string, body: unknown = {}) {
   return { response, payload }
 }
 
-async function ensureUser() {
+async function ensureUser(): Promise<User> {
   const explicitUserId = argValue('--user-id')
   if (explicitUserId) return { id: explicitUserId, displayName: 'Existing agent smoke user' }
 
   const suffix = Date.now()
   const email = `agent-smoke-${suffix}@nara.local`
-  const { response, payload } = await callJson<{ user: User }>('/api/auth/register', {
+  const { response, payload } = await callJson<{ token: string; user: User }>('/api/auth/register', {
     displayName: 'Agent Smoke User',
     email,
     password: 'agent-smoke-password',
@@ -62,7 +64,7 @@ async function ensureUser() {
     throw new Error(`Failed to create smoke user: HTTP ${response.status}`)
   }
 
-  return payload.user
+  return { ...payload.user, token: payload.token }
 }
 
 function resolveSmokeContext(user: User | null) {
@@ -105,6 +107,25 @@ async function callTool<T>(path: string, body: unknown = {}) {
   return payload.data
 }
 
+async function rejectApproval(id: string, token?: string) {
+  if (!token) return false
+
+  const response = await fetch(`${backendUrl}/api/approvals/${id}/reject`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({}),
+  })
+
+  if (!response.ok) {
+    throw new Error(`Failed to reject smoke approval ${id}: HTTP ${response.status}`)
+  }
+
+  return true
+}
+
 async function main() {
   const contactValue = argValue('--contact-value')
   const user = contactValue ? null : await ensureUser()
@@ -124,6 +145,32 @@ async function main() {
   )
   console.log(`Instructions: ${agentContext.instructions.length}`)
   console.log(`Resolved context: ${JSON.stringify(agentContext.toolContext ?? {})}`)
+
+  if (approvalFlow) {
+    const approvalTitle = `Agent approval smoke ${new Date().toISOString()}`
+    const approvalResponse = await callTool<{
+      approvalRequired: true
+      approval: { id: string; title: string }
+      message: string
+    }>('/tasks/create', {
+      ...context,
+      title: approvalTitle,
+      description: 'Created by local agent approval simulation.',
+    })
+
+    if (!approvalResponse.approvalRequired || !approvalResponse.approval?.id) {
+      throw new Error('Expected create_task without confirmed=true to create an approval request')
+    }
+
+    console.log(`Approval requested: ${approvalResponse.approval.id}`)
+
+    if (cleanup) {
+      const rejected = await rejectApproval(approvalResponse.approval.id, user?.token)
+      console.log(rejected
+        ? `Approval rejected: ${approvalResponse.approval.id}`
+        : `Approval left pending: ${approvalResponse.approval.id}`)
+    }
+  }
 
   const created = await callTool<{ task: Task; message: string }>('/tasks/create', {
     ...context,

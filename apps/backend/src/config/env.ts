@@ -11,6 +11,7 @@ const EnvSchema = z.object({
   OPENCLAW_GATEWAY_TOKEN: z.string().optional(),
   OPENCLAW_CONFIG_PATH: z.string().optional(),
   OPENCLAW_WHATSAPP_ACCOUNT: z.string().default('default'),
+  OPENCLAW_WHATSAPP_HOST_NUMBER: z.string().optional(),
   OPENCLAW_WHATSAPP_DM_POLICY: z.enum(['pairing', 'allowlist', 'open', 'disabled']).default('allowlist'),
   OPENCLAW_AUTO_ALLOWLIST_REQUESTS: z.coerce.boolean().default(true),
   OPENCLAW_ALLOWLIST_SYNC_MODE: z.enum(['auto', 'api', 'config']).default('auto'),

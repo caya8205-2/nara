@@ -245,6 +245,8 @@ Route implementation should use `authzService.requireSession`, `requireOperator`
 
 The WhatsApp readiness check is intentionally non-mutating. It verifies required OpenClaw WhatsApp environment values and counts allowed WhatsApp recipients from the Nara database. It does not send a message, pair WhatsApp, or rewrite OpenClaw config.
 
+For live use, the readiness check also expects the OpenClaw WhatsApp account to have a dedicated `hostNumber` and `selfChatMode=false`. Set `OPENCLAW_WHATSAPP_HOST_NUMBER` to the same E.164 number when it is available. If shared personal-number mode is enabled, readiness reports WhatsApp as not ready for live use so operators do not accidentally route normal personal chat through Nara Bot.
+
 Server-side E2E verification still needs to be run on the PC that has the active OpenClaw WhatsApp session:
 
 1. Pull this branch and run `npm --workspace @nara/backend run db:migrate`.

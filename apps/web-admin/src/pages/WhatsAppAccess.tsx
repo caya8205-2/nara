@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import {
   deleteAgentAccess,
+  getReadiness,
   listAgentAccess,
   retryAgentAccessSync,
   updateAgentAccess,
@@ -54,6 +55,12 @@ export default function WhatsAppAccess() {
     queryFn: listAgentAccess,
   })
 
+  const readinessQuery = useQuery({
+    queryKey: ['readiness'],
+    queryFn: getReadiness,
+    refetchInterval: 30_000,
+  })
+
   const updateMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: AgentChannelAccess['status'] }) =>
       updateAgentAccess(id, { status }),
@@ -80,6 +87,7 @@ export default function WhatsAppAccess() {
   })
 
   const accessRecords = accessQuery.data ?? []
+  const whatsAppReadiness = readinessQuery.data?.dependencies.whatsapp
 
   const getUserName = (access: AgentChannelAccess) => {
     return access.user?.displayName || access.userId.slice(0, 8)
@@ -145,6 +153,41 @@ export default function WhatsAppAccess() {
             </div>
           </div>
         </div>
+
+        {whatsAppReadiness && !whatsAppReadiness.ok && (
+          <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 shrink-0 text-amber-600" />
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-semibold text-amber-900">Nara Bot Number Not Ready</h3>
+                <p className="mt-1 text-sm text-amber-800">
+                  {whatsAppReadiness.message ||
+                    'Link a dedicated WhatsApp number for Nara Bot before approving live access.'}
+                </p>
+                {whatsAppReadiness.details && (
+                  <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
+                    <div className="rounded-md border border-amber-200 bg-white px-3 py-2">
+                      <p className="font-semibold text-amber-900">Account</p>
+                      <p className="mt-0.5 text-amber-800">{String(whatsAppReadiness.details.account ?? 'default')}</p>
+                    </div>
+                    <div className="rounded-md border border-amber-200 bg-white px-3 py-2">
+                      <p className="font-semibold text-amber-900">Dedicated Number</p>
+                      <p className="mt-0.5 text-amber-800">
+                        {whatsAppReadiness.details.hostNumberConfigured ? 'Configured' : 'Pending'}
+                      </p>
+                    </div>
+                    <div className="rounded-md border border-amber-200 bg-white px-3 py-2">
+                      <p className="font-semibold text-amber-900">Live Ready</p>
+                      <p className="mt-0.5 text-amber-800">
+                        {whatsAppReadiness.details.readyForLiveUse ? 'Yes' : 'No'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 p-4">

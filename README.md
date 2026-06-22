@@ -176,6 +176,8 @@ Set `OPENCLAW_GATEWAY_TOKEN` from `gateway.auth.token` in:
 C:\Users\<username>\.openclaw\openclaw.json
 ```
 
+When the dedicated Nara Bot SIM is ready, set `OPENCLAW_WHATSAPP_HOST_NUMBER` to that E.164 number. Keep personal/customer numbers as allowlisted senders, not as the host account.
+
 Start PostgreSQL + pgvector and Redis with Docker:
 
 ```powershell
@@ -407,9 +409,12 @@ After WhatsApp access is allowed, test the real sender-number path before chatti
 
 ```powershell
 npm run agent:smoke -- --contact-value +62812xxxxxxx --cleanup
+npm run agent:smoke:approval -- --cleanup
 ```
 
 The OpenClaw WhatsApp agent must use the Nara Bot runtime contract in `agent/prompts/system.md` and `agent/config/tools.json`. Its first tool call should be `get_user_context` with the WhatsApp sender phone number, and task/reminder actions should go through `/api/agent/*` Nara backend tools rather than OpenClaw internal task or sub-agent behavior.
+
+For live use, OpenClaw should be linked to a dedicated Nara Bot WhatsApp number. Shared personal-number mode remains available for recovery, but backend readiness will mark WhatsApp as not ready for live use while it is enabled.
 
 Validate, export, or sync the Nara Bot runtime contract for OpenClaw:
 

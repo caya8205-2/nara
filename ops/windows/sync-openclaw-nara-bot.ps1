@@ -8,6 +8,8 @@ param(
 
   [string]$BackendBaseUrl = "http://127.0.0.1:4000",
 
+  [string]$HostNumber = $env:OPENCLAW_WHATSAPP_HOST_NUMBER,
+
   [string]$AgentSecretEnvName = "AGENT_API_SECRET",
 
   [string]$AgentPath = "",
@@ -207,6 +209,28 @@ function Test-Contract {
       name = "allowlist policy"
       ok = ($accountConfig -and ($accountConfig.dmPolicy -eq "allowlist" -or $accountConfig.dmPolicy -eq "open"))
       message = if ($accountConfig) { "dmPolicy=$($accountConfig.dmPolicy)" } else { "account missing" }
+    },
+    [pscustomobject]@{
+      name = "dedicated host number"
+      ok = ($accountConfig -and $accountConfig.hostNumber -and -not $accountConfig.selfChatMode)
+      message = if ($accountConfig -and $accountConfig.selfChatMode) {
+        "shared personal-number mode is enabled"
+      } elseif ($accountConfig -and $accountConfig.hostNumber) {
+        "hostNumber is configured"
+      } else {
+        "hostNumber is missing"
+      }
+    },
+    [pscustomobject]@{
+      name = "expected host number"
+      ok = (-not $HostNumber -or ($accountConfig -and $accountConfig.hostNumber -eq $HostNumber))
+      message = if (!$HostNumber) {
+        "OPENCLAW_WHATSAPP_HOST_NUMBER not provided"
+      } elseif ($accountConfig) {
+        "expected=$HostNumber configured=$($accountConfig.hostNumber)"
+      } else {
+        "account missing"
+      }
     },
     [pscustomobject]@{
       name = "runtime metadata"

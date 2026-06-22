@@ -232,13 +232,19 @@ OpenClaw is machine state, not normal repo state. On a new server PC:
    openclaw channels add --channel whatsapp --account default --name "Nara Bot"
    ```
 
-3. Configure owner or host policy:
+3. Configure the dedicated Nara Bot host number:
 
    ```powershell
-   powershell -ExecutionPolicy Bypass -File .\ops\windows\setup-openclaw-whatsapp.ps1 -OwnerPhone +62812xxxxxxx -SelfPhoneMode
+   powershell -ExecutionPolicy Bypass -File .\ops\windows\setup-openclaw-whatsapp.ps1 -HostPhone +62812xxxxxxx
    ```
 
-4. Link WhatsApp:
+   Also set the same E.164 number in `.env`:
+
+   ```env
+   OPENCLAW_WHATSAPP_HOST_NUMBER=+62812xxxxxxx
+   ```
+
+4. Link WhatsApp for that dedicated number:
 
    ```powershell
    openclaw channels login --channel whatsapp --account default --verbose
@@ -259,19 +265,23 @@ connected: true
 healthState: healthy
 ```
 
-## Self-Phone Mode vs Dedicated Host Number
+## Dedicated Host Number
 
-Self-phone mode is useful for development when the owner only has one WhatsApp number. The same number is linked as the OpenClaw WhatsApp Web session and allowlisted as the owner.
+Use a dedicated host number for live Nara Bot access:
 
-Tradeoff: the phone still receives normal WhatsApp notifications for messages sent to that number. It does not lock the owner out of WhatsApp, but it mixes personal chat and bot-host traffic.
-
-For real use, a dedicated host number is cleaner:
-
-- server PC links the host number once
+- server PC links the Nara Bot host number once
 - users add their own WhatsApp numbers in the Nara app
 - backend stores access intent in PostgreSQL
 - backend syncs allowed WhatsApp senders into the local OpenClaw allowlist
 - backend admin approve/retry/block actions update OpenClaw allowlist from backend state
+
+Shared personal-number mode is available only as a temporary recovery path:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\ops\windows\setup-openclaw-whatsapp.ps1 -HostPhone +62812xxxxxxx -SelfPhoneMode
+```
+
+While shared personal-number mode is enabled, backend readiness and the web admin Health page mark WhatsApp as not ready for live use. This protects normal personal chat from being treated as bot traffic.
 
 ## OpenClaw Allowlist Sync
 
@@ -289,6 +299,7 @@ Configure the sync path in `.env`:
 ```env
 OPENCLAW_CONFIG_PATH=C:\Users\<user>\.openclaw\openclaw.json
 OPENCLAW_WHATSAPP_ACCOUNT=default
+OPENCLAW_WHATSAPP_HOST_NUMBER=+62812xxxxxxx
 OPENCLAW_WHATSAPP_DM_POLICY=allowlist
 OPENCLAW_AUTO_ALLOWLIST_REQUESTS=true
 OPENCLAW_ALLOWLIST_SYNC_MODE=auto
@@ -311,7 +322,7 @@ After the dedicated host number is linked:
    npm run openclaw:nara:export
    ```
 
-   The export writes `.tmp\openclaw-nara-bot-contract.json` plus `.system.md` and `.tools.json` sidecar files for manual import/paste into OpenClaw when the exact agent schema is managed through the OpenClaw UI.
+   The validate command checks the runtime contract and confirms the WhatsApp account has a dedicated host number. The export writes `.tmp\openclaw-nara-bot-contract.json` plus `.system.md` and `.tools.json` sidecar files for manual import/paste into OpenClaw when the exact agent schema is managed through the OpenClaw UI.
 
 2. Install the Nara Bot runtime contract into the OpenClaw WhatsApp agent:
    - system prompt: `agent/prompts/system.md`
@@ -336,10 +347,11 @@ After the dedicated host number is linked:
 5. Request Nara Bot access.
 6. Confirm the access status becomes `allowed`; if it becomes `sync_failed`, inspect `syncError` in the admin WhatsApp Access screen.
 7. Confirm the number appears under `channels.whatsapp.accounts.default.allowFrom`.
-8. Verify Nara backend contact resolution directly:
+8. Verify Nara backend contact resolution and approval flow directly:
 
    ```powershell
    npm run agent:smoke -- --contact-value +62812xxxxxxx --cleanup
+   npm run agent:smoke:approval -- --cleanup
    ```
 
 9. Send a WhatsApp message from the user number to the linked host number.
@@ -347,7 +359,7 @@ After the dedicated host number is linked:
 
 If the WhatsApp agent tries to create an OpenClaw task, spawn a sub-agent, or act like an OpenClaw operator, the OpenClaw agent prompt/tool setup is not using the Nara Bot runtime contract yet.
 
-Use `setup-openclaw-whatsapp.ps1` to update owner/self-phone setup safely. It creates a timestamped backup before editing OpenClaw config. The backend sync also creates timestamped backups before editing `openclaw.json`.
+Use `setup-openclaw-whatsapp.ps1` to update host-number setup safely. It creates a timestamped backup before editing OpenClaw config. The backend sync also creates timestamped backups before editing `openclaw.json`.
 
 ## Migration Checklist To A New Server PC
 

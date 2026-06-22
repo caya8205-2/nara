@@ -68,6 +68,7 @@ Use a user ID for no-WhatsApp local simulation:
 ```powershell
 npm run agent:smoke -- --cleanup
 npm run agent:smoke -- --user-id <user-uuid> --cleanup
+npm run agent:smoke:approval -- --cleanup
 ```
 
 Use the WhatsApp sender number after the mobile app has registered the number and Nara has allowed access:
@@ -83,6 +84,8 @@ Expected behavior:
 3. Reminder create/list/update uses `/api/agent/reminders/*`.
 4. No task or reminder is created inside OpenClaw internal state.
 5. If the user's autonomy is `Confirm` or `Suggest`, unconfirmed mutating calls return an approval item instead of silently executing.
+
+`agent:smoke:approval` verifies that confirmation path without WhatsApp transport. It calls a mutating tool without `confirmed=true`, expects a pending approval request, and rejects that smoke approval automatically when `--cleanup` is present and the script created a temporary smoke user.
 
 ## Current Non-Goal
 

@@ -20,9 +20,9 @@ Nara backend agent tools
 
 This keeps the owner's personal WhatsApp separate from bot traffic and notifications.
 
-## Development Shape
+## Temporary Shared-Number Shape
 
-When only one number is available, enable self-phone mode:
+When only one number is available, self-phone mode can keep the system configurable, but it is not the live operating shape:
 
 ```text
 channels.whatsapp.accounts.default.selfChatMode = true
@@ -31,6 +31,8 @@ channels.whatsapp.accounts.default.allowFrom = ["+62...owner"]
 ```
 
 The owner's phone still works normally. The tradeoff is that bot traffic is mixed with personal WhatsApp traffic and notifications on that number.
+
+Backend readiness marks WhatsApp as not ready for live use while this mode is enabled.
 
 ## Move To A New Server PC
 
@@ -43,10 +45,10 @@ Cleanest path:
    openclaw channels add --channel whatsapp --account default --name "Nara Bot"
    ```
 
-3. Apply the owner or host allowlist:
+3. Apply the dedicated host number:
 
    ```powershell
-   powershell -ExecutionPolicy Bypass -File .\ops\windows\setup-openclaw-whatsapp.ps1 -OwnerPhone +62812xxxxxxx -SelfPhoneMode
+   powershell -ExecutionPolicy Bypass -File .\ops\windows\setup-openclaw-whatsapp.ps1 -HostPhone +62812xxxxxxx
    ```
 
 4. Link again by QR:
@@ -84,7 +86,7 @@ Implementation target:
 - read allowed WhatsApp contacts from PostgreSQL
 - normalize to E.164
 - update `channels.whatsapp.accounts.default.allowFrom`
-- preserve existing owner/host number
+- preserve existing dedicated host number
 - write a timestamped backup before editing OpenClaw config
 - run `openclaw channels status --channel whatsapp --json` after sync
 

@@ -16,6 +16,16 @@ type OpenClawConfig = {
   meta?: Record<string, unknown>
 }
 
+type WhatsAppAccountConfig = {
+  exists: boolean
+  name?: string
+  enabled?: boolean
+  dmPolicy?: string
+  selfChatMode?: boolean
+  hostNumber?: string | null
+  allowFrom: string[]
+}
+
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : String(error)
 
@@ -47,10 +57,103 @@ export class OpenClawService {
 
     try {
       const allowedNumbers = await this.getAllowedWhatsAppNumbers()
+      const account = await this.getWhatsAppAccountConfig()
+      const expectedHostNumber = env.OPENCLAW_WHATSAPP_HOST_NUMBER
+        ? this.normalizePhone(env.OPENCLAW_WHATSAPP_HOST_NUMBER)
+        : null
+      const configuredHostNumber = account.hostNumber
+        ? this.normalizePhone(account.hostNumber)
+        : null
+      const hostReady = Boolean(configuredHostNumber) &&
+        (!expectedHostNumber || configuredHostNumber === expectedHostNumber) &&
+        account.selfChatMode !== true
+
+      if (!account.exists) {
+        return {
+          ok: false,
+          status: 'missing' as const,
+          message: `WhatsApp account ${env.OPENCLAW_WHATSAPP_ACCOUNT} is not present in OpenClaw config.`,
+          details: {
+            account: env.OPENCLAW_WHATSAPP_ACCOUNT,
+            allowedRecipientCount: allowedNumbers.length,
+            hostNumberConfigured: Boolean(configuredHostNumber),
+            selfChatMode: false,
+            readyForLiveUse: false,
+          },
+        }
+      }
+
+      if (account.selfChatMode) {
+        return {
+          ok: false,
+          status: 'error' as const,
+          message: 'WhatsApp is using a shared personal-number mode. Link a dedicated Nara Bot number before live use.',
+          details: {
+            account: env.OPENCLAW_WHATSAPP_ACCOUNT,
+            accountName: account.name ?? null,
+            dmPolicy: account.dmPolicy ?? env.OPENCLAW_WHATSAPP_DM_POLICY,
+            allowedRecipientCount: allowedNumbers.length,
+            hostNumberConfigured: Boolean(configuredHostNumber),
+            configuredHostNumber,
+            expectedHostNumber,
+            selfChatMode: true,
+            readyForLiveUse: false,
+          },
+        }
+      }
+
+      if (!configuredHostNumber) {
+        return {
+          ok: false,
+          status: 'missing' as const,
+          message: 'Dedicated Nara Bot WhatsApp number is not configured yet.',
+          details: {
+            account: env.OPENCLAW_WHATSAPP_ACCOUNT,
+            accountName: account.name ?? null,
+            dmPolicy: account.dmPolicy ?? env.OPENCLAW_WHATSAPP_DM_POLICY,
+            allowedRecipientCount: allowedNumbers.length,
+            hostNumberConfigured: false,
+            expectedHostNumber,
+            selfChatMode: false,
+            readyForLiveUse: false,
+          },
+        }
+      }
+
+      if (!hostReady) {
+        return {
+          ok: false,
+          status: 'error' as const,
+          message: 'Configured WhatsApp host number does not match OPENCLAW_WHATSAPP_HOST_NUMBER.',
+          details: {
+            account: env.OPENCLAW_WHATSAPP_ACCOUNT,
+            accountName: account.name ?? null,
+            dmPolicy: account.dmPolicy ?? env.OPENCLAW_WHATSAPP_DM_POLICY,
+            allowedRecipientCount: allowedNumbers.length,
+            hostNumberConfigured: true,
+            configuredHostNumber,
+            expectedHostNumber,
+            selfChatMode: false,
+            readyForLiveUse: false,
+          },
+        }
+      }
+
       return {
         ok: true,
         status: 'ok' as const,
-        message: `${allowedNumbers.length} allowed WhatsApp recipient(s); account=${env.OPENCLAW_WHATSAPP_ACCOUNT}; policy=${env.OPENCLAW_WHATSAPP_DM_POLICY}`,
+        message: `${allowedNumbers.length} allowed WhatsApp recipient(s); dedicated Nara Bot number configured.`,
+        details: {
+          account: env.OPENCLAW_WHATSAPP_ACCOUNT,
+          accountName: account.name ?? null,
+          dmPolicy: account.dmPolicy ?? env.OPENCLAW_WHATSAPP_DM_POLICY,
+          allowedRecipientCount: allowedNumbers.length,
+          hostNumberConfigured: true,
+          configuredHostNumber,
+          expectedHostNumber,
+          selfChatMode: false,
+          readyForLiveUse: true,
+        },
       }
     } catch (error) {
       return {
@@ -156,6 +259,39 @@ export class OpenClawService {
     }
 
     return Array.from(numbers).sort()
+  }
+
+  private async getWhatsAppAccountConfig(): Promise<WhatsAppAccountConfig> {
+    const configPath = this.configPath()
+    const raw = await readFile(configPath, 'utf8')
+    const config = JSON.parse(raw) as OpenClawConfig
+    const channels = config.channels && typeof config.channels === 'object'
+      ? config.channels
+      : {}
+    const whatsapp = this.record(channels.whatsapp)
+    const accounts = this.record(whatsapp?.accounts)
+    const account = this.record(accounts?.[env.OPENCLAW_WHATSAPP_ACCOUNT])
+
+    if (!account) {
+      return {
+        exists: false,
+        allowFrom: [],
+      }
+    }
+
+    return {
+      exists: true,
+      name: typeof account.name === 'string' ? account.name : undefined,
+      enabled: typeof account.enabled === 'boolean' ? account.enabled : undefined,
+      dmPolicy: typeof account.dmPolicy === 'string' ? account.dmPolicy : undefined,
+      selfChatMode: account.selfChatMode === true,
+      hostNumber: typeof account.hostNumber === 'string'
+        ? account.hostNumber
+        : typeof account.ownerPhone === 'string'
+          ? account.ownerPhone
+          : null,
+      allowFrom: this.stringArray(account.allowFrom),
+    }
   }
 
   private async trySyncAllowlistViaGateway(numbers: string[]) {
@@ -304,6 +440,13 @@ export class OpenClawService {
     const next: Record<string, unknown> = {}
     parent[key] = next
     return next
+  }
+
+  private record(value: unknown) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return value as Record<string, unknown>
+    }
+    return null
   }
 
   private stringArray(value: unknown) {

@@ -40,7 +40,7 @@ const suggestedFixes = {
   redis: 'Check Docker container: docker ps | grep redis',
   reminderWorker: 'Verify REMINDER_WORKER_ENABLED=true, REDIS_URL is set, then restart the backend service',
   openclaw: 'Verify OPENCLAW_GATEWAY_URL, gateway token, and OpenClaw Gateway is running',
-  whatsapp: 'Verify OpenClaw WhatsApp account, send path, Nara Bot allowlist, and paired session',
+  whatsapp: 'Link a dedicated Nara Bot WhatsApp number, then verify OpenClaw account, allowlist, and paired session',
 } as const
 
 export default function Health() {
@@ -195,6 +195,23 @@ export default function Health() {
                             ['Last Run', String(status.details.lastRunAt ?? 'Never')],
                             ['Last Status', String(status.details.lastRunStatus ?? 'None')],
                             ['Queue', String(status.details.queueName ?? 'unknown')],
+                          ].map(([label, value]) => (
+                            <div key={label} className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2">
+                              <dt className="font-semibold text-slate-500">{label}</dt>
+                              <dd className="mt-0.5 truncate font-mono text-slate-800">{value}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      )}
+                      {key === 'whatsapp' && status?.details && (
+                        <dl className="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
+                          {[
+                            ['Account', String(status.details.account ?? 'default')],
+                            ['Host Number', status.details.configuredHostNumber ? 'Configured' : 'Not configured'],
+                            ['Ready for Live Use', status.details.readyForLiveUse ? 'Yes' : 'No'],
+                            ['Access Count', String(status.details.allowedRecipientCount ?? 0)],
+                            ['Policy', String(status.details.dmPolicy ?? 'allowlist')],
+                            ['Shared Personal Number', status.details.selfChatMode ? 'Yes' : 'No'],
                           ].map(([label, value]) => (
                             <div key={label} className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2">
                               <dt className="font-semibold text-slate-500">{label}</dt>
