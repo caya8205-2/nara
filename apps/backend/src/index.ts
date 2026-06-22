@@ -169,6 +169,9 @@ app.get('/', async () => ({
 app.get('/health', async () => ({
   status: 'ok',
   service: 'nara-backend',
+  workers: {
+    reminder: reminderWorkerService.getStatus(),
+  },
   timestamp: new Date().toISOString(),
 }))
 

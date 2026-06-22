@@ -135,6 +135,13 @@ Agent tool calls store pending records in `approval_requests` with the action ty
 
 The backend starts a BullMQ reminder worker when `REMINDER_WORKER_ENABLED=true`. It requires `REDIS_URL`, schedules a repeat job every `REMINDER_WORKER_INTERVAL_MS` milliseconds, defaults to 60 seconds, and calls `reminderService.processDue()`.
 
+Worker visibility is exposed through `/health` and `/api/readiness`. `/api/readiness.dependencies.reminderWorker` reports the BullMQ worker state and turns readiness degraded when automatic reminder execution will not run. Common actionable states include:
+
+- `disabled` when `REMINDER_WORKER_ENABLED=false`
+- `missing` when `REDIS_URL` is not configured
+- `error` when the worker is enabled but failed to start or schedule jobs
+- `ok` when the worker is running and repeat scheduling succeeded
+
 Execution behavior:
 
 - one-time reminders trigger once, set `enabled=false`, clear `nextRunAt`, and record `lastTriggeredAt`
@@ -142,7 +149,7 @@ Execution behavior:
 - every trigger writes `reminder.delivery.recorded` and `reminder.triggered` audit events with the delivery status
 - user reminders are sent through the OpenClaw WhatsApp delivery adapter when an allowed WhatsApp recipient exists
 - delivery failures are stored in `lastTriggerStatus=delivery_failed` and `lastTriggerMessage` for admin visibility
-- push or local notification delivery is still a separate follow-up
+- Android mobile fallback notifications can alert the signed-in user locally when WhatsApp access is unavailable or backend delivery records `delivery_failed`/`delivery_skipped`
 
 Useful endpoints:
 
@@ -232,6 +239,7 @@ Route implementation should use `authzService.requireSession`, `requireOperator`
 
 - `dependencies.database`
 - `dependencies.redis`
+- `dependencies.reminderWorker`
 - `dependencies.openclaw`
 - `dependencies.whatsapp`
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/state/nara_mobile_state.dart';
 import '../../core/theme/nara_theme.dart';
 import '../../core/widgets/nara_card.dart';
+import '../approvals/pending_approvals_module.dart';
 
 class AssistantScreen extends StatefulWidget {
   const AssistantScreen({
@@ -10,6 +11,9 @@ class AssistantScreen extends StatefulWidget {
     required this.onRefresh,
     required this.onSavePreferences,
     required this.onRequestWhatsAppAccess,
+    required this.onOpenApprovals,
+    required this.onApproveApproval,
+    required this.onRejectApproval,
     super.key,
   });
 
@@ -18,6 +22,9 @@ class AssistantScreen extends StatefulWidget {
   final Future<void> Function(NaraAssistantPreferences preferences)
       onSavePreferences;
   final Future<void> Function(String number) onRequestWhatsAppAccess;
+  final VoidCallback onOpenApprovals;
+  final Future<void> Function(NaraApproval approval) onApproveApproval;
+  final Future<void> Function(NaraApproval approval) onRejectApproval;
 
   @override
   State<AssistantScreen> createState() => _AssistantScreenState();
@@ -104,6 +111,16 @@ class _AssistantScreenState extends State<AssistantScreen> {
           // ── Setup progress ──
           _SetupProgress(state: widget.state),
           const SizedBox(height: 18),
+
+          if (widget.state.pendingApprovals.isNotEmpty) ...[
+            PendingApprovalsModule(
+              state: widget.state,
+              onOpenApprovals: widget.onOpenApprovals,
+              onApprove: widget.onApproveApproval,
+              onReject: widget.onRejectApproval,
+            ),
+            const SizedBox(height: 14),
+          ],
 
           // ── WhatsApp access ──
           _buildSection(

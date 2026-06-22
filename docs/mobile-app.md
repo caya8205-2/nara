@@ -37,6 +37,8 @@ The mobile app is the main user-facing Nara app. The backend remains the source 
 - Nara screen can save personality, custom personality, autonomy, allowed-action toggles, WhatsApp number, and Nara Bot access request
 - First-run WhatsApp setup prompt appears when a signed-in user has not connected a WhatsApp number yet
 - WhatsApp access status is loaded from `GET /api/users/:id/agent-access` and shown on Home and Nara
+- Pending approvals are surfaced as a high-priority module on Home and Nara, with quick approve/reject actions and the existing Approvals screen kept as the detail view
+- Android local fallback notifications alert the signed-in user for due reminders when WhatsApp is not connected/allowed or when backend WhatsApp delivery records a failure/skipped status
 - Optional machine-specific Android SDK relocation if a Windows username or SDK path with whitespace causes NDK tooling issues
 
 ## Run Locally
@@ -137,17 +139,21 @@ Reminder data is stored in PostgreSQL and scoped to the signed-in mobile user th
 
 The mobile screen supports creating, listing, pausing, resuming, deleting, and pull-to-refresh. One-time reminders use `scheduledAt`. Recurring reminders currently offer daily, weekly, and monthly presets backed by cron expressions and the `Asia/Jakarta` timezone.
 
-The backend now records due reminders through a BullMQ worker backed by Redis. Mobile reads execution fields from reminder list responses, including `nextRunAt`, `lastTriggeredAt`, `lastTriggerStatus`, and `lastTriggerMessage`, and shows next/last recorded timing in the reminder list. The first delivery path sends due user reminders through OpenClaw WhatsApp when an allowed WhatsApp contact exists; push or local notification delivery remains a separate follow-up work item.
+The backend now records due reminders through a BullMQ worker backed by Redis. Mobile reads execution fields from reminder list responses, including `nextRunAt`, `lastTriggeredAt`, `lastTriggerStatus`, and `lastTriggerMessage`, and shows next/last recorded timing in the reminder list. The first delivery path sends due user reminders through OpenClaw WhatsApp when an allowed WhatsApp contact exists.
+
+Android fallback notifications are local to the app. The Flutter layer periodically refreshes reminders while a signed-in session is active, then uses the Android host `nara/local_notifications` channel to show a notification once per due or failed-delivery event. This covers cases where WhatsApp is not allowed/connected or the backend records `delivery_failed`/`delivery_skipped`. It does not replace backend processing and it is not a push notification service; if the app has not synced recently, the backend/OpenClaw path remains the primary delivery path.
 
 ## Approvals
 
-The Approvals tab is connected to backend approval records:
+The existing Approvals screen is connected to backend approval records:
 
 - `GET /api/approvals`
 - `POST /api/approvals/:id/approve`
 - `POST /api/approvals/:id/reject`
 
 Agent tool calls that need confirmation now create pending approval records. Approving a record runs the stored action payload, then refreshes tasks, reminders, and approvals in the app. Rejecting a record closes it without running the action.
+
+Approvals no longer need a primary bottom-navigation slot. Home and Nara show a high-priority pending approval module with counts and quick approve/reject controls; opening the module still uses the existing Approvals screen for the full list/detail flow.
 
 ## Validation
 
@@ -225,5 +231,5 @@ Avoid copy themes:
 
 ## Next Work
 
-1. Add local or push notification delivery for triggered reminders.
+1. Add push notification delivery if reminders must alert when the app has not synced recently.
 2. Add reminder edit controls beyond pause/resume and the current recurrence presets.

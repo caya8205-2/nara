@@ -11,6 +11,7 @@ class ApprovalsScreen extends StatelessWidget {
     required this.onRefresh,
     required this.onApprove,
     required this.onReject,
+    this.onBack,
     super.key,
   });
 
@@ -18,6 +19,7 @@ class ApprovalsScreen extends StatelessWidget {
   final Future<void> Function({bool silent}) onRefresh;
   final Future<void> Function(NaraApproval approval) onApprove;
   final Future<void> Function(NaraApproval approval) onReject;
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -30,9 +32,23 @@ class ApprovalsScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
         children: [
           // Header
-          Text(
-            'Approvals',
-            style: Theme.of(context).textTheme.headlineMedium,
+          Row(
+            children: [
+              if (onBack != null) ...[
+                IconButton(
+                  onPressed: onBack,
+                  icon: const Icon(Icons.arrow_back),
+                  tooltip: 'Back',
+                ),
+                const SizedBox(width: 4),
+              ],
+              Expanded(
+                child: Text(
+                  'Approvals',
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 4),
           Text(

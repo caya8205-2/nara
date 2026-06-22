@@ -149,7 +149,7 @@ To include the authenticated reminder execution summary, pass local operator cre
 powershell -ExecutionPolicy Bypass -File .\ops\windows\check-nara-health.ps1 -OperatorUsername admin -OperatorPassword "<password-from-env>"
 ```
 
-The unauthenticated checks cover Docker, backend `/health`, backend `/api/readiness`, and OpenClaw Control UI. The readiness response includes PostgreSQL, Redis, OpenClaw Gateway, and WhatsApp bridge checks. Reminder execution is skipped unless credentials are provided.
+The unauthenticated checks cover Docker, backend `/health`, backend `/api/readiness`, and OpenClaw Control UI. The readiness response includes PostgreSQL, Redis, BullMQ Reminder Worker, OpenClaw Gateway, and WhatsApp bridge checks. Reminder execution is skipped unless credentials are provided.
 
 PM2 checks are optional because the recommended Windows launcher does not use PM2:
 
@@ -170,6 +170,19 @@ REPORT_WORKER_INTERVAL_MS=300000
 
 The worker records due reminders, disables one-time reminders after they trigger, advances supported recurring schedules, and writes `reminder.triggered` audit events. The current delivery adapter sends user reminders through OpenClaw WhatsApp when an allowed WhatsApp contact exists. Delivery status is stored in `lastTriggerStatus` and `lastTriggerMessage`.
 
+The web admin Health screen includes a Reminder Worker row from `/api/readiness.dependencies.reminderWorker`. If it shows `DISABLED`, `MISSING`, or `ERROR`, reminders will not fire automatically even when Redis itself is healthy. Check:
+
+```env
+REMINDER_WORKER_ENABLED=true
+REDIS_URL=redis://localhost:6379
+```
+
+Then restart the backend service and run:
+
+```powershell
+npm run health-check
+```
+
 The report worker processes due report schedules, generates daily or weekly summaries, and can deliver them through the same OpenClaw WhatsApp allowlist path. Delivery status is stored on each report row. Use the web admin `/reports` page or `POST /api/reports/process-due` with an operator token to verify processing without waiting for the repeat interval.
 
 ## WhatsApp Readiness
@@ -183,7 +196,7 @@ npm run server:status
 npm run health-check
 ```
 
-Then open `/health` in the web admin and confirm PostgreSQL, Redis, OpenClaw Gateway, and WhatsApp Bridge are all healthy or have actionable messages.
+Then open `/health` in the web admin and confirm PostgreSQL, Redis, Reminder Worker, OpenClaw Gateway, and WhatsApp Bridge are all healthy or have actionable messages.
 
 ## Cloudflare Tunnel
 

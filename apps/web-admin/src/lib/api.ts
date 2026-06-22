@@ -7,8 +7,9 @@ export const api = axios.create({
 
 export type DependencyStatus = {
   ok: boolean
-  status: 'ok' | 'missing' | 'error'
+  status: 'ok' | 'missing' | 'error' | 'disabled'
   message?: string
+  details?: Record<string, unknown>
 }
 
 export type ReadinessReport = {
@@ -18,6 +19,7 @@ export type ReadinessReport = {
   dependencies: {
     database: DependencyStatus
     redis: DependencyStatus
+    reminderWorker: DependencyStatus
     openclaw: DependencyStatus
     whatsapp: DependencyStatus
   }

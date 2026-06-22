@@ -16,6 +16,7 @@ const dependencyLabels = {
   backend: 'Backend API',
   database: 'PostgreSQL',
   redis: 'Redis',
+  reminderWorker: 'Reminder Worker',
   openclaw: 'OpenClaw Gateway',
   whatsapp: 'WhatsApp Bridge',
 } as const
@@ -24,6 +25,7 @@ const dependencyIcons = {
   backend: Server,
   database: Database,
   redis: Activity,
+  reminderWorker: RefreshCw,
   openclaw: Bot,
   whatsapp: Bot,
 } as const
@@ -36,6 +38,7 @@ const formatDependencyKey = (key: string) =>
 const suggestedFixes = {
   database: 'Check Docker container: docker ps | grep postgres',
   redis: 'Check Docker container: docker ps | grep redis',
+  reminderWorker: 'Verify REMINDER_WORKER_ENABLED=true, REDIS_URL is set, then restart the backend service',
   openclaw: 'Verify OPENCLAW_GATEWAY_URL, gateway token, and OpenClaw Gateway is running',
   whatsapp: 'Verify OpenClaw WhatsApp account, send path, Nara Bot allowlist, and paired session',
 } as const
@@ -65,6 +68,7 @@ export default function Health() {
       { key: 'backend', status: backendStatus },
       { key: 'database', status: readiness.dependencies.database },
       { key: 'redis', status: readiness.dependencies.redis },
+      { key: 'reminderWorker', status: readiness.dependencies.reminderWorker },
       { key: 'openclaw', status: readiness.dependencies.openclaw },
       { key: 'whatsapp', status: readiness.dependencies.whatsapp },
     ]
@@ -82,10 +86,9 @@ export default function Health() {
       'Generated: ' + new Date().toISOString(),
       '',
       'Backend: ' + (backendStatus?.ok ? 'OK' : 'ERROR'),
-      'Database: ' + readiness.dependencies.database.status.toUpperCase() + ' ' + (readiness.dependencies.database.message || ''),
-      'Redis: ' + readiness.dependencies.redis.status.toUpperCase() + ' ' + (readiness.dependencies.redis.message || ''),
-      'OpenClaw: ' + readiness.dependencies.openclaw.status.toUpperCase() + ' ' + (readiness.dependencies.openclaw.message || ''),
-      'WhatsApp: ' + readiness.dependencies.whatsapp.status.toUpperCase() + ' ' + (readiness.dependencies.whatsapp.message || ''),
+      ...Object.entries(readiness.dependencies).map(([key, dependency]) =>
+        `${dependencyLabels[key as keyof typeof dependencyLabels] ?? formatDependencyKey(key)}: ${dependency.status.toUpperCase()} ${dependency.message || ''}`,
+      ),
       '',
       'Last Checked: ' + lastChecked,
     ].join('\n')
@@ -98,6 +101,7 @@ export default function Health() {
   const getStatusColor = (status?: DependencyStatus) => {
     if (!status) return 'border-slate-200 bg-slate-50 text-slate-600'
     if (status.ok) return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+    if (status.status === 'disabled') return 'border-amber-200 bg-amber-50 text-amber-700'
     if (status.status === 'missing') return 'border-amber-200 bg-amber-50 text-amber-700'
     return 'border-rose-200 bg-rose-50 text-rose-700'
   }
@@ -181,6 +185,23 @@ export default function Health() {
                       </div>
                       {status?.message && (
                         <p className="mt-2 text-sm text-slate-600">{status.message}</p>
+                      )}
+                      {key === 'reminderWorker' && status?.details && (
+                        <dl className="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
+                          {[
+                            ['Enabled', String(status.details.enabled ?? 'unknown')],
+                            ['Started', String(status.details.started ?? 'unknown')],
+                            ['Interval', `${status.details.intervalMs ?? 'unknown'}ms`],
+                            ['Last Run', String(status.details.lastRunAt ?? 'Never')],
+                            ['Last Status', String(status.details.lastRunStatus ?? 'None')],
+                            ['Queue', String(status.details.queueName ?? 'unknown')],
+                          ].map(([label, value]) => (
+                            <div key={label} className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2">
+                              <dt className="font-semibold text-slate-500">{label}</dt>
+                              <dd className="mt-0.5 truncate font-mono text-slate-800">{value}</dd>
+                            </div>
+                          ))}
+                        </dl>
                       )}
                       {suggestedFix && (
                         <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3">

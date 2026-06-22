@@ -411,6 +411,8 @@ class NaraMobileState {
 
   List<NaraTask> get latestTasks => tasks.take(3).toList();
 
+  List<NaraApproval> get pendingApprovals => approvals;
+
   List<NaraReminder> get upcomingReminders => reminders
       .where((reminder) => reminder.enabled && reminder.kind == 'once')
       .toList()

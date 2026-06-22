@@ -251,7 +251,7 @@ The dashboard reads:
 
 Task endpoints require authentication. Normal mobile users receive only their own tasks, while the local operator dashboard sees global/admin tasks by default.
 
-Use `/health` for Cloudflare Tunnel checks, uptime checks, and app connectivity tests. Use `/api/readiness` for detailed dependency status; it reports PostgreSQL, Redis, OpenClaw Gateway, and WhatsApp bridge readiness. The report can be degraded when OpenClaw or WhatsApp is not reachable while the backend API is still running.
+Use `/health` for Cloudflare Tunnel checks, uptime checks, and app connectivity tests. Use `/api/readiness` for detailed dependency status; it reports PostgreSQL, Redis, the BullMQ reminder worker, OpenClaw Gateway, and WhatsApp bridge readiness. The report can be degraded when automatic reminders, OpenClaw, or WhatsApp are not reachable while the backend API is still running.
 
 ## Windows Server Setup
 
@@ -345,7 +345,7 @@ Reminder endpoints:
 * `PATCH /api/reminders/:id`
 * `DELETE /api/reminders/:id`
 
-Reminder records are scoped to the signed-in mobile user. One-time reminders use `scheduledAt`; recurring reminders use a cron expression and timezone. The backend worker records due reminders, disables completed one-time reminders, advances supported recurring schedules, and sends user reminders through the OpenClaw WhatsApp delivery adapter when an allowed WhatsApp contact exists. Delivery success/failure is stored in `lastTriggerStatus` and `lastTriggerMessage`; push or local notification delivery remains a follow-up milestone.
+Reminder records are scoped to the signed-in mobile user. One-time reminders use `scheduledAt`; recurring reminders use a cron expression and timezone. The backend worker records due reminders, disables completed one-time reminders, advances supported recurring schedules, and sends user reminders through the OpenClaw WhatsApp delivery adapter when an allowed WhatsApp contact exists. Delivery success/failure is stored in `lastTriggerStatus` and `lastTriggerMessage`; the Android app also shows local fallback notifications when WhatsApp is unavailable or backend delivery fails/skips.
 
 Report endpoints:
 
@@ -529,7 +529,8 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
 * [x] Personality and assistant setup screen with persisted local preferences
 * [x] WhatsApp number and Nara Bot access request screen
 * [x] Home Nara Bot status backed by user contact and agent access data
-* [ ] Push or local notification strategy
+* [x] Android local fallback notifications for due reminders
+* [ ] Push notification strategy
 * [x] Approval screen for agent-triggered actions
 
 ### Phase 5: Desktop App
@@ -572,7 +573,8 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
 * [x] Nara Bot allowlist sync with OpenClaw
 * [ ] Telegram integration (optional)
 * [x] OpenClaw WhatsApp delivery for due reminders
-* [ ] Push/local delivery for reminders and reports
+* [x] Android local fallback delivery for reminders
+* [ ] Push/local delivery for reports
 
 ---
 

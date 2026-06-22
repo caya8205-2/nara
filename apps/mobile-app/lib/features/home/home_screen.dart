@@ -7,6 +7,7 @@ import '../../core/widgets/nara_metric_tile.dart';
 import '../../core/widgets/nara_section_header.dart';
 import '../../core/widgets/nara_status_chip.dart';
 import '../../core/widgets/nara_task_row.dart';
+import '../approvals/pending_approvals_module.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -19,6 +20,9 @@ class HomeScreen extends StatefulWidget {
     required this.onCreateTask,
     required this.onCompleteTask,
     required this.onOpenAssistant,
+    required this.onOpenApprovals,
+    required this.onApproveApproval,
+    required this.onRejectApproval,
     required this.onRequestWhatsAppAccess,
     required this.onOpenSettings,
     required this.onOpenTaskDetail,
@@ -35,6 +39,9 @@ class HomeScreen extends StatefulWidget {
   final Future<void> Function(NaraTaskDraft draft) onCreateTask;
   final Future<void> Function(String id) onCompleteTask;
   final VoidCallback onOpenAssistant;
+  final VoidCallback onOpenApprovals;
+  final Future<void> Function(NaraApproval approval) onApproveApproval;
+  final Future<void> Function(NaraApproval approval) onRejectApproval;
   final Future<void> Function(String number) onRequestWhatsAppAccess;
   final VoidCallback onOpenSettings;
   final Future<void> Function(NaraTask task) onOpenTaskDetail;
@@ -103,6 +110,17 @@ class _HomeScreenState extends State<HomeScreen> {
             onOpenSettings: widget.onOpenSettings,
           ),
           const SizedBox(height: 18),
+
+          if (!isGuest && widget.state.pendingApprovals.isNotEmpty) ...[
+            PendingApprovalsModule(
+              state: widget.state,
+              compact: true,
+              onOpenApprovals: widget.onOpenApprovals,
+              onApprove: widget.onApproveApproval,
+              onReject: widget.onRejectApproval,
+            ),
+            const SizedBox(height: 18),
+          ],
 
           // ── Metric cards ──
           Row(
@@ -295,7 +313,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             .withValues(alpha: context.isNaraDark ? 0.14 : 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.smart_toy_outlined,
                         size: 22,
                         color: NaraColors.agent,

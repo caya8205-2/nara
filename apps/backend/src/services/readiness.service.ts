@@ -3,23 +3,26 @@ import Redis from 'ioredis'
 import { env } from '../config/env.js'
 import { db } from '../db/index.js'
 import { openClawService } from './openclaw.service.js'
+import { reminderWorkerService } from './reminder-worker.service.js'
 
 export type DependencyStatus = {
   ok: boolean
-  status: 'ok' | 'missing' | 'error'
+  status: 'ok' | 'missing' | 'error' | 'disabled'
   message?: string
+  details?: Record<string, unknown>
 }
 
 export type ReadinessReport = {
   ok: boolean
   service: 'nara-backend'
   timestamp: string
-    dependencies: {
-      database: DependencyStatus
-      redis: DependencyStatus
-      openclaw: DependencyStatus
-      whatsapp: DependencyStatus
-    }
+  dependencies: {
+    database: DependencyStatus
+    redis: DependencyStatus
+    reminderWorker: DependencyStatus
+    openclaw: DependencyStatus
+    whatsapp: DependencyStatus
+  }
 }
 
 const errorMessage = (error: unknown) =>
@@ -97,6 +100,28 @@ export class ReadinessService {
     }
   }
 
+  checkReminderWorker(): DependencyStatus {
+    const status = reminderWorkerService.getStatus()
+    return {
+      ok: status.ok,
+      status: status.status,
+      message: status.message,
+      details: {
+        enabled: status.enabled,
+        configured: status.configured,
+        started: status.started,
+        queueName: status.queueName,
+        jobName: status.jobName,
+        intervalMs: status.intervalMs,
+        startedAt: status.startedAt,
+        scheduledAt: status.scheduledAt,
+        lastRunAt: status.lastRunAt,
+        lastRunStatus: status.lastRunStatus,
+        lastError: status.lastError,
+      },
+    }
+  }
+
   async getReport(): Promise<ReadinessReport> {
     const [database, redis, openclaw, whatsapp] = await Promise.all([
       this.checkDatabase(),
@@ -104,12 +129,13 @@ export class ReadinessService {
       this.checkOpenClaw(),
       openClawService.getWhatsAppReadiness(),
     ])
+    const reminderWorker = this.checkReminderWorker()
 
     return {
-      ok: database.ok && redis.ok && openclaw.ok && whatsapp.ok,
+      ok: database.ok && redis.ok && reminderWorker.ok && openclaw.ok && whatsapp.ok,
       service: 'nara-backend',
       timestamp: new Date().toISOString(),
-      dependencies: { database, redis, openclaw, whatsapp },
+      dependencies: { database, redis, reminderWorker, openclaw, whatsapp },
     }
   }
 }

@@ -29,12 +29,14 @@ import {
 const dependencyLabels = {
   database: 'PostgreSQL',
   redis: 'Redis',
+  reminderWorker: 'Reminder Worker',
   openclaw: 'OpenClaw',
 } as const
 
 const dependencyIcons = {
   database: Database,
   redis: Activity,
+  reminderWorker: Clock3,
   openclaw: Bot,
 } as const
 
@@ -45,6 +47,7 @@ const formatDependencyKey = (key: string) =>
 
 const statusClasses = (status?: DependencyStatus) => {
   if (status?.ok) return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  if (status?.status === 'disabled') return 'border-amber-200 bg-amber-50 text-amber-700'
   if (status?.status === 'missing') return 'border-amber-200 bg-amber-50 text-amber-700'
   return 'border-rose-200 bg-rose-50 text-rose-700'
 }
@@ -59,7 +62,7 @@ const StatusPill = ({ status }: { status?: DependencyStatus }) => (
     <span
       className={[
         'h-1.5 w-1.5 rounded-full',
-        status?.ok ? 'bg-emerald-500' : status?.status === 'missing' ? 'bg-amber-500' : 'bg-rose-500',
+        status?.ok ? 'bg-emerald-500' : status?.status === 'missing' || status?.status === 'disabled' ? 'bg-amber-500' : 'bg-rose-500',
       ].join(' ')}
     />
     {status?.ok ? 'Online' : status?.status ?? 'Checking'}

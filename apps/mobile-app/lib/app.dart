@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'core/services/api_client.dart';
+import 'core/services/local_reminder_notification_service.dart';
 import 'core/services/session_store.dart';
 import 'core/state/nara_mobile_state.dart';
 import 'core/theme/nara_theme.dart';
@@ -27,12 +28,15 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     with WidgetsBindingObserver {
   final NaraApiClient apiClient = NaraApiClient();
   final NaraSessionStore sessionStore = NaraSessionStore();
+  final LocalReminderNotificationService localReminderNotifications =
+      LocalReminderNotificationService();
   final NaraMobileState appState = NaraMobileState();
   int selectedIndex = 0;
   int tabDirection = 1;
   Map<String, dynamic>? currentUser;
   bool isGuest = false;
   Timer? connectionTimer;
+  Timer? reminderNotificationTimer;
   bool restoringSession = true;
   bool whatsAppPromptVisible = false;
 
@@ -41,9 +45,15 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     restoreSession();
+    unawaited(localReminderNotifications.initialize());
     connectionTimer = Timer.periodic(const Duration(minutes: 2), (_) {
       if (!isGuest && (currentUser != null || apiClient.currentUser != null)) {
         checkConnection(showChecking: false);
+      }
+    });
+    reminderNotificationTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (!isGuest && (currentUser != null || apiClient.currentUser != null)) {
+        loadReminders(silent: true);
       }
     });
   }
@@ -51,6 +61,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
   @override
   void dispose() {
     connectionTimer?.cancel();
+    reminderNotificationTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -62,8 +73,8 @@ class _NaraMobileAppState extends State<NaraMobileApp>
         (currentUser != null || apiClient.currentUser != null)) {
       checkConnection(showChecking: false);
       loadTasks(silent: true);
-      loadReminders(silent: true);
       loadAssistantProfile(silent: true);
+      loadReminders(silent: true);
       loadApprovals(silent: true);
     }
   }
@@ -119,8 +130,8 @@ class _NaraMobileAppState extends State<NaraMobileApp>
 
     checkConnection(showChecking: false);
     loadTasks(silent: true);
-    loadReminders(silent: true);
     loadAssistantProfile(silent: true);
+    loadReminders(silent: true);
     loadApprovals(silent: true);
   }
 
@@ -143,8 +154,8 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     }
     checkConnection(showChecking: false);
     loadTasks();
-    loadReminders();
     loadAssistantProfile(forceWhatsAppPrompt: isNewUser);
+    loadReminders();
     loadApprovals();
   }
 
@@ -198,7 +209,8 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       appState.whatsappContact = null;
       appState.whatsappAccess = null;
     });
-    sessionStore.clear();
+    unawaited(sessionStore.clear());
+    unawaited(localReminderNotifications.clearHistory());
   }
 
   Future<void> updateThemePreference(NaraThemePreference preference) async {
@@ -293,6 +305,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
           .toList();
       if (!mounted) return;
       setState(() => appState.reminders = reminders);
+      await reconcileLocalReminderNotifications(reminders);
     } catch (_) {
       if (!mounted) return;
       setState(() => appState.remindersError = 'Could not load reminders');
@@ -729,6 +742,15 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     }
   }
 
+  Future<void> reconcileLocalReminderNotifications(
+    List<NaraReminder> reminders,
+  ) {
+    return localReminderNotifications.reconcile(
+      reminders: reminders,
+      hasWhatsAppAccess: appState.hasWhatsAppAccess,
+    );
+  }
+
   Future<void> handleApprove(NaraApproval approval) async {
     // Placeholder — connect to backend endpoint later
     setState(() {
@@ -838,6 +860,11 @@ class _NaraMobileAppState extends State<NaraMobileApp>
         onCreateTask: createTask,
         onCompleteTask: completeTask,
         onOpenAssistant: () => openTab(3),
+        onOpenApprovals: () => openTab(4),
+        onApproveApproval: (approval) =>
+            processApproval(approval, approve: true),
+        onRejectApproval: (approval) =>
+            processApproval(approval, approve: false),
         onRequestWhatsAppAccess: requestWhatsAppAccess,
         onOpenSettings: () => openTab(5),
         onOpenTaskDetail: _showTaskDetail,
@@ -865,6 +892,11 @@ class _NaraMobileAppState extends State<NaraMobileApp>
         onRefresh: loadAssistantProfile,
         onSavePreferences: saveAssistantPreferences,
         onRequestWhatsAppAccess: requestWhatsAppAccess,
+        onOpenApprovals: () => openTab(4),
+        onApproveApproval: (approval) =>
+            processApproval(approval, approve: true),
+        onRejectApproval: (approval) =>
+            processApproval(approval, approve: false),
       ),
       // 4 — Approvals
       ApprovalsScreen(
@@ -872,6 +904,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
         onRefresh: loadApprovals,
         onApprove: (approval) => processApproval(approval, approve: true),
         onReject: (approval) => processApproval(approval, approve: false),
+        onBack: () => openTab(0),
       ),
       // 5 — Settings (hidden tab)
       SettingsScreen(
@@ -922,7 +955,8 @@ class _NaraMobileAppState extends State<NaraMobileApp>
                         ),
                       ),
                     ),
-                    bottomNavigationBar: selectedIndex == 5
+                    bottomNavigationBar: selectedIndex == 4 ||
+                            selectedIndex == 5
                         ? null
                         : NavigationBar(
                             selectedIndex: selectedIndex,
@@ -949,10 +983,9 @@ class _NaraMobileAppState extends State<NaraMobileApp>
                                           ? 'Pengingat'
                                           : 'Reminders',
                                     ),
-                                    NavigationDestination(
-                                      icon:
-                                          const Icon(Icons.smart_toy_outlined),
-                                      selectedIcon: const Icon(Icons.smart_toy),
+                                    const NavigationDestination(
+                                      icon: Icon(Icons.smart_toy_outlined),
+                                      selectedIcon: Icon(Icons.smart_toy),
                                       label: 'Nara',
                                     ),
                                   ]
@@ -977,20 +1010,10 @@ class _NaraMobileAppState extends State<NaraMobileApp>
                                           ? 'Pengingat'
                                           : 'Reminders',
                                     ),
-                                    NavigationDestination(
-                                      icon:
-                                          const Icon(Icons.smart_toy_outlined),
-                                      selectedIcon: const Icon(Icons.smart_toy),
+                                    const NavigationDestination(
+                                      icon: Icon(Icons.smart_toy_outlined),
+                                      selectedIcon: Icon(Icons.smart_toy),
                                       label: 'Nara',
-                                    ),
-                                    NavigationDestination(
-                                      icon:
-                                          const Icon(Icons.checklist_outlined),
-                                      selectedIcon: const Icon(
-                                          Icons.assignment_turned_in),
-                                      label: isIndonesian
-                                          ? 'Persetujuan'
-                                          : 'Approvals',
                                     ),
                                   ],
                           ),
