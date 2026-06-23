@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { z } from 'zod'
 import { backupService } from '../services/backup.service.js'
+import { backupWorkerService } from '../services/backup-worker.service.js'
 import { authzService } from '../services/authz.service.js'
 
 const BackupTypeSchema = z.enum(['database', 'reports', 'config', 'full'])
@@ -40,6 +41,16 @@ const plugin: FastifyPluginAsync = async (app) => {
   app.get('/history', { preHandler: requireOperator }, async (req) => {
     const query = HistoryQuerySchema.parse(req.query)
     return backupService.listHistory(query.limit)
+  })
+
+  app.get('/status', { preHandler: requireOperator }, async () => {
+    const storage = await backupService.getStatus()
+    const worker = backupWorkerService.getStatus()
+    return {
+      ok: storage.ok && worker.ok,
+      storage,
+      worker,
+    }
   })
 }
 

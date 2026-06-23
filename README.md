@@ -390,6 +390,15 @@ Backup uses `BACKUP_DIR` for local backup files. Database export tries host `pg_
 nara-postgres-1
 ```
 
+Scheduled full backups run through the backend BullMQ worker when Redis is configured:
+
+```env
+BACKUP_WORKER_ENABLED=true
+BACKUP_WORKER_INTERVAL_MS=86400000
+```
+
+The web admin Backup page and `/api/readiness` report whether the backup folder is writable, whether host `pg_dump` or Docker fallback is available, and whether the scheduled backup worker is running. Full backups require the database dump to succeed before recording success.
+
 Test the agent tool endpoints without WhatsApp:
 
 ```powershell
@@ -560,7 +569,7 @@ See [Mobile App Notes](docs/mobile-app.md) for Flutter run commands, device test
 * [x] Local backup/export controls and backend MVP
 * [x] Open source attribution section
 
-> **Note:** Phase 6 admin dashboard is complete for MVP. Backup restore and scheduled backup automation remain later hardening work.
+> **Note:** Phase 6 admin dashboard is complete for MVP. Backup restore remains document-only hardening work so live data is not overwritten accidentally.
 
 ### Phase 7: Agent Automation
 

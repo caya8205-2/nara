@@ -4,6 +4,7 @@ import jwt from '@fastify/jwt'
 import { ZodError } from 'zod'
 import { env } from './config/env.js'
 import { backendLogService } from './services/backend-log.service.js'
+import { backupWorkerService } from './services/backup-worker.service.js'
 import { reminderWorkerService } from './services/reminder-worker.service.js'
 import { reportWorkerService } from './services/report-worker.service.js'
 import { rateLimitService } from './services/rate-limit.service.js'
@@ -148,12 +149,14 @@ process.on('uncaughtException', (error) => {
 
 process.on('SIGINT', () => {
   reminderWorkerService.stop()
+  backupWorkerService.stop()
   reportWorkerService.stop()
   process.exit(0)
 })
 
 process.on('SIGTERM', () => {
   reminderWorkerService.stop()
+  backupWorkerService.stop()
   reportWorkerService.stop()
   process.exit(0)
 })
@@ -170,6 +173,7 @@ app.get('/health', async () => ({
   status: 'ok',
   service: 'nara-backend',
   workers: {
+    backup: backupWorkerService.getStatus(),
     reminder: reminderWorkerService.getStatus(),
   },
   timestamp: new Date().toISOString(),
@@ -196,6 +200,7 @@ const start = async () => {
   try {
     await app.listen({ port: env.PORT, host: '0.0.0.0' })
     reminderWorkerService.start(app.log)
+    backupWorkerService.start(app.log)
     reportWorkerService.start(app.log)
   } catch (err) {
     app.log.error(err)

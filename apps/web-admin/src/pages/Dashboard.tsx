@@ -27,6 +27,8 @@ import {
 } from '../lib/api'
 
 const dependencyLabels = {
+  backup: 'Backup',
+  backupWorker: 'Backup Worker',
   database: 'PostgreSQL',
   redis: 'Redis',
   reminderWorker: 'Reminder Worker',
@@ -34,6 +36,8 @@ const dependencyLabels = {
 } as const
 
 const dependencyIcons = {
+  backup: Database,
+  backupWorker: Clock3,
   database: Database,
   redis: Activity,
   reminderWorker: Clock3,

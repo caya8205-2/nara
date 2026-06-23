@@ -14,6 +14,8 @@ import { getReadiness, type DependencyStatus } from '../lib/api'
 
 const dependencyLabels = {
   backend: 'Backend API',
+  backup: 'Backup Storage',
+  backupWorker: 'Backup Worker',
   database: 'PostgreSQL',
   redis: 'Redis',
   reminderWorker: 'Reminder Worker',
@@ -23,6 +25,8 @@ const dependencyLabels = {
 
 const dependencyIcons = {
   backend: Server,
+  backup: Database,
+  backupWorker: RefreshCw,
   database: Database,
   redis: Activity,
   reminderWorker: RefreshCw,
@@ -38,6 +42,8 @@ const formatDependencyKey = (key: string) =>
 const suggestedFixes = {
   database: 'Check Docker container: docker ps | grep postgres',
   redis: 'Check Docker container: docker ps | grep redis',
+  backup: 'Verify BACKUP_DIR is writable and pg_dump or Docker is available on the server',
+  backupWorker: 'Verify BACKUP_WORKER_ENABLED=true, REDIS_URL is set, then restart the backend service',
   reminderWorker: 'Verify REMINDER_WORKER_ENABLED=true, REDIS_URL is set, then restart the backend service',
   openclaw: 'Verify OPENCLAW_GATEWAY_URL, gateway token, and OpenClaw Gateway is running',
   whatsapp: 'Link a dedicated Nara Bot WhatsApp number, then verify OpenClaw account, allowlist, and paired session',
@@ -68,6 +74,8 @@ export default function Health() {
       { key: 'backend', status: backendStatus },
       { key: 'database', status: readiness.dependencies.database },
       { key: 'redis', status: readiness.dependencies.redis },
+      { key: 'backup', status: readiness.dependencies.backup },
+      { key: 'backupWorker', status: readiness.dependencies.backupWorker },
       { key: 'reminderWorker', status: readiness.dependencies.reminderWorker },
       { key: 'openclaw', status: readiness.dependencies.openclaw },
       { key: 'whatsapp', status: readiness.dependencies.whatsapp },
@@ -186,7 +194,7 @@ export default function Health() {
                       {status?.message && (
                         <p className="mt-2 text-sm text-slate-600">{status.message}</p>
                       )}
-                      {key === 'reminderWorker' && status?.details && (
+                      {(key === 'reminderWorker' || key === 'backupWorker') && status?.details && (
                         <dl className="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
                           {[
                             ['Enabled', String(status.details.enabled ?? 'unknown')],

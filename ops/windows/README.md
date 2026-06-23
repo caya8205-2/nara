@@ -185,6 +185,42 @@ npm run health-check
 
 The report worker processes due report schedules, generates daily or weekly summaries, and can deliver them through the same OpenClaw WhatsApp allowlist path. Delivery status is stored on each report row. Use the web admin `/reports` page or `POST /api/reports/process-due` with an operator token to verify processing without waiting for the repeat interval.
 
+## Backup Worker
+
+The backend starts the scheduled backup worker by default:
+
+```env
+BACKUP_DIR=./data/backups
+BACKUP_WORKER_ENABLED=true
+BACKUP_WORKER_INTERVAL_MS=86400000
+POSTGRES_CONTAINER_NAME=nara-postgres-1
+```
+
+The worker uses Redis/BullMQ and runs a full backup on the configured interval. A full backup records success only after the PostgreSQL dump succeeds. The backend tries host `pg_dump` first and falls back to Docker:
+
+```powershell
+pg_dump --version
+docker ps
+```
+
+Open the web admin `/backup` page after pulling new code. Confirm:
+
+- Backup Storage is healthy
+- Scheduled Backup is running
+- Last successful backup is recent after the first run
+- Failed records show an actionable message instead of disappearing silently
+
+The same status is included in `/api/readiness` as `backup` and `backupWorker`.
+
+Restore remains manual. Verify any restore on a throwaway database first:
+
+```powershell
+createdb nara_restore_check
+psql "postgresql://nara:password@localhost:5432/nara_restore_check" -f .\data\backups\database-YYYY-MM-DDTHH-MM-SS.sql
+```
+
+Do not restore into the live database until backend services are stopped, the target database is confirmed, and the latest successful backup file has been checked.
+
 ## WhatsApp Readiness
 
 The web admin Health screen shows a WhatsApp Bridge row from `/api/readiness`. It checks Nara-side configuration and database allowlist state without sending a WhatsApp message or mutating OpenClaw config.

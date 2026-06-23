@@ -19,6 +19,8 @@ export type ReadinessReport = {
   dependencies: {
     database: DependencyStatus
     redis: DependencyStatus
+    backup: DependencyStatus
+    backupWorker: DependencyStatus
     reminderWorker: DependencyStatus
     openclaw: DependencyStatus
     whatsapp: DependencyStatus
@@ -155,6 +157,47 @@ export type BackupRecord = {
 
 export type BackupHistoryResponse = {
   backups: BackupRecord[]
+}
+
+export type BackupStorageStatus = {
+  ok: boolean
+  status: 'ok' | 'missing' | 'error' | 'disabled'
+  message?: string
+  details: {
+    backupDir: string
+    reportsDir: string
+    historyPath: string
+    pgDumpAvailable: boolean
+    dockerAvailable: boolean
+    postgresContainerName: string
+    lastBackupAt: string | null
+    lastSuccessfulBackupAt: string | null
+    lastFailureAt: string | null
+    lastFailureMessage: string | null
+  }
+}
+
+export type BackupWorkerStatus = {
+  ok: boolean
+  status: 'ok' | 'missing' | 'error' | 'disabled'
+  message?: string
+  queueName: string
+  jobName: string
+  enabled: boolean
+  configured: boolean
+  started: boolean
+  intervalMs: number
+  startedAt: string | null
+  scheduledAt: string | null
+  lastRunAt: string | null
+  lastRunStatus: 'ok' | 'error' | null
+  lastError: string | null
+}
+
+export type BackupStatusResponse = {
+  ok: boolean
+  storage: BackupStorageStatus
+  worker: BackupWorkerStatus
 }
 
 export type Report = {
@@ -403,6 +446,11 @@ export const listLogs = async (input: ListLogsInput = {}) => {
 export const listBackups = async () => {
   const response = await api.get<BackupHistoryResponse>('/backup/history')
   return response.data.backups
+}
+
+export const getBackupStatus = async () => {
+  const response = await api.get<BackupStatusResponse>('/backup/status')
+  return response.data
 }
 
 export const runBackup = async () => {

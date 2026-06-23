@@ -2,6 +2,8 @@ import { sql } from 'drizzle-orm'
 import Redis from 'ioredis'
 import { env } from '../config/env.js'
 import { db } from '../db/index.js'
+import { backupService } from './backup.service.js'
+import { backupWorkerService } from './backup-worker.service.js'
 import { openClawService } from './openclaw.service.js'
 import { reminderWorkerService } from './reminder-worker.service.js'
 
@@ -19,6 +21,8 @@ export type ReadinessReport = {
   dependencies: {
     database: DependencyStatus
     redis: DependencyStatus
+    backup: DependencyStatus
+    backupWorker: DependencyStatus
     reminderWorker: DependencyStatus
     openclaw: DependencyStatus
     whatsapp: DependencyStatus
@@ -122,20 +126,54 @@ export class ReadinessService {
     }
   }
 
+  async checkBackup(): Promise<DependencyStatus> {
+    const status = await backupService.getStatus()
+    return {
+      ok: status.ok,
+      status: status.status,
+      message: status.message,
+      details: status.details,
+    }
+  }
+
+  checkBackupWorker(): DependencyStatus {
+    const status = backupWorkerService.getStatus()
+    return {
+      ok: status.ok,
+      status: status.status,
+      message: status.message,
+      details: {
+        enabled: status.enabled,
+        configured: status.configured,
+        started: status.started,
+        queueName: status.queueName,
+        jobName: status.jobName,
+        intervalMs: status.intervalMs,
+        startedAt: status.startedAt,
+        scheduledAt: status.scheduledAt,
+        lastRunAt: status.lastRunAt,
+        lastRunStatus: status.lastRunStatus,
+        lastError: status.lastError,
+      },
+    }
+  }
+
   async getReport(): Promise<ReadinessReport> {
-    const [database, redis, openclaw, whatsapp] = await Promise.all([
+    const [database, redis, backup, openclaw, whatsapp] = await Promise.all([
       this.checkDatabase(),
       this.checkRedis(),
+      this.checkBackup(),
       this.checkOpenClaw(),
       openClawService.getWhatsAppReadiness(),
     ])
+    const backupWorker = this.checkBackupWorker()
     const reminderWorker = this.checkReminderWorker()
 
     return {
-      ok: database.ok && redis.ok && reminderWorker.ok && openclaw.ok && whatsapp.ok,
+      ok: database.ok && redis.ok && backup.ok && backupWorker.ok && reminderWorker.ok && openclaw.ok && whatsapp.ok,
       service: 'nara-backend',
       timestamp: new Date().toISOString(),
-      dependencies: { database, redis, reminderWorker, openclaw, whatsapp },
+      dependencies: { database, redis, backup, backupWorker, reminderWorker, openclaw, whatsapp },
     }
   }
 }

@@ -18,6 +18,8 @@ const EnvSchema = z.object({
   OPENCLAW_ALLOWLIST_SYNC_PATH: z.string().optional(),
   OPENCLAW_WHATSAPP_SEND_PATH: z.string().default('/api/channels/whatsapp/send'),
   BACKUP_DIR: z.string().optional(),
+  BACKUP_WORKER_ENABLED: z.coerce.boolean().default(true),
+  BACKUP_WORKER_INTERVAL_MS: z.coerce.number().int().positive().default(86_400_000),
   BACKEND_LOG_DIR: z.string().optional(),
   REPORTS_DIR: z.string().optional(),
   POSTGRES_CONTAINER_NAME: z.string().default('nara-postgres-1'),

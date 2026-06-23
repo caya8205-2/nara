@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
-import { createReadStream, createWriteStream } from 'node:fs'
-import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { constants, createReadStream, createWriteStream } from 'node:fs'
+import { access, mkdir, readdir, readFile, stat, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { env } from '../config/env.js'
 import { db } from '../db/index.js'
@@ -17,6 +17,24 @@ export interface BackupRecord {
   status: BackupStatus
   location: string
   error?: string
+}
+
+export interface BackupStorageStatus {
+  ok: boolean
+  status: 'ok' | 'missing' | 'error' | 'disabled'
+  message?: string
+  details: {
+    backupDir: string
+    reportsDir: string
+    historyPath: string
+    pgDumpAvailable: boolean
+    dockerAvailable: boolean
+    postgresContainerName: string
+    lastBackupAt: string | null
+    lastSuccessfulBackupAt: string | null
+    lastFailureAt: string | null
+    lastFailureMessage: string | null
+  }
 }
 
 const backupDir = path.resolve(env.BACKUP_DIR ?? './data/backups')
@@ -119,6 +137,77 @@ export class BackupService {
     return { backups: records.slice(0, Math.min(limit, 50)) }
   }
 
+  async getStatus(): Promise<BackupStorageStatus> {
+    let records: BackupRecord[] = []
+    try {
+      records = await this.readHistory()
+    } catch {
+      records = []
+    }
+
+    const lastBackup = records[0] ?? null
+    const lastSuccessfulBackup = records.find((record) => record.status === 'success') ?? null
+    const lastFailure = records.find((record) => record.status === 'failed') ?? null
+    const baseDetails = {
+      backupDir,
+      reportsDir,
+      historyPath,
+      pgDumpAvailable: false,
+      dockerAvailable: false,
+      postgresContainerName: env.POSTGRES_CONTAINER_NAME,
+      lastBackupAt: lastBackup?.timestamp ?? null,
+      lastSuccessfulBackupAt: lastSuccessfulBackup?.timestamp ?? null,
+      lastFailureAt: lastFailure?.timestamp ?? null,
+      lastFailureMessage: lastFailure?.error ?? null,
+    }
+
+    try {
+      await this.ensureBackupDir()
+      await access(backupDir, constants.R_OK | constants.W_OK)
+      const probePath = path.join(backupDir, `.nara-backup-write-check-${process.pid}.tmp`)
+      await writeFile(probePath, 'ok', 'utf8')
+      await unlink(probePath)
+    } catch (error) {
+      return {
+        ok: false,
+        status: 'error',
+        message: `Backup directory is not writable: ${errorMessage(error)}`,
+        details: baseDetails,
+      }
+    }
+
+    const pgDumpAvailable = await this.commandAvailable('pg_dump', ['--version'])
+    const dockerAvailable = await this.commandAvailable('docker', [
+      'exec',
+      env.POSTGRES_CONTAINER_NAME,
+      'pg_dump',
+      '--version',
+    ])
+    const details = {
+      ...baseDetails,
+      pgDumpAvailable,
+      dockerAvailable,
+    }
+
+    if (!pgDumpAvailable && !dockerAvailable) {
+      return {
+        ok: false,
+        status: 'missing',
+        message: 'Neither host pg_dump nor Docker is available for database backups.',
+        details,
+      }
+    }
+
+    return {
+      ok: true,
+      status: 'ok',
+      message: pgDumpAvailable
+        ? 'Backup storage is writable and host pg_dump is available.'
+        : 'Backup storage is writable and Docker fallback is available.',
+      details,
+    }
+  }
+
   async createBackup(type: BackupType = 'full') {
     try {
       const filePath = await this.createBackupFile(type)
@@ -197,6 +286,8 @@ export class BackupService {
 
   private async createFullSnapshot() {
     const filePath = path.join(backupDir, `full-${getTimestampSlug()}.json`)
+    const databaseDumpPath = await this.createDatabaseDump()
+    const databaseDumpInfo = await stat(databaseDumpPath)
     let reports: Array<{ path: string; size: number }> = []
     let reportsMissing = false
 
@@ -211,7 +302,8 @@ export class BackupService {
       backupDir,
       reportsDir,
       database: {
-        export: 'Run database export to create a pg_dump file.',
+        dumpPath: databaseDumpPath,
+        size: databaseDumpInfo.size,
       },
       config: redactEnv(),
       reports: {
@@ -323,6 +415,18 @@ export class BackupService {
       })
     })
   }
+
+  private async commandAvailable(command: string, args: string[]) {
+    try {
+      await this.runCommand(command, args)
+      return true
+    } catch {
+      return false
+    }
+  }
 }
 
 export const backupService = new BackupService()
+
+const errorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : String(error)

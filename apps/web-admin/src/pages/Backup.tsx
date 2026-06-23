@@ -9,11 +9,13 @@ import {
   FileText,
   HardDrive,
   RefreshCw,
+  Server,
   Settings,
   XCircle,
 } from 'lucide-react'
 import {
   exportBackup,
+  getBackupStatus,
   listBackups,
   runBackup,
   type BackupRecord,
@@ -41,6 +43,17 @@ const statusColor = {
   in_progress: 'text-amber-600',
 }
 
+const formatDate = (value: string | null | undefined) =>
+  value ? new Date(value).toLocaleString() : 'Not recorded'
+
+const formatInterval = (intervalMs: number) => {
+  const minutes = Math.round(intervalMs / 60_000)
+  if (minutes < 60) return `${minutes} min`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `${hours} hours`
+  return `${Math.round(hours / 24)} days`
+}
+
 export default function Backup() {
   const queryClient = useQueryClient()
   const [exportError, setExportError] = useState<string | null>(null)
@@ -50,10 +63,16 @@ export default function Backup() {
     queryFn: listBackups,
   })
 
+  const statusQuery = useQuery({
+    queryKey: ['backup-status'],
+    queryFn: getBackupStatus,
+  })
+
   const runBackupMutation = useMutation({
     mutationFn: runBackup,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['backups'] })
+      queryClient.invalidateQueries({ queryKey: ['backup-status'] })
     },
   })
 
@@ -65,15 +84,19 @@ export default function Backup() {
     onSuccess: ({ blob, filename }) => {
       downloadBlob(blob, filename)
       queryClient.invalidateQueries({ queryKey: ['backups'] })
+      queryClient.invalidateQueries({ queryKey: ['backup-status'] })
     },
     onError: (error) => {
       setExportError(error instanceof Error ? error.message : String(error))
       queryClient.invalidateQueries({ queryKey: ['backups'] })
+      queryClient.invalidateQueries({ queryKey: ['backup-status'] })
     },
   })
 
   const backupRecords = backupQuery.data ?? []
   const lastBackup = backupRecords[0] ?? null
+  const backupStatus = statusQuery.data ?? null
+  const backupStatusOk = backupStatus?.ok ?? false
 
   const handleExport = (type: BackupType) => {
     exportMutation.mutate(type)
@@ -116,14 +139,87 @@ export default function Backup() {
           </div>
           <button
             type="button"
-            onClick={() => queryClient.invalidateQueries({ queryKey: ['backups'] })}
-            disabled={backupQuery.isFetching}
+            onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ['backups'] })
+              queryClient.invalidateQueries({ queryKey: ['backup-status'] })
+            }}
+            disabled={backupQuery.isFetching || statusQuery.isFetching}
             className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <RefreshCw className={['h-4 w-4', backupQuery.isFetching && 'animate-spin'].join(' ')} />
+            <RefreshCw className={['h-4 w-4', (backupQuery.isFetching || statusQuery.isFetching) && 'animate-spin'].join(' ')} />
             Refresh
           </button>
         </div>
+
+        <div className="mb-6 grid gap-4 lg:grid-cols-3">
+          <div className={['rounded-lg border p-4 shadow-sm', backupStatusOk ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'].join(' ')}>
+            <div className="flex items-start gap-3">
+              {backupStatusOk ? (
+                <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
+              ) : (
+                <AlertCircle className="h-5 w-5 shrink-0 text-amber-600" />
+              )}
+              <div>
+                <h2 className={['text-sm font-semibold', backupStatusOk ? 'text-emerald-950' : 'text-amber-950'].join(' ')}>
+                  Scheduled Backup
+                </h2>
+                <p className={['mt-1 text-sm', backupStatusOk ? 'text-emerald-800' : 'text-amber-800'].join(' ')}>
+                  {backupStatus?.worker.message ?? 'Loading backup worker status...'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-slate-100">
+                <Server className="h-5 w-5 text-slate-700" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-slate-950">Backup Storage</h2>
+                <p className="mt-0.5 text-xs text-slate-600">
+                  {backupStatus?.storage.message ?? 'Checking backup folder and dump tools...'}
+                </p>
+              </div>
+            </div>
+            {backupStatus?.storage.details && (
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                <span>pg_dump: <strong className="text-slate-950">{backupStatus.storage.details.pgDumpAvailable ? 'ready' : 'missing'}</strong></span>
+                <span>Docker: <strong className="text-slate-950">{backupStatus.storage.details.dockerAvailable ? 'ready' : 'missing'}</strong></span>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-slate-950">Latest Automatic Run</h2>
+            <dl className="mt-3 space-y-2 text-xs text-slate-600">
+              <div className="flex justify-between gap-3">
+                <dt>Interval</dt>
+                <dd className="font-medium text-slate-950">{backupStatus ? formatInterval(backupStatus.worker.intervalMs) : '...'}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt>Last run</dt>
+                <dd className="text-right font-medium text-slate-950">{formatDate(backupStatus?.worker.lastRunAt)}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt>Last success</dt>
+                <dd className="text-right font-medium text-slate-950">{formatDate(backupStatus?.storage.details.lastSuccessfulBackupAt)}</dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+
+        {backupStatus?.storage.details.lastFailureMessage && (
+          <div className="mb-6 rounded-lg border border-rose-200 bg-rose-50 p-4">
+            <div className="flex items-start gap-3">
+              <XCircle className="h-5 w-5 shrink-0 text-rose-600" />
+              <div>
+                <h3 className="text-sm font-semibold text-rose-900">Last backup failure</h3>
+                <p className="mt-1 text-sm text-rose-700">{backupStatus.storage.details.lastFailureMessage}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -287,8 +383,8 @@ export default function Backup() {
             <FileText className="h-5 w-5 shrink-0 text-blue-600" />
             <div>
               <h3 className="text-sm font-semibold text-blue-900">Restore Procedure</h3>
-              <p className="mt-1 text-sm text-blue-700">
-                Restore from backup is document-only for MVP. For production use:
+            <p className="mt-1 text-sm text-blue-700">
+                Restore is handled from the server runbook so live data is not overwritten by accident:
               </p>
               <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-blue-700">
                 <li>Stop backend services</li>

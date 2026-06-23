@@ -1652,7 +1652,7 @@ See **[Backend Integration Requirements](backend-integration.md)** for detailed 
 2. Tighten server-side authorization for user contact read/create endpoints
 3. Add reminders once backend schedule/reminder endpoints are ready
 4. Add approval queue once backend approval endpoints exist
-5. Consider scheduled backup automation via BullMQ after mobile MVP is moving
+5. Keep restore verification manual until backup restore has been tested safely away from live data
 
 ### Related Documentation
 

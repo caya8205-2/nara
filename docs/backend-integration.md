@@ -395,7 +395,7 @@ GET /api/logs
 
 **Screen:** `/backup` (`apps/web-admin/src/pages/Backup.tsx`)
 
-**Status:** Implemented for MVP with local backup history and export files.
+**Status:** Implemented for MVP with local backup history, export files, readiness checks, and scheduled backup execution.
 
 ### Required Endpoints
 
@@ -421,7 +421,8 @@ POST /api/backup
 ```
 
 **Implementation:**
-- Create a full JSON snapshot with redacted config and report manifest
+- Create a full JSON snapshot with redacted config, report manifest, and a companion PostgreSQL dump
+- Record the backup as failed if the PostgreSQL dump cannot be created
 - Store backup history in `BACKUP_DIR/history.json`
 - Audit backup success/failure to `audit_logs`
 
@@ -446,7 +447,7 @@ POST /api/backup/export
 - `database`: PostgreSQL dump file through host `pg_dump` or Docker container `pg_dump`
 - `reports`: JSON manifest of report files
 - `config`: JSON file with redacted environment variables
-- `full`: JSON snapshot with config and reports manifest
+- `full`: JSON snapshot with config, reports manifest, and a companion PostgreSQL dump
 
 #### 3. List Backup History
 
@@ -502,11 +503,35 @@ GET /api/backup/history
 - Configure reports directory path via environment variable: `REPORTS_DIR`
 - Configure Docker PostgreSQL container via `POSTGRES_CONTAINER_NAME` when using Docker Desktop
 - Keep the latest 50 backup history records
-- Future hardening can move metadata into PostgreSQL and add scheduled backups via BullMQ
+- Future hardening can move metadata into PostgreSQL and add a guided restore flow after manual restore checks are reliable
 
 **Authentication:**
 - Requires operator JWT token
 - All backup operations should be audit-logged
+
+#### 4. Backup Status
+
+```
+GET /api/backup/status
+```
+
+Returns backup storage readiness and scheduled worker runtime state for the web admin Backup page.
+
+**Implementation:**
+- Verifies `BACKUP_DIR` is writable
+- Checks whether host `pg_dump` or Docker fallback is available
+- Reports the latest backup, latest successful backup, and latest failure message from `history.json`
+- Reports BullMQ backup worker state, including disabled, missing Redis, startup error, last run, and interval
+
+Scheduled full backups run when:
+
+```env
+BACKUP_WORKER_ENABLED=true
+BACKUP_WORKER_INTERVAL_MS=86400000
+REDIS_URL=redis://localhost:6379
+```
+
+The worker uses the existing Redis/BullMQ setup and records success/failure through the same backup history and audit log path as manual backups.
 
 ---
 
@@ -663,11 +688,9 @@ Before marking backend integration complete:
 
 ## Next Steps for Implementation
 
-1. **Install or document pg_dump availability** on the office server PC
-2. **Add scheduled backups** via BullMQ or a local scheduler
-3. **Add backup restore verification** as a manual admin checklist
-4. **Move backup metadata to PostgreSQL** if file-based history becomes limiting
-5. **Add cursor pagination** for logs once audit volume grows
+1. **Run restore verification** on a non-live database before enabling any guided restore flow
+2. **Move backup metadata to PostgreSQL** if file-based history becomes limiting
+3. **Add cursor pagination** for logs once audit volume grows
 
 ---
 
