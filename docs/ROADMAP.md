@@ -14,6 +14,37 @@ This file combines the current planning, architecture, ADR, deployment, and desi
 - Agent-triggered reminder mutations are written to audit logs.
 - Redis/BullMQ reminder delivery, OpenClaw WhatsApp reminder delivery, approval execution, and scheduled report generation are implemented for the MVP; local/push notification delivery remains a future milestone.
 
+## Next Handoff Plan
+
+Date: 2026-06-23
+
+Continue from commit `f2d73a6e` after pulling on the server PC.
+
+Immediate server checklist:
+
+1. Run `npm run db:migrate` because `0011_agent_groups.sql` adds group-context tables.
+2. Restart the backend service.
+3. Run `npm run agent:smoke:group -- --cleanup` to verify group context tools without live WhatsApp group traffic.
+4. Re-run `npm run openclaw:nara:sync` so the OpenClaw-side Nara Bot contract sees the new group tools and updated prompt.
+
+Next product milestone:
+
+1. Wire real OpenClaw WhatsApp group events into Nara group tools.
+   - Confirm what payload OpenClaw exposes for group messages: sender phone, group id/JID, group name, message body, timestamp.
+   - Ensure the agent calls `get_user_context` first for the sender and `get_group_context` for the group.
+   - Feed real provided messages into `record_group_messages`; do not scrape or invent transcript content inside Nara.
+2. Add automated group digest execution.
+   - Use `agent_groups.summaryEnabled`, `summaryCronExpr`, `summaryTimezone`, and `digestTarget`.
+   - Process due group digest schedules with the existing Redis/BullMQ pattern.
+   - Generate summaries from stored `agent_group_messages` and save them through `agent_group_summaries`.
+   - Deliver digest through OpenClaw WhatsApp when the dedicated Nara Bot number is available; until then, expose status in admin/logs.
+
+Skip for now:
+
+- Dedicated WhatsApp number setup remains blocked by SIM availability.
+- Internal pitch/deck work is intentionally skipped.
+- Tauri remains last priority.
+
 ---
 
 Source: docs/architecture.md

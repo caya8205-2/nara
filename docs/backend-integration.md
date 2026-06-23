@@ -165,6 +165,54 @@ npm run agent:smoke:group -- --cleanup
 
 Current limitation: the backend stores group digest schedules (`summaryEnabled`, `summaryCronExpr`, `summaryTimezone`, `digestTarget`), but there is not yet a dedicated group-summary worker that fetches new WhatsApp group messages by itself. The next OpenClaw milestone is wiring real group message events into these tools and then adding automated scheduled digest delivery.
 
+#### Next Group Digest Plan
+
+Continue from commit `f2d73a6e`.
+
+Server verification after pull:
+
+```powershell
+npm run db:migrate
+npm run server:restart
+npm run agent:smoke:group -- --cleanup
+npm run openclaw:nara:sync
+```
+
+Implementation order:
+
+1. **Inspect OpenClaw WhatsApp group event shape**
+   - Find whether OpenClaw exposes group id/JID, group subject, sender phone, sender display name, body text, and timestamp.
+   - Keep any raw runtime payload in tool metadata only when useful for debugging.
+   - Do not add a direct OpenClaw dependency inside unrelated app services; keep the boundary in agent/openclaw adapter code.
+
+2. **Add group message ingestion path**
+   - Map each real group message event to `record_group_messages`.
+   - Require `get_user_context` for the sender before any group mutation.
+   - Require `get_group_context` before recording or summarizing group messages.
+   - Skip messages when the sender cannot be resolved or is not allowed for Nara Bot.
+
+3. **Add group summary worker**
+   - Follow the existing reminder/report worker pattern with Redis/BullMQ.
+   - Suggested env names:
+     - `GROUP_SUMMARY_WORKER_ENABLED=true`
+     - `GROUP_SUMMARY_WORKER_INTERVAL_MS=300000`
+   - Find groups where `summaryEnabled=true` and the next digest is due.
+   - Build a digest from stored `agent_group_messages` since the last summary or within the requested period.
+   - Save output to `agent_group_summaries`.
+   - Record `lastSummaryAt` and an actionable failure message/status if generation or delivery fails.
+
+4. **Delivery/status**
+   - If WhatsApp delivery is unavailable, keep the saved summary and expose status in admin/logs.
+   - Once the dedicated Nara Bot number exists, send the digest to `digestTarget=group` through OpenClaw WhatsApp.
+   - Avoid user-facing dev copy; admin/debug surfaces may mention OpenClaw.
+
+Non-goals for the next pass:
+
+- Do not build Tauri.
+- Do not create a public dashboard for group summaries yet.
+- Do not implement destructive restore or broad admin redesign.
+- Do not claim automated group summaries are live until real OpenClaw group events are verified on the server PC.
+
 ### Reminder Execution
 
 **Status:** Implemented for backend-side due detection, BullMQ scheduling, and OpenClaw WhatsApp delivery attempts.
