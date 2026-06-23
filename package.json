@@ -16,6 +16,7 @@
     "server:stop": "powershell -ExecutionPolicy Bypass -File ./ops/windows/manage-nara-services.ps1 -Action stop",
     "server:restart": "powershell -ExecutionPolicy Bypass -File ./ops/windows/manage-nara-services.ps1 -Action restart",
     "server:logs": "powershell -ExecutionPolicy Bypass -File ./ops/windows/manage-nara-services.ps1 -Action logs",
+    "backup:verify-restore": "powershell -ExecutionPolicy Bypass -File ./ops/windows/verify-backup-restore.ps1",
     "openclaw:nara:validate": "powershell -ExecutionPolicy Bypass -File ./ops/windows/sync-openclaw-nara-bot.ps1 -Action validate",
     "openclaw:nara:sync": "powershell -ExecutionPolicy Bypass -File ./ops/windows/sync-openclaw-nara-bot.ps1 -Action sync",
     "openclaw:nara:export": "powershell -ExecutionPolicy Bypass -File ./ops/windows/sync-openclaw-nara-bot.ps1 -Action export",

@@ -399,6 +399,13 @@ BACKUP_WORKER_INTERVAL_MS=86400000
 
 The web admin Backup page and `/api/readiness` report whether the backup folder is writable, whether host `pg_dump` or Docker fallback is available, and whether the scheduled backup worker is running. Full backups require the database dump to succeed before recording success.
 
+Verify a backup restore against a throwaway PostgreSQL database before trusting a backup for recovery:
+
+```powershell
+npm run backup:verify-restore
+npm run backup:verify-restore -- -Execute -ResetCheckDatabase
+```
+
 Test the agent tool endpoints without WhatsApp:
 
 ```powershell

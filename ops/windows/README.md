@@ -215,11 +215,13 @@ The same status is included in `/api/readiness` as `backup` and `backupWorker`.
 Restore remains manual. Verify any restore on a throwaway database first:
 
 ```powershell
-createdb nara_restore_check
-psql "postgresql://nara:password@localhost:5432/nara_restore_check" -f .\data\backups\database-YYYY-MM-DDTHH-MM-SS.sql
+npm run backup:verify-restore
+npm run backup:verify-restore -- -Execute -ResetCheckDatabase
 ```
 
-Do not restore into the live database until backend services are stopped, the target database is confirmed, and the latest successful backup file has been checked.
+The first command is a dry run. The second command creates or resets only the `nara_restore_check` database, restores the latest `full-*.json` or `database-*.sql` backup into it, and verifies that public tables exist. Pass `-BackupPath .\data\backups\database-YYYY-MM-DDTHH-MM-SS.sql` to verify a specific dump.
+
+Do not restore into the live database until backend services are stopped, the target database is confirmed, and the latest successful backup file has passed this throwaway restore check.
 
 ## WhatsApp Readiness
 

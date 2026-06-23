@@ -533,6 +533,17 @@ REDIS_URL=redis://localhost:6379
 
 The worker uses the existing Redis/BullMQ setup and records success/failure through the same backup history and audit log path as manual backups.
 
+#### 5. Restore Verification Helper
+
+Restore remains manual and non-destructive by default. Use the Windows helper to verify the latest backup against a throwaway database:
+
+```powershell
+npm run backup:verify-restore
+npm run backup:verify-restore -- -Execute -ResetCheckDatabase
+```
+
+The helper resolves the latest `full-*.json` or `database-*.sql` backup, refuses to target the live `DATABASE_URL` database, restores into `nara_restore_check`, and verifies that public tables exist. Pass `-BackupPath` to check a specific dump.
+
 ---
 
 ## WhatsApp Access Enhancement
@@ -688,9 +699,8 @@ Before marking backend integration complete:
 
 ## Next Steps for Implementation
 
-1. **Run restore verification** on a non-live database before enabling any guided restore flow
-2. **Move backup metadata to PostgreSQL** if file-based history becomes limiting
-3. **Add cursor pagination** for logs once audit volume grows
+1. **Move backup metadata to PostgreSQL** if file-based history becomes limiting
+2. **Add cursor pagination** for logs once audit volume grows
 
 ---
 
