@@ -29,6 +29,7 @@ type Reminder = {
 const backendUrl = process.env.NARA_BACKEND_URL ?? `http://127.0.0.1:${env.PORT}`
 const cleanup = process.argv.includes('--cleanup')
 const approvalFlow = process.argv.includes('--approval-flow')
+const groupFlow = process.argv.includes('--group-flow')
 
 const argValue = (name: string) => {
   const prefix = `${name}=`
@@ -170,6 +171,50 @@ async function main() {
         ? `Approval rejected: ${approvalResponse.approval.id}`
         : `Approval left pending: ${approvalResponse.approval.id}`)
     }
+  }
+
+  if (groupFlow) {
+    const groupExternalId = `agent-smoke-group-${Date.now()}@g.us`
+    const groupContext = await callTool<{
+      group: { id: string; externalId: string; name: string }
+      toolContext: { groupId: string; groupExternalId: string }
+    }>('/groups/context', {
+      ...context,
+      groupExternalId,
+      groupName: 'Agent Smoke Group',
+    })
+    console.log(`Group resolved: ${groupContext.group.id}`)
+
+    const recorded = await callTool<{ recorded: number }>('/groups/messages/record', {
+      ...context,
+      groupExternalId,
+      groupName: 'Agent Smoke Group',
+      messages: [
+        {
+          senderDisplayName: 'Ari',
+          body: 'Besok jam 9 follow up supplier bahan.',
+          occurredAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+        },
+        {
+          senderDisplayName: 'Bima',
+          body: 'Invoice revisi sudah dikirim, tinggal tunggu konfirmasi.',
+          occurredAt: new Date().toISOString(),
+        },
+      ],
+    })
+    if (recorded.recorded !== 2) throw new Error('Expected two group messages to be recorded')
+    console.log(`Group messages recorded: ${recorded.recorded}`)
+
+    const savedSummary = await callTool<{ summary: { id: string; messageCount: number } }>('/groups/summary/save', {
+      ...context,
+      groupExternalId,
+      groupName: 'Agent Smoke Group',
+      title: 'Agent smoke group summary',
+      summary: 'Supplier perlu difollow-up besok jam 9. Invoice revisi sudah dikirim dan menunggu konfirmasi.',
+      messageCount: 2,
+    })
+    if (savedSummary.summary.messageCount !== 2) throw new Error('Group summary message count mismatch')
+    console.log(`Group summary saved: ${savedSummary.summary.id}`)
   }
 
   const created = await callTool<{ task: Task; message: string }>('/tasks/create', {

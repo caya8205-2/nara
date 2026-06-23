@@ -4,6 +4,7 @@ import { env } from '../config/env.js'
 import { identityService, type AgentChannelType } from '../services/identity.service.js'
 import { approvalService, type ApprovalActionType, type ApprovalPayload } from '../services/approval.service.js'
 import { contextService } from '../services/context.service.js'
+import { groupContextService } from '../services/group-context.service.js'
 import { reminderService, type ReminderKind } from '../services/reminder.service.js'
 import { taskService, type TaskPriority } from '../services/task.service.js'
 
@@ -21,6 +22,13 @@ const AgentSubjectSchema = z.object({
   userId: z.string().uuid().optional(),
   channelType: z.enum(['whatsapp', 'telegram']).default('whatsapp'),
   contactValue: z.string().min(1).optional(),
+})
+
+const AgentGroupSchema = z.object({
+  groupExternalId: z.string().trim().min(1),
+  groupName: z.string().trim().min(1).optional(),
+  groupDescription: z.string().trim().nullable().optional(),
+  groupChannelType: z.enum(['whatsapp', 'telegram']).default('whatsapp'),
 })
 
 const TaskPrioritySchema = z.enum(['low', 'normal', 'high', 'urgent'])
@@ -216,7 +224,193 @@ const plugin: FastifyPluginAsync = async (app) => {
           contactValue: req.body && typeof req.body === 'object'
             ? (req.body as { contactValue?: unknown }).contactValue ?? null
             : null,
+          naraToolContractVersion: '2026-06-23',
+          resolvedBy: 'get_user_context',
         },
+      })
+    } catch (e: unknown) {
+      return reply.status(400).send(fail(e instanceof Error ? e.message : String(e)))
+    }
+  })
+
+  // Tool: get_group_context
+  app.post('/groups/context', async (req, reply) => {
+    try {
+      const body = AgentSubjectSchema.merge(AgentGroupSchema).parse(req.body ?? {})
+      const subject = await resolveSubject(body, reply)
+      if (!subject) return
+
+      const context = await groupContextService.getContext({
+        channelType: body.groupChannelType,
+        externalId: body.groupExternalId,
+        name: body.groupName,
+        description: body.groupDescription,
+        metadata: {
+          resolvedFrom: 'agent_tool',
+          requesterUserId: subject.userId,
+        },
+      }, { type: 'agent', id: subject.userId })
+
+      await groupContextService.addMember(
+        context.group.id,
+        subject.userId,
+        'member',
+        { type: 'agent', id: subject.userId },
+      )
+
+      return ok({
+        ...context,
+        requester: {
+          userId: subject.userId,
+          contact: subject.contact ?? null,
+          channelType: subject.channelType,
+        },
+      })
+    } catch (e: unknown) {
+      return reply.status(400).send(fail(e instanceof Error ? e.message : String(e)))
+    }
+  })
+
+  // Tool: record_group_messages
+  app.post('/groups/messages/record', async (req, reply) => {
+    try {
+      const body = AgentSubjectSchema.merge(AgentGroupSchema).extend({
+        messages: z.array(z.object({
+          senderContactValue: z.string().trim().nullable().optional(),
+          senderDisplayName: z.string().trim().nullable().optional(),
+          body: z.string().trim().min(1),
+          occurredAt: z.string().datetime().optional(),
+          metadata: z.record(z.unknown()).nullable().optional(),
+        })).min(1).max(100),
+      }).parse(req.body ?? {})
+      const subject = await resolveSubject(body, reply)
+      if (!subject) return
+
+      const context = await groupContextService.getContext({
+        channelType: body.groupChannelType,
+        externalId: body.groupExternalId,
+        name: body.groupName,
+        description: body.groupDescription,
+      }, { type: 'agent', id: subject.userId })
+
+      await groupContextService.addMember(context.group.id, subject.userId, 'member', {
+        type: 'agent',
+        id: subject.userId,
+      })
+
+      const result = await groupContextService.recordMessages(
+        context.group.id,
+        body.messages.map((message) => ({
+          senderContactValue: message.senderContactValue,
+          senderDisplayName: message.senderDisplayName,
+          body: message.body,
+          occurredAt: message.occurredAt ? new Date(message.occurredAt) : null,
+          metadata: message.metadata ?? null,
+        })),
+        { type: 'agent', id: subject.userId },
+      )
+
+      return ok({
+        group: context.group,
+        ...result,
+      })
+    } catch (e: unknown) {
+      return reply.status(400).send(fail(e instanceof Error ? e.message : String(e)))
+    }
+  })
+
+  // Tool: configure_group_summary
+  app.post('/groups/summary/configure', async (req, reply) => {
+    try {
+      const body = AgentSubjectSchema.merge(AgentGroupSchema).extend({
+        summaryEnabled: z.boolean().optional(),
+        summaryCronExpr: z.string().trim().nullable().optional(),
+        summaryTimezone: z.string().trim().min(1).default('Asia/Jakarta'),
+        digestTarget: z.enum(['group', 'owner', 'admin']).default('group'),
+        confirmed: z.boolean().optional(),
+      }).parse(req.body ?? {})
+      const subject = await resolveSubject(body, reply)
+      if (!subject) return
+
+      const profile = await identityService.getAssistantProfile(subject.userId)
+      if (shouldRequireConfirmation(profile.autonomy) && body.confirmed !== true) {
+        return reply.status(202).send(await requestApproval({
+          subject,
+          title: `Configure group summary: ${body.groupName ?? body.groupExternalId}`,
+          actionType: 'configure_group_summary',
+          payload: {
+            actionType: 'configure_group_summary',
+            input: {
+              groupExternalId: body.groupExternalId,
+              groupName: body.groupName,
+              groupChannelType: body.groupChannelType,
+              summaryEnabled: body.summaryEnabled,
+              summaryCronExpr: body.summaryCronExpr,
+              summaryTimezone: body.summaryTimezone,
+              digestTarget: body.digestTarget,
+            },
+          } as ApprovalPayload,
+          riskLevel: 'medium',
+        }))
+      }
+
+      const context = await groupContextService.getContext({
+        channelType: body.groupChannelType,
+        externalId: body.groupExternalId,
+        name: body.groupName,
+        description: body.groupDescription,
+      }, { type: 'agent', id: subject.userId })
+      const group = await groupContextService.configureSummary(context.group.id, {
+        summaryEnabled: body.summaryEnabled,
+        summaryCronExpr: body.summaryCronExpr,
+        summaryTimezone: body.summaryTimezone,
+        digestTarget: body.digestTarget,
+      }, { type: 'agent', id: subject.userId })
+
+      if (!group) return reply.status(404).send(fail('Group not found'))
+      return ok({
+        group,
+        message: 'Group summary settings saved in Nara.',
+      })
+    } catch (e: unknown) {
+      return reply.status(400).send(fail(e instanceof Error ? e.message : String(e)))
+    }
+  })
+
+  // Tool: save_group_summary
+  app.post('/groups/summary/save', async (req, reply) => {
+    try {
+      const body = AgentSubjectSchema.merge(AgentGroupSchema).extend({
+        title: z.string().trim().min(1),
+        summary: z.string().trim().min(1),
+        periodStart: z.string().datetime().nullable().optional(),
+        periodEnd: z.string().datetime().nullable().optional(),
+        messageCount: z.number().int().nonnegative().optional(),
+        metadata: z.record(z.unknown()).nullable().optional(),
+      }).parse(req.body ?? {})
+      const subject = await resolveSubject(body, reply)
+      if (!subject) return
+
+      const context = await groupContextService.getContext({
+        channelType: body.groupChannelType,
+        externalId: body.groupExternalId,
+        name: body.groupName,
+        description: body.groupDescription,
+      }, { type: 'agent', id: subject.userId })
+
+      const summary = await groupContextService.saveSummary(context.group.id, {
+        title: body.title,
+        summary: body.summary,
+        periodStart: body.periodStart ? new Date(body.periodStart) : null,
+        periodEnd: body.periodEnd ? new Date(body.periodEnd) : null,
+        messageCount: body.messageCount,
+        metadata: body.metadata ?? null,
+      }, { type: 'agent', id: subject.userId })
+
+      return ok({
+        group: context.group,
+        summary,
+        message: 'Group summary saved in Nara.',
       })
     } catch (e: unknown) {
       return reply.status(400).send(fail(e instanceof Error ? e.message : String(e)))

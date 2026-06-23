@@ -1,4 +1,4 @@
-import { boolean, index, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
+import { boolean, index, integer, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 
 export const userRole = pgEnum('user_role', ['admin', 'user'])
 
@@ -287,5 +287,85 @@ export const contextEntries = pgTable(
     userCreated: index('context_entries_user_created_idx').on(table.userId, table.createdAt),
     clientCreated: index('context_entries_client_created_idx').on(table.clientId, table.createdAt),
     kind: index('context_entries_kind_idx').on(table.kind),
+  }),
+)
+
+export const agentGroups = pgTable(
+  'agent_groups',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    channelType: agentChannelType('channel_type').default('whatsapp').notNull(),
+    externalId: text('external_id').notNull(),
+    name: text('name').notNull(),
+    description: text('description'),
+    status: text('status').default('active').notNull(),
+    summaryEnabled: boolean('summary_enabled').default(false).notNull(),
+    summaryCronExpr: text('summary_cron_expr'),
+    summaryTimezone: text('summary_timezone').default('Asia/Jakarta').notNull(),
+    digestTarget: text('digest_target').default('group').notNull(),
+    lastMessageAt: timestamp('last_message_at'),
+    lastSummaryAt: timestamp('last_summary_at'),
+    metadata: text('metadata'),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => ({
+    channelExternalUnique: uniqueIndex('agent_groups_channel_external_unique')
+      .on(table.channelType, table.externalId),
+    statusUpdated: index('agent_groups_status_updated_idx').on(table.status, table.updatedAt),
+  }),
+)
+
+export const agentGroupMembers = pgTable(
+  'agent_group_members',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    groupId: uuid('group_id').references(() => agentGroups.id).notNull(),
+    userId: uuid('user_id').references(() => users.id).notNull(),
+    role: text('role').default('member').notNull(),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => ({
+    groupUserUnique: uniqueIndex('agent_group_members_group_user_unique').on(table.groupId, table.userId),
+    groupCreated: index('agent_group_members_group_created_idx').on(table.groupId, table.createdAt),
+  }),
+)
+
+export const agentGroupMessages = pgTable(
+  'agent_group_messages',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    groupId: uuid('group_id').references(() => agentGroups.id).notNull(),
+    senderContactValue: text('sender_contact_value'),
+    senderDisplayName: text('sender_display_name'),
+    body: text('body').notNull(),
+    occurredAt: timestamp('occurred_at').defaultNow(),
+    metadata: text('metadata'),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (table) => ({
+    groupOccurred: index('agent_group_messages_group_occurred_idx').on(table.groupId, table.occurredAt),
+  }),
+)
+
+export const agentGroupSummaries = pgTable(
+  'agent_group_summaries',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    groupId: uuid('group_id').references(() => agentGroups.id).notNull(),
+    title: text('title').notNull(),
+    summary: text('summary').notNull(),
+    periodStart: timestamp('period_start'),
+    periodEnd: timestamp('period_end'),
+    messageCount: integer('message_count').default(0).notNull(),
+    source: text('source').default('agent').notNull(),
+    metadata: text('metadata'),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => ({
+    groupCreated: index('agent_group_summaries_group_created_idx').on(table.groupId, table.createdAt),
+    period: index('agent_group_summaries_period_idx').on(table.periodStart, table.periodEnd),
   }),
 )

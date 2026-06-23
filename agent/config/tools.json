@@ -169,6 +169,87 @@
         "channelType": "whatsapp | telegram (optional, defaults to whatsapp)",
         "contactValue": "sender contact value (optional when userId is provided)"
       }
+    },
+    {
+      "name": "get_group_context",
+      "endpoint": "/api/agent/groups/context",
+      "method": "POST",
+      "description": "Nara backend tool. Resolve a WhatsApp group into Nara group context, recent messages, recent summaries, digest settings, and group-specific instructions. Use after get_user_context for group conversations.",
+      "headers": {
+        "x-agent-secret": "AGENT_API_SECRET"
+      },
+      "parameters": {
+        "userId": "UUID string (optional when contactValue is provided)",
+        "channelType": "whatsapp | telegram (optional, defaults to whatsapp)",
+        "contactValue": "sender contact value (optional when userId is provided)",
+        "groupChannelType": "whatsapp | telegram (optional, defaults to whatsapp)",
+        "groupExternalId": "WhatsApp group id/JID from the runtime (required)",
+        "groupName": "group subject/name (optional)",
+        "groupDescription": "string or null (optional)"
+      }
+    },
+    {
+      "name": "record_group_messages",
+      "endpoint": "/api/agent/groups/messages/record",
+      "method": "POST",
+      "description": "Nara backend tool. Store real group transcript messages provided by the WhatsApp runtime. Do not invent messages.",
+      "headers": {
+        "x-agent-secret": "AGENT_API_SECRET"
+      },
+      "parameters": {
+        "userId": "UUID string (optional when contactValue is provided)",
+        "channelType": "whatsapp | telegram (optional, defaults to whatsapp)",
+        "contactValue": "sender contact value (optional when userId is provided)",
+        "groupChannelType": "whatsapp | telegram (optional, defaults to whatsapp)",
+        "groupExternalId": "WhatsApp group id/JID from the runtime (required)",
+        "groupName": "group subject/name (optional)",
+        "messages": "array of { senderContactValue?, senderDisplayName?, body, occurredAt?, metadata? }"
+      }
+    },
+    {
+      "name": "configure_group_summary",
+      "endpoint": "/api/agent/groups/summary/configure",
+      "method": "POST",
+      "description": "Nara backend tool. Enable or change group summary preferences. Respect assistantProfile.autonomy and include confirmed=true only after confirmation when required.",
+      "headers": {
+        "x-agent-secret": "AGENT_API_SECRET"
+      },
+      "parameters": {
+        "userId": "UUID string (optional when contactValue is provided)",
+        "channelType": "whatsapp | telegram (optional, defaults to whatsapp)",
+        "contactValue": "sender contact value (optional when userId is provided)",
+        "groupChannelType": "whatsapp | telegram (optional, defaults to whatsapp)",
+        "groupExternalId": "WhatsApp group id/JID from the runtime (required)",
+        "groupName": "group subject/name (optional)",
+        "summaryEnabled": "boolean (optional)",
+        "summaryCronExpr": "cron expression string or null (optional)",
+        "summaryTimezone": "IANA timezone string (optional, defaults to Asia/Jakarta)",
+        "digestTarget": "group | owner | admin (optional, defaults to group)",
+        "confirmed": "boolean (required when user autonomy requires confirmation)"
+      }
+    },
+    {
+      "name": "save_group_summary",
+      "endpoint": "/api/agent/groups/summary/save",
+      "method": "POST",
+      "description": "Nara backend tool. Save a concise group digest generated from real group messages provided by the WhatsApp runtime.",
+      "headers": {
+        "x-agent-secret": "AGENT_API_SECRET"
+      },
+      "parameters": {
+        "userId": "UUID string (optional when contactValue is provided)",
+        "channelType": "whatsapp | telegram (optional, defaults to whatsapp)",
+        "contactValue": "sender contact value (optional when userId is provided)",
+        "groupChannelType": "whatsapp | telegram (optional, defaults to whatsapp)",
+        "groupExternalId": "WhatsApp group id/JID from the runtime (required)",
+        "groupName": "group subject/name (optional)",
+        "title": "string (required)",
+        "summary": "string (required)",
+        "periodStart": "ISO 8601 datetime string or null (optional)",
+        "periodEnd": "ISO 8601 datetime string or null (optional)",
+        "messageCount": "number (optional)",
+        "metadata": "object (optional)"
+      }
     }
   ]
 }

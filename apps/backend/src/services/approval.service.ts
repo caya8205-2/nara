@@ -1,6 +1,7 @@
 import { and, desc, eq, isNull } from 'drizzle-orm'
 import { db } from '../db/index.js'
 import { approvalRequests, auditLogs } from '../db/schema.js'
+import { groupContextService } from './group-context.service.js'
 import { reminderService, type ReminderActor, type ReminderKind } from './reminder.service.js'
 import { taskService, type TaskPriority } from './task.service.js'
 
@@ -32,6 +33,7 @@ export type ApprovalActionType =
   | 'create_reminder'
   | 'update_reminder'
   | 'delete_reminder'
+  | 'configure_group_summary'
 
 export type ApprovalPayload =
   | {
@@ -77,6 +79,18 @@ export type ApprovalPayload =
   | {
       actionType: 'delete_reminder'
       input: { id: string }
+    }
+  | {
+      actionType: 'configure_group_summary'
+      input: {
+        groupExternalId: string
+        groupName?: string
+        groupChannelType?: 'whatsapp' | 'telegram'
+        summaryEnabled?: boolean
+        summaryCronExpr?: string | null
+        summaryTimezone?: string
+        digestTarget?: string
+      }
     }
 
 type ApprovalRow = typeof approvalRequests.$inferSelect
@@ -270,6 +284,21 @@ export class ApprovalService {
         const reminder = await reminderService.delete(payload.input.id, access, actor)
         if (!reminder) throw new Error('Reminder not found')
         return { reminderId: reminder.id, name: reminder.name }
+      }
+      case 'configure_group_summary': {
+        const context = await groupContextService.getContext({
+          channelType: payload.input.groupChannelType ?? 'whatsapp',
+          externalId: payload.input.groupExternalId,
+          name: payload.input.groupName,
+        }, actor)
+        const group = await groupContextService.configureSummary(context.group.id, {
+          summaryEnabled: payload.input.summaryEnabled,
+          summaryCronExpr: payload.input.summaryCronExpr,
+          summaryTimezone: payload.input.summaryTimezone,
+          digestTarget: payload.input.digestTarget,
+        }, actor)
+        if (!group) throw new Error('Group not found')
+        return { group }
       }
     }
   }

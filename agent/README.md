@@ -17,7 +17,9 @@ The WhatsApp agent must follow these rules:
 - The first tool call in each WhatsApp conversation is `get_user_context`.
 - WhatsApp sender phone number is passed as `contactValue` with `channelType: "whatsapp"`.
 - Later tool calls reuse the returned `toolContext`.
+- Group conversations call `get_group_context` after `get_user_context`, then reuse the returned group context.
 - Task, reminder, approval, profile, and context state is read or changed only through Nara backend tools.
+- Group transcript and summary state is read or changed only through Nara backend group tools.
 - OpenClaw internal task/project/sub-agent behavior is disabled for normal user requests.
 - If a Nara backend tool is unavailable, the agent tells the user Nara cannot complete the action yet instead of doing the action inside OpenClaw.
 
@@ -69,6 +71,12 @@ Use a user ID for no-WhatsApp local simulation:
 npm run agent:smoke -- --cleanup
 npm run agent:smoke -- --user-id <user-uuid> --cleanup
 npm run agent:smoke:approval -- --cleanup
+```
+
+Smoke-test group context storage and summary saving without a live WhatsApp group:
+
+```powershell
+npm run agent:smoke:group -- --cleanup
 ```
 
 Use the WhatsApp sender number after the mobile app has registered the number and Nara has allowed access:
