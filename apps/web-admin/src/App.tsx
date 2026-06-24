@@ -13,6 +13,7 @@ import Attribution from './pages/Attribution'
 import Tasks from './pages/Tasks'
 import Schedules from './pages/Schedules'
 import Reports from './pages/Reports'
+import GroupDigests from './pages/GroupDigests'
 import Clients from './pages/Clients'
 import Context from './pages/Context'
 
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="/config" element={<Layout><Config /></Layout>} />
           <Route path="/backup" element={<Layout><Backup /></Layout>} />
           <Route path="/reports" element={<Layout><Reports /></Layout>} />
+          <Route path="/group-digests" element={<Layout><GroupDigests /></Layout>} />
           <Route path="/attribution" element={<Layout><Attribution /></Layout>} />
           <Route path="/tasks" element={<Layout><Tasks /></Layout>} />
           <Route path="/schedules" element={<Layout><Schedules /></Layout>} />

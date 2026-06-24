@@ -21,6 +21,7 @@ export type ReadinessReport = {
     redis: DependencyStatus
     backup: DependencyStatus
     backupWorker: DependencyStatus
+    groupSummaryWorker: DependencyStatus
     reminderWorker: DependencyStatus
     openclaw: DependencyStatus
     whatsapp: DependencyStatus
@@ -232,6 +233,80 @@ export type ReportSchedule = {
   lastRunMessage: string | null
   createdAt: string
   updatedAt: string
+}
+
+export type AgentGroupSummary = {
+  id: string
+  groupId: string
+  title: string
+  summary: string
+  periodStart: string | null
+  periodEnd: string | null
+  messageCount: number
+  source: string
+  metadata: unknown | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type AgentGroupMessage = {
+  id: string
+  groupId: string
+  senderContactValue: string | null
+  senderDisplayName: string | null
+  body: string
+  occurredAt: string
+  metadata: unknown | null
+  createdAt: string
+}
+
+export type AgentGroupDigestStatus = {
+  id: string
+  channelType: 'whatsapp' | 'telegram'
+  externalId: string
+  name: string
+  description: string | null
+  status: string
+  summaryEnabled: boolean
+  summaryCronExpr: string | null
+  summaryTimezone: string
+  digestTarget: string
+  lastMessageAt: string | null
+  lastSummaryAt: string | null
+  metadata: unknown | null
+  createdAt: string
+  updatedAt: string
+  messageCount: number
+  nextRunAt: string | null
+  digestDue: boolean
+  latestSummary: AgentGroupSummary | null
+  latestSummaryStatus: string | null
+  latestDeliveryStatus: string | null
+  latestDeliveryMessage: string | null
+  recentMessages: AgentGroupMessage[]
+}
+
+export type GroupDigestStatusResponse = {
+  groups: AgentGroupDigestStatus[]
+  total: number
+  enabled: number
+  due: number
+}
+
+export type ProcessDueGroupDigestsResponse = {
+  checkedAt: string
+  processed: number
+  groups: Array<{
+    groupId: string
+    groupExternalId: string
+    groupName: string
+    status: 'generated' | 'skipped' | 'failed'
+    message: string
+    summaryId: string | null
+    messageCount: number
+    periodStart: string
+    periodEnd: string
+  }>
 }
 
 export type GenerateReportInput = {
@@ -497,6 +572,16 @@ export const updateReportSchedule = async (id: string, input: Partial<CreateRepo
 
 export const processDueReports = async () => {
   const response = await api.post('/reports/process-due', {})
+  return response.data
+}
+
+export const listGroupDigests = async () => {
+  const response = await api.get<GroupDigestStatusResponse>('/group-summaries')
+  return response.data
+}
+
+export const processDueGroupDigests = async () => {
+  const response = await api.post<ProcessDueGroupDigestsResponse>('/group-summaries/process-due', {})
   return response.data
 }
 

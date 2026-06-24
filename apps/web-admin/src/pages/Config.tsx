@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   AlertCircle,
@@ -8,9 +8,21 @@ import {
   Key,
   Server,
   Settings,
+  ShieldCheck,
+  Wifi,
   XCircle,
 } from 'lucide-react'
 import { getReadiness } from '../lib/api'
+import {
+  AdminButton,
+  DependencyBadge,
+  InlineNotice,
+  MetricTile,
+  PageHeader,
+  Panel,
+  PanelHeader,
+  StatusBadge,
+} from '../components/admin-ui'
 
 type ConfigItem = {
   key: string
@@ -22,6 +34,15 @@ type ConfigItem = {
   helpText: string
 }
 
+const categories = [
+  { id: 'backend', label: 'Backend', icon: Server },
+  { id: 'database', label: 'Database', icon: Database },
+  { id: 'redis', label: 'Redis', icon: Wifi },
+  { id: 'openclaw', label: 'OpenClaw', icon: Server },
+  { id: 'agent', label: 'Agent Tools', icon: Key },
+  { id: 'frontend', label: 'Frontend', icon: Settings },
+] as const
+
 export default function Config() {
   const [copied, setCopied] = useState(false)
 
@@ -31,7 +52,6 @@ export default function Config() {
   })
 
   const readiness = readinessQuery.data
-
   const agentSecretPresent = Boolean(localStorage.getItem('agentSecret'))
   const operatorTokenPresent = Boolean(localStorage.getItem('token'))
 
@@ -43,7 +63,7 @@ export default function Config() {
       required: true,
       present: true,
       category: 'backend',
-      helpText: 'Base URL for backend API endpoints',
+      helpText: 'Base URL used by the admin app for API calls.',
     },
     {
       key: 'BACKEND_STATUS',
@@ -52,72 +72,63 @@ export default function Config() {
       required: true,
       present: Boolean(readiness),
       category: 'backend',
-      helpText: 'Backend API is reachable; dependency status is listed below',
+      helpText: 'Backend API reachability and dependency report.',
     },
     {
       key: 'DATABASE_URL',
       label: 'PostgreSQL Connection',
-      value: readiness?.dependencies.database.ok ? 'Configured' : 'Not Available',
+      value: readiness?.dependencies.database.ok ? 'Configured' : 'Not available',
       required: true,
       present: Boolean(readiness?.dependencies.database.ok),
       category: 'database',
-      helpText: 'PostgreSQL database with pgvector extension',
+      helpText: 'Primary database connection for users, records, tasks, and audit data.',
     },
     {
       key: 'REDIS_URL',
       label: 'Redis Connection',
-      value: readiness?.dependencies.redis.ok ? 'Configured' : 'Not Available',
+      value: readiness?.dependencies.redis.ok ? 'Configured' : 'Not available',
       required: true,
       present: Boolean(readiness?.dependencies.redis.ok),
       category: 'redis',
-      helpText: 'Redis for job queues and caching',
+      helpText: 'Redis is used by queues and reminder/group summary workers.',
     },
     {
       key: 'OPENCLAW_API_TOKEN',
       label: 'OpenClaw API Token',
-      value: readiness?.dependencies.openclaw.ok ? 'Configured' : 'Missing',
+      value: readiness?.dependencies.openclaw.ok ? 'Configured' : 'Missing or unreachable',
       required: false,
       present: Boolean(readiness?.dependencies.openclaw.ok),
       category: 'openclaw',
-      helpText: 'Required for agent runtime and WhatsApp integration',
+      helpText: 'Required for agent runtime checks and WhatsApp access sync.',
     },
     {
       key: 'OPENCLAW_GATEWAY',
-      label: 'OpenClaw Gateway URL',
-      value: readiness?.dependencies.openclaw.ok ? 'Reachable' : 'Not Reachable',
+      label: 'OpenClaw Gateway',
+      value: readiness?.dependencies.openclaw.ok ? 'Reachable' : 'Not reachable',
       required: false,
       present: Boolean(readiness?.dependencies.openclaw.ok),
       category: 'openclaw',
-      helpText: 'OpenClaw Gateway endpoint for agent tools',
+      helpText: 'Runtime endpoint used by backend services.',
     },
     {
       key: 'AGENT_API_SECRET',
       label: 'Agent API Secret',
-      value: agentSecretPresent ? 'Present (stored locally)' : 'Not Set',
+      value: agentSecretPresent ? 'Present in browser' : 'Not set',
       required: true,
       present: agentSecretPresent,
       category: 'agent',
-      helpText: 'Secret for agent tool endpoint authentication (stored in browser)',
+      helpText: 'Local browser value used by the Agent Tools page.',
     },
     {
       key: 'OPERATOR_TOKEN',
       label: 'Operator Session',
-      value: operatorTokenPresent ? 'Active' : 'Not Logged In',
+      value: operatorTokenPresent ? 'Active' : 'Not logged in',
       required: true,
       present: operatorTokenPresent,
       category: 'frontend',
-      helpText: 'JWT token for operator authentication',
+      helpText: 'Admin session token for protected backend endpoints.',
     },
   ]
-
-  const categories = [
-    { id: 'backend', label: 'Backend', icon: Server },
-    { id: 'database', label: 'Database', icon: Database },
-    { id: 'redis', label: 'Redis', icon: Settings },
-    { id: 'openclaw', label: 'OpenClaw', icon: Server },
-    { id: 'agent', label: 'Agent Tools', icon: Key },
-    { id: 'frontend', label: 'Frontend', icon: Settings },
-  ] as const
 
   const copyConfig = () => {
     const report = [
@@ -125,9 +136,9 @@ export default function Config() {
       'Generated: ' + new Date().toISOString(),
       '',
       ...configItems.map((item) => {
-        const status = item.present ? '✓' : '✗'
-        const req = item.required ? 'REQUIRED' : 'OPTIONAL'
-        return '[' + status + '] ' + item.label + ' (' + req + '): ' + item.value
+        const status = item.present ? 'OK' : 'MISSING'
+        const requirement = item.required ? 'REQUIRED' : 'OPTIONAL'
+        return `[${status}] ${item.label} (${requirement}): ${item.value}`
       }),
     ].join('\n')
 
@@ -137,126 +148,128 @@ export default function Config() {
   }
 
   const requiredMissing = configItems.filter((item) => item.required && !item.present)
+  const optionalMissing = configItems.filter((item) => !item.required && !item.present)
   const allRequiredPresent = requiredMissing.length === 0
 
   return (
     <main className="min-h-screen bg-stone-50 text-slate-950">
       <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-950">Config</h1>
-            <p className="mt-1 text-sm text-slate-600">
-              Verify environment and connection configuration
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={copyConfig}
-            className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-          >
-            <ClipboardCopy className="h-4 w-4" />
-            {copied ? 'Copied!' : 'Copy Report'}
-          </button>
+        <PageHeader
+          title="Config"
+          description="Verify setup values without exposing secrets, and copy a safe diagnostic report when needed."
+          actions={
+            <AdminButton variant="secondary" onClick={copyConfig}>
+              <ClipboardCopy className="h-4 w-4" />
+              {copied ? 'Copied' : 'Copy Report'}
+            </AdminButton>
+          }
+        />
+
+        <div className="grid gap-4 lg:grid-cols-4">
+          <MetricTile
+            label="Required Config"
+            value={allRequiredPresent ? 'Ready' : requiredMissing.length}
+            description={allRequiredPresent ? 'Required items are present' : 'Required items missing'}
+            icon={allRequiredPresent ? CheckCircle2 : AlertCircle}
+            tone={allRequiredPresent ? 'success' : 'warning'}
+          />
+          <MetricTile
+            label="Backend"
+            value={<DependencyBadge status={readiness?.dependencies.database} />}
+            description={readiness ? 'Readiness report loaded' : 'Waiting for readiness'}
+            icon={Server}
+            tone={readiness?.ok ? 'success' : 'warning'}
+          />
+          <MetricTile
+            label="OpenClaw"
+            value={<DependencyBadge status={readiness?.dependencies.openclaw} />}
+            description={readiness?.dependencies.openclaw.message ?? 'Runtime dependency'}
+            icon={ShieldCheck}
+            tone={readiness?.dependencies.openclaw.ok ? 'success' : 'warning'}
+          />
+          <MetricTile
+            label="Optional Missing"
+            value={optionalMissing.length}
+            description="Optional setup items not ready"
+            icon={Settings}
+            tone={optionalMissing.length > 0 ? 'neutral' : 'success'}
+          />
         </div>
 
-        <div className="mb-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-start gap-3">
-            {allRequiredPresent ? (
-              <>
-                <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-950">All Required Config Present</h3>
-                  <p className="mt-1 text-sm text-slate-600">
-                    Required configuration items are available. Optional items may be configured later.
-                  </p>
-                </div>
-              </>
-            ) : (
-              <>
-                <AlertCircle className="h-5 w-5 shrink-0 text-amber-600" />
-                <div>
-                  <h3 className="text-sm font-semibold text-amber-900">
-                    {requiredMissing.length} Required Item{requiredMissing.length !== 1 && 's'} Missing
-                  </h3>
-                  <p className="mt-1 text-sm text-amber-700">
-                    Some required configuration is missing. Features may not work correctly.
-                  </p>
-                  <ul className="mt-2 space-y-1 text-sm text-amber-700">
-                    {requiredMissing.map((item) => (
-                      <li key={item.key}>• {item.label}</li>
-                    ))}
-                  </ul>
-                </div>
-              </>
-            )}
-          </div>
+        <div className="mt-5">
+          {allRequiredPresent ? (
+            <InlineNotice tone="success" title="Required setup is ready">
+              Required configuration is available. Optional integrations can still be checked below.
+            </InlineNotice>
+          ) : (
+            <InlineNotice tone="warning" title={`${requiredMissing.length} required item${requiredMissing.length === 1 ? '' : 's'} missing`}>
+              <div className="space-y-1">
+                {requiredMissing.map((item) => (
+                  <p key={item.key}>{item.label}</p>
+                ))}
+              </div>
+            </InlineNotice>
+          )}
         </div>
 
-        <div className="space-y-6">
+        <div className="mt-5 space-y-5">
           {categories.map((category) => {
             const items = configItems.filter((item) => item.category === category.id)
             if (items.length === 0) return null
 
             const Icon = category.icon
+            const missingCount = items.filter((item) => !item.present).length
 
             return (
-              <div key={category.id} className="rounded-lg border border-slate-200 bg-white shadow-sm">
-                <div className="flex items-center gap-3 border-b border-slate-100 p-4">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-100">
-                    <Icon className="h-4 w-4 text-slate-700" />
-                  </div>
-                  <h2 className="text-sm font-semibold text-slate-950">{category.label}</h2>
-                </div>
+              <Panel key={category.id}>
+                <PanelHeader
+                  title={category.label}
+                  description={missingCount > 0 ? `${missingCount} item${missingCount === 1 ? '' : 's'} need attention` : 'All items present'}
+                  action={
+                    <span className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-700">
+                      <Icon className="h-4 w-4" />
+                    </span>
+                  }
+                />
 
                 <div className="divide-y divide-slate-100">
                   {items.map((item) => (
-                    <div key={item.key} className="p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-semibold text-slate-950">{item.label}</h3>
-                            {item.required ? (
-                              <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-700">
-                                Required
-                              </span>
-                            ) : (
-                              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-600">
-                                Optional
-                              </span>
-                            )}
-                          </div>
-                          <p className="mt-1 text-sm text-slate-600">{item.helpText}</p>
-                          <div className="mt-2 flex items-center gap-2 text-sm">
-                            <span className="font-mono text-slate-500">{item.key}</span>
-                            <span className="text-slate-400">→</span>
-                            <span className="font-medium text-slate-700">{item.value}</span>
-                          </div>
+                    <div key={item.key} className="grid gap-3 px-4 py-4 lg:grid-cols-[1fr_220px_120px] lg:items-center">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-sm font-semibold text-slate-950">{item.label}</h3>
+                          <StatusBadge tone={item.required ? 'danger' : 'neutral'} withDot={false}>
+                            {item.required ? 'Required' : 'Optional'}
+                          </StatusBadge>
                         </div>
-                        <div className="shrink-0">
+                        <p className="mt-1 text-sm text-slate-500">{item.helpText}</p>
+                        <p className="mt-2 break-all font-mono text-xs text-slate-500">{item.key}</p>
+                      </div>
+                      <div className="min-w-0 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                        <p className="break-all text-sm font-medium text-slate-700">{item.value}</p>
+                      </div>
+                      <div className="flex justify-start lg:justify-end">
+                        <StatusBadge tone={item.present ? 'success' : item.required ? 'warning' : 'neutral'}>
                           {item.present ? (
-                            <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                            <CheckCircle2 className="h-3 w-3" />
                           ) : (
-                            <XCircle className="h-5 w-5 text-slate-300" />
+                            <XCircle className="h-3 w-3" />
                           )}
-                        </div>
+                          {item.present ? 'Present' : 'Missing'}
+                        </StatusBadge>
                       </div>
                     </div>
                   ))}
                 </div>
-              </div>
+              </Panel>
             )
           })}
         </div>
 
-        <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-950">Configuration Notes</h3>
-          <ul className="mt-3 space-y-2 text-sm text-slate-600">
-            <li>• Backend configuration is managed via environment variables in <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs">.env</code> file</li>
-            <li>• Agent API Secret is stored in browser localStorage for testing purposes</li>
-            <li>• PostgreSQL and Redis should be running via Docker: <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs">npm run infra:up</code></li>
-            <li>• OpenClaw integration is optional for Phase 3, required for Phase 8</li>
-            <li>• Configuration changes require backend restart to take effect</li>
-          </ul>
+        <div className="mt-5">
+          <InlineNotice tone="info" title="Setup notes">
+            Backend environment changes require a service restart. Secret values stay masked here; use the copied report for status only, not for credential sharing.
+          </InlineNotice>
         </div>
       </div>
     </main>

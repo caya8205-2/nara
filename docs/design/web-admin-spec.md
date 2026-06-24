@@ -38,6 +38,21 @@ If the dashboard is opened on a narrow screen, collapse navigation into a top me
 
 Purpose: provide one-glance server status.
 
+### Current Direction
+
+The Overview screen is an operator console, not a task workspace. It should not create, complete, or delete tasks directly because task ownership belongs to app users and agent tool flows.
+
+Overview should summarize service state and route the operator to the right admin area:
+
+- Backend readiness.
+- Reminder worker status.
+- WhatsApp/OpenClaw readiness.
+- Operator session state.
+- Flagged dependencies.
+- Quick links to Health, WhatsApp Access, Backup, Reports, Logs, and Agent Tools.
+
+Task creation belongs in user-scoped app flows or OpenClaw-facing agent tools after `get_user_context` has resolved the Nara user. If a web admin task screen is revisited later, it must make scope explicit, such as selecting a target user or showing that the action is operator-only system work.
+
 ### Default Layout
 
 Top row:
@@ -84,6 +99,18 @@ No OpenClaw token:
 - RecentErrorList
 - AgentActionTable
 - BackupStatusPanel
+
+### Follow-up UI Work
+
+Use the 21st.dev-style references as visual inspiration only. Do not add a new UI dependency unless there is a clear maintenance benefit. Keep the current React, Tailwind, and lucide stack.
+
+Next refresh pass:
+
+1. Apply the new admin UI primitives to Agent Tools, Users, Clients, and Context. Backup, Reports, WhatsApp Access, Logs, and Config have been refreshed.
+2. Replace remaining placeholder/scaffold copy with operator-facing copy.
+3. Keep admin pages dense and scannable: rows, tables, status badges, compact panels.
+4. Avoid landing-page treatment, decorative gradients, nested cards, and user-facing development copy.
+5. Revisit `/tasks`; either remove it from admin navigation or rebuild it as an explicitly scoped admin/user task inspection screen.
 
 ## Screen: Health
 

@@ -163,7 +163,7 @@ Local simulation:
 npm run agent:smoke:group -- --cleanup
 ```
 
-Current limitation: the backend stores group digest schedules (`summaryEnabled`, `summaryCronExpr`, `summaryTimezone`, `digestTarget`), but there is not yet a dedicated group-summary worker that fetches new WhatsApp group messages by itself. The next OpenClaw milestone is wiring real group message events into these tools and then adding automated scheduled digest delivery.
+Current limitation: group message ingestion still depends on the live OpenClaw WhatsApp runtime providing real group events. The backend now has a dedicated group-summary worker that processes due digest schedules from stored group messages, but it does not fetch WhatsApp history by itself and does not yet deliver digests back into WhatsApp groups.
 
 #### Next Group Digest Plan
 
@@ -191,19 +191,19 @@ Implementation order:
    - Require `get_group_context` before recording or summarizing group messages.
    - Skip messages when the sender cannot be resolved or is not allowed for Nara Bot.
 
-3. **Add group summary worker**
-   - Follow the existing reminder/report worker pattern with Redis/BullMQ.
-   - Suggested env names:
+3. **Group summary worker**
+   - Implemented with Redis/BullMQ using:
      - `GROUP_SUMMARY_WORKER_ENABLED=true`
      - `GROUP_SUMMARY_WORKER_INTERVAL_MS=300000`
-   - Find groups where `summaryEnabled=true` and the next digest is due.
-   - Build a digest from stored `agent_group_messages` since the last summary or within the requested period.
-   - Save output to `agent_group_summaries`.
-   - Record `lastSummaryAt` and an actionable failure message/status if generation or delivery fails.
+   - Finds active groups where `summaryEnabled=true` and the configured cron preset is due.
+   - Builds a deterministic digest from stored `agent_group_messages` since the last summary or a fallback period.
+   - Saves output to `agent_group_summaries` with worker/delivery metadata.
+   - Updates `lastSummaryAt` through the existing summary save path.
+   - Exposes worker state through `/health` and `/api/readiness.dependencies.groupSummaryWorker`.
 
 4. **Delivery/status**
-   - If WhatsApp delivery is unavailable, keep the saved summary and expose status in admin/logs.
-   - Once the dedicated Nara Bot number exists, send the digest to `digestTarget=group` through OpenClaw WhatsApp.
+   - If WhatsApp group delivery is unavailable, the worker keeps the saved summary and records `delivery_skipped` metadata.
+   - Once the dedicated Nara Bot number and OpenClaw group-send adapter are available, send the digest to `digestTarget=group` through OpenClaw WhatsApp.
    - Avoid user-facing dev copy; admin/debug surfaces may mention OpenClaw.
 
 Non-goals for the next pass:
@@ -212,6 +212,28 @@ Non-goals for the next pass:
 - Do not create a public dashboard for group summaries yet.
 - Do not implement destructive restore or broad admin redesign.
 - Do not claim automated group summaries are live until real OpenClaw group events are verified on the server PC.
+
+Manual worker verification:
+
+```powershell
+npm run infra:up
+npm --workspace @nara/backend run db:migrate
+npm --workspace @nara/backend run dev
+```
+
+Create or configure a group through the agent tool smoke path, record real or smoke group messages, enable a supported cron expression such as `0 9 * * *`, then either wait for the worker interval or call the operator-only endpoint:
+
+```http
+POST /api/group-summaries/process-due
+```
+
+The response includes `processed`, `groups`, and per-group status. The generated summary row is stored in `agent_group_summaries`.
+
+Admin visibility:
+
+- `GET /api/group-summaries` returns operator-only digest status for active groups.
+- Web admin `/group-digests` shows tracked groups, enabled schedules, due counts, latest summaries, delivery metadata, and a **Process Due** action.
+- This screen is for local server operations. It should not imply that WhatsApp group delivery is live until the OpenClaw group-send adapter is verified.
 
 ### Reminder Execution
 

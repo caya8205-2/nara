@@ -5,6 +5,7 @@ import { ZodError } from 'zod'
 import { env } from './config/env.js'
 import { backendLogService } from './services/backend-log.service.js'
 import { backupWorkerService } from './services/backup-worker.service.js'
+import { groupSummaryWorkerService } from './services/group-summary-worker.service.js'
 import { reminderWorkerService } from './services/reminder-worker.service.js'
 import { reportWorkerService } from './services/report-worker.service.js'
 import { rateLimitService } from './services/rate-limit.service.js'
@@ -151,6 +152,7 @@ process.on('SIGINT', () => {
   reminderWorkerService.stop()
   backupWorkerService.stop()
   reportWorkerService.stop()
+  groupSummaryWorkerService.stop()
   process.exit(0)
 })
 
@@ -158,6 +160,7 @@ process.on('SIGTERM', () => {
   reminderWorkerService.stop()
   backupWorkerService.stop()
   reportWorkerService.stop()
+  groupSummaryWorkerService.stop()
   process.exit(0)
 })
 
@@ -175,6 +178,7 @@ app.get('/health', async () => ({
   workers: {
     backup: backupWorkerService.getStatus(),
     reminder: reminderWorkerService.getStatus(),
+    groupSummary: groupSummaryWorkerService.getStatus(),
   },
   timestamp: new Date().toISOString(),
 }))
@@ -191,6 +195,7 @@ app.register(import('./routes/agent-tools.js'), { prefix: '/api/agent' })
 app.register(import('./routes/logs.js'), { prefix: '/api/logs' })
 app.register(import('./routes/backup.js'), { prefix: '/api/backup' })
 app.register(import('./routes/reports.js'), { prefix: '/api/reports' })
+app.register(import('./routes/group-summaries.js'), { prefix: '/api/group-summaries' })
 app.register(import('./routes/clients.js'), { prefix: '/api/clients' })
 app.register(import('./routes/context.js'), { prefix: '/api/context' })
 
@@ -202,6 +207,7 @@ const start = async () => {
     reminderWorkerService.start(app.log)
     backupWorkerService.start(app.log)
     reportWorkerService.start(app.log)
+    groupSummaryWorkerService.start(app.log)
   } catch (err) {
     app.log.error(err)
     process.exit(1)

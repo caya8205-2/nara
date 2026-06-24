@@ -149,7 +149,7 @@ To include the authenticated reminder execution summary, pass local operator cre
 powershell -ExecutionPolicy Bypass -File .\ops\windows\check-nara-health.ps1 -OperatorUsername admin -OperatorPassword "<password-from-env>"
 ```
 
-The unauthenticated checks cover Docker, backend `/health`, backend `/api/readiness`, and OpenClaw Control UI. The readiness response includes PostgreSQL, Redis, BullMQ Reminder Worker, OpenClaw Gateway, and WhatsApp bridge checks. Reminder execution is skipped unless credentials are provided.
+The unauthenticated checks cover Docker, backend `/health`, backend `/api/readiness`, and OpenClaw Control UI. The readiness response includes PostgreSQL, Redis, BullMQ Reminder Worker, BullMQ Group Summary Worker, OpenClaw Gateway, and WhatsApp bridge checks. Reminder execution is skipped unless credentials are provided.
 
 PM2 checks are optional because the recommended Windows launcher does not use PM2:
 
@@ -166,6 +166,8 @@ REMINDER_WORKER_ENABLED=true
 REMINDER_WORKER_INTERVAL_MS=60000
 REPORT_WORKER_ENABLED=true
 REPORT_WORKER_INTERVAL_MS=300000
+GROUP_SUMMARY_WORKER_ENABLED=true
+GROUP_SUMMARY_WORKER_INTERVAL_MS=300000
 ```
 
 The worker records due reminders, disables one-time reminders after they trigger, advances supported recurring schedules, and writes `reminder.triggered` audit events. The current delivery adapter sends user reminders through OpenClaw WhatsApp when an allowed WhatsApp contact exists. Delivery status is stored in `lastTriggerStatus` and `lastTriggerMessage`.
@@ -184,6 +186,8 @@ npm run health-check
 ```
 
 The report worker processes due report schedules, generates daily or weekly summaries, and can deliver them through the same OpenClaw WhatsApp allowlist path. Delivery status is stored on each report row. Use the web admin `/reports` page or `POST /api/reports/process-due` with an operator token to verify processing without waiting for the repeat interval.
+
+The group summary worker processes due WhatsApp group digest schedules from `agent_groups`, reads already-recorded `agent_group_messages`, and saves generated rows to `agent_group_summaries`. It does not fetch WhatsApp history by itself; real group messages still need to arrive through the OpenClaw group event/tool path. The readiness row is `/api/readiness.dependencies.groupSummaryWorker`, and manual verification is available through `POST /api/group-summaries/process-due` with an operator token.
 
 ## Backup Worker
 
@@ -234,7 +238,7 @@ npm run server:status
 npm run health-check
 ```
 
-Then open `/health` in the web admin and confirm PostgreSQL, Redis, Reminder Worker, OpenClaw Gateway, and WhatsApp Bridge are all healthy or have actionable messages.
+Then open `/health` in the web admin and confirm PostgreSQL, Redis, Reminder Worker, Group Summary Worker, OpenClaw Gateway, and WhatsApp Bridge are all healthy or have actionable messages.
 
 ## Cloudflare Tunnel
 

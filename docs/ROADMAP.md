@@ -9,6 +9,7 @@ This file combines the current planning, architecture, ADR, deployment, and desi
 - Reminder records support one-time schedules through `scheduledAt` and recurring schedules through `cronExpr` plus timezone.
 - OpenClaw-facing agent tools support user-scoped task and reminder lifecycles.
 - OpenClaw-facing group tools can store WhatsApp group context, transcript snippets, digest settings, and saved summaries.
+- Backend group digest schedules are processed by a Redis/BullMQ group summary worker that saves due summaries from stored group messages.
 - Nara Bot access requests can sync allowed WhatsApp senders into local OpenClaw config.
 - Backend tunnel-facing endpoints have basic in-memory rate limiting.
 - Agent-triggered reminder mutations are written to audit logs.
@@ -35,15 +36,25 @@ Next product milestone:
    - Feed real provided messages into `record_group_messages`; do not scrape or invent transcript content inside Nara.
 2. Add automated group digest execution.
    - Use `agent_groups.summaryEnabled`, `summaryCronExpr`, `summaryTimezone`, and `digestTarget`.
-   - Process due group digest schedules with the existing Redis/BullMQ pattern.
-   - Generate summaries from stored `agent_group_messages` and save them through `agent_group_summaries`.
-   - Deliver digest through OpenClaw WhatsApp when the dedicated Nara Bot number is available; until then, expose status in admin/logs.
+- Done: process due group digest schedules with the existing Redis/BullMQ pattern.
+- Done: generate deterministic summaries from stored `agent_group_messages` and save them through `agent_group_summaries`.
+- Done: expose group summary worker status in backend health/readiness.
+- Done: expose group digest admin visibility at `/group-digests` with due counts, latest summary, and manual processing.
+- Next: deliver digest through OpenClaw WhatsApp group send when the dedicated Nara Bot number and live group adapter are available.
 
 Skip for now:
 
 - Dedicated WhatsApp number setup remains blocked by SIM availability.
 - Internal pitch/deck work is intentionally skipped.
 - Tauri remains last priority.
+
+Admin dashboard refresh note:
+
+- A 21st.dev-inspired web admin refresh has started without adding UI dependencies.
+- Keep the web admin as a local server/operator console, not a user task workspace.
+- Overview should show readiness, worker/WhatsApp status, session state, flagged dependencies, and admin-area links.
+- Do not put Add Task or global task management on Overview; task creation remains user-scoped through the mobile app or OpenClaw agent tools after user context is resolved.
+- Continue the visual refresh from `docs/design/web-admin-spec.md` when returning to admin polish.
 
 ---
 

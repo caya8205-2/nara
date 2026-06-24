@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lte, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, lte, sql } from 'drizzle-orm'
 import { db } from '../db/index.js'
 import {
   agentGroupMembers,
@@ -47,6 +47,11 @@ export interface SaveGroupSummaryInput {
   messageCount?: number
   source?: string
   metadata?: Record<string, unknown> | null
+}
+
+export interface ProcessDueGroupSummariesInput {
+  now?: Date
+  limit?: number
 }
 
 type GroupRow = typeof agentGroups.$inferSelect
@@ -241,6 +246,82 @@ export class GroupContextService {
     return this.toPublicSummary(summary)
   }
 
+  async processDue(input: ProcessDueGroupSummariesInput = {}) {
+    const now = input.now ?? new Date()
+    const limit = Math.max(1, Math.min(input.limit ?? 10, 50))
+    const candidates = await db
+      .select()
+      .from(agentGroups)
+      .where(and(
+        eq(agentGroups.status, 'active'),
+        eq(agentGroups.summaryEnabled, true),
+      ))
+      .orderBy(asc(agentGroups.lastSummaryAt), asc(agentGroups.updatedAt))
+      .limit(limit * 4)
+
+    const processed = []
+    for (const group of candidates) {
+      if (processed.length >= limit) break
+      if (!this.isGroupSummaryDue(group, now)) continue
+      processed.push(await this.runSummarySchedule(group, now))
+    }
+
+    return {
+      checkedAt: now,
+      processed: processed.length,
+      groups: processed,
+    }
+  }
+
+  async listDigestStatus(limit = 50) {
+    const rows = await db
+      .select()
+      .from(agentGroups)
+      .where(eq(agentGroups.status, 'active'))
+      .orderBy(desc(agentGroups.updatedAt))
+      .limit(Math.max(1, Math.min(limit, 100)))
+
+    const groups = []
+    for (const group of rows) {
+      const [messageCount, summaries, recentMessages] = await Promise.all([
+        this.countMessages(group.id),
+        this.listSummaries(group.id, 1),
+        this.listMessages(group.id, 3),
+      ])
+      const nextRunAt = group.summaryEnabled && group.summaryCronExpr
+        ? this.nextFromSupportedCron(
+          group.summaryCronExpr,
+          group.summaryTimezone,
+          group.lastSummaryAt ?? group.createdAt ?? new Date(0),
+          false,
+        )
+        : null
+      const latestSummary = summaries[0] ?? null
+      const metadata = latestSummary?.metadata && typeof latestSummary.metadata === 'object'
+        ? latestSummary.metadata as Record<string, unknown>
+        : null
+
+      groups.push({
+        ...this.toPublicGroup(group),
+        messageCount,
+        nextRunAt,
+        digestDue: Boolean(nextRunAt && nextRunAt <= new Date()),
+        latestSummary,
+        latestSummaryStatus: typeof metadata?.status === 'string' ? metadata.status : null,
+        latestDeliveryStatus: typeof metadata?.deliveryStatus === 'string' ? metadata.deliveryStatus : null,
+        latestDeliveryMessage: typeof metadata?.deliveryMessage === 'string' ? metadata.deliveryMessage : null,
+        recentMessages,
+      })
+    }
+
+    return {
+      groups,
+      total: groups.length,
+      enabled: groups.filter((group) => group.summaryEnabled).length,
+      due: groups.filter((group) => group.digestDue).length,
+    }
+  }
+
   async findGroup(channelType: AgentChannelType, externalId: string) {
     const [group] = await db
       .select()
@@ -284,6 +365,20 @@ export class GroupContextService {
     return rows.map((row) => this.toPublicSummary(row))
   }
 
+  private async listMessagesForPeriod(groupId: string, from: Date, to: Date, limit = 100) {
+    const rows = await db
+      .select()
+      .from(agentGroupMessages)
+      .where(and(
+        eq(agentGroupMessages.groupId, groupId),
+        gte(agentGroupMessages.occurredAt, from),
+        lte(agentGroupMessages.occurredAt, to),
+      ))
+      .orderBy(asc(agentGroupMessages.occurredAt))
+      .limit(Math.max(1, Math.min(limit, 500)))
+    return rows
+  }
+
   private async countMessages(groupId: string, from?: Date, to?: Date) {
     const conditions = [
       eq(agentGroupMessages.groupId, groupId),
@@ -301,6 +396,243 @@ export class GroupContextService {
     const trimmed = value.trim()
     if (!trimmed) throw new Error('Group externalId is required')
     return trimmed.toLowerCase()
+  }
+
+  private isGroupSummaryDue(group: GroupRow, now: Date) {
+    if (!group.summaryEnabled || !group.summaryCronExpr) return false
+    const lastRun = group.lastSummaryAt ?? group.createdAt ?? new Date(0)
+    const nextRunAt = this.nextFromSupportedCron(
+      group.summaryCronExpr,
+      group.summaryTimezone,
+      lastRun,
+      false,
+    )
+    return Boolean(nextRunAt && nextRunAt <= now)
+  }
+
+  private async runSummarySchedule(group: GroupRow, now: Date) {
+    const periodEnd = now
+    const periodStart = group.lastSummaryAt ??
+      this.previousPeriodStart(group.summaryCronExpr, group.summaryTimezone, now) ??
+      new Date(now.getTime() - 24 * 60 * 60 * 1000)
+
+    let status: 'generated' | 'skipped' | 'failed' = 'generated'
+    let message = 'Group digest saved.'
+    let summaryId: string | null = null
+    let messageCount = 0
+
+    try {
+      const messages = await this.listMessagesForPeriod(group.id, periodStart, periodEnd, 100)
+      messageCount = messages.length
+      if (messages.length === 0) {
+        status = 'skipped'
+        message = 'No group messages found for this digest period.'
+      }
+
+      const digest = this.renderDigest(group, messages, periodStart, periodEnd, status)
+      const summary = await this.saveSummary(group.id, {
+        title: this.digestTitle(group, periodStart, periodEnd),
+        summary: digest,
+        periodStart,
+        periodEnd,
+        messageCount,
+        source: 'worker',
+        metadata: {
+          status,
+          message,
+          digestTarget: group.digestTarget,
+          generatedBy: 'group_summary_worker',
+          deliveryStatus: 'delivery_skipped',
+          deliveryMessage: 'Automated group digest delivery is pending the live OpenClaw WhatsApp group delivery adapter.',
+        },
+      }, { type: 'system' })
+      summaryId = summary.id
+    } catch (error) {
+      status = 'failed'
+      message = error instanceof Error ? error.message : String(error)
+      await this.audit({ type: 'system' }, 'agent_group.summary_failed', group.id, {
+        periodStart,
+        periodEnd,
+        message,
+      })
+    }
+
+    return {
+      groupId: group.id,
+      groupExternalId: group.externalId,
+      groupName: group.name,
+      status,
+      message,
+      summaryId,
+      messageCount,
+      periodStart,
+      periodEnd,
+    }
+  }
+
+  private digestTitle(group: GroupRow, periodStart: Date, periodEnd: Date) {
+    return `${group.name} digest (${periodStart.toISOString()} - ${periodEnd.toISOString()})`
+  }
+
+  private renderDigest(
+    group: GroupRow,
+    messages: GroupMessageRow[],
+    periodStart: Date,
+    periodEnd: Date,
+    status: 'generated' | 'skipped' | 'failed',
+  ) {
+    if (status === 'skipped') {
+      return [
+        `No new messages were recorded for ${group.name}.`,
+        `Period: ${periodStart.toISOString()} - ${periodEnd.toISOString()}.`,
+      ].join('\n')
+    }
+
+    const participants = Array.from(new Set(messages
+      .map((message) => message.senderDisplayName || message.senderContactValue || 'Unknown')
+      .filter(Boolean))).slice(0, 12)
+    const highlights = messages.slice(-8).map((message) => {
+      const sender = message.senderDisplayName || message.senderContactValue || 'Unknown'
+      const body = message.body.length > 180 ? `${message.body.slice(0, 177)}...` : message.body
+      return `- ${sender}: ${body}`
+    })
+
+    return [
+      `Digest for ${group.name}`,
+      `Period: ${periodStart.toISOString()} - ${periodEnd.toISOString()}`,
+      `Messages recorded: ${messages.length}`,
+      participants.length > 0 ? `Participants: ${participants.join(', ')}` : 'Participants: none recorded',
+      '',
+      'Recent highlights:',
+      ...highlights,
+    ].join('\n')
+  }
+
+  private previousPeriodStart(cronExpr: string | null, timezone: string, now: Date) {
+    if (!cronExpr) return null
+    const next = this.nextFromSupportedCron(cronExpr, timezone, now, true)
+    if (!next) return null
+    const parts = cronExpr.trim().split(/\s+/)
+    const dayOfMonthRaw = parts[2]
+    const dayOfWeekRaw = parts[4]
+    const days = dayOfMonthRaw !== '*' ? 31 : dayOfWeekRaw !== '*' ? 7 : 1
+    return new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
+  }
+
+  private nextFromSupportedCron(
+    cronExpr: string,
+    timezone: string,
+    from: Date,
+    includeCurrent: boolean,
+  ) {
+    const parts = cronExpr.trim().split(/\s+/)
+    if (parts.length !== 5) return null
+
+    const [minuteRaw, hourRaw, dayOfMonthRaw, monthRaw, dayOfWeekRaw] = parts
+    if (monthRaw !== '*') return null
+
+    const minute = Number(minuteRaw)
+    const hour = Number(hourRaw)
+    if (!Number.isInteger(minute) || !Number.isInteger(hour)) return null
+    if (minute < 0 || minute > 59 || hour < 0 || hour > 23) return null
+
+    if (dayOfMonthRaw === '*' && dayOfWeekRaw === '*') {
+      return this.findNextLocalDate(timezone, from, includeCurrent, (candidate) => ({
+        year: candidate.year,
+        month: candidate.month,
+        day: candidate.day,
+        hour,
+        minute,
+      }))
+    }
+
+    if (dayOfMonthRaw === '*' && dayOfWeekRaw !== '*') {
+      const dayOfWeek = Number(dayOfWeekRaw)
+      if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) return null
+      return this.findNextLocalDate(timezone, from, includeCurrent, (candidate) => {
+        const delta = (dayOfWeek - candidate.dayOfWeek + 7) % 7
+        const target = this.addLocalDays(candidate, delta)
+        return {
+          year: target.year,
+          month: target.month,
+          day: target.day,
+          hour,
+          minute,
+        }
+      })
+    }
+
+    if (dayOfMonthRaw !== '*' && dayOfWeekRaw === '*') {
+      const dayOfMonth = Number(dayOfMonthRaw)
+      if (!Number.isInteger(dayOfMonth) || dayOfMonth < 1 || dayOfMonth > 31) return null
+      return this.findNextLocalDate(timezone, from, includeCurrent, (candidate) => ({
+        year: candidate.year,
+        month: candidate.month,
+        day: Math.min(dayOfMonth, this.daysInMonth(candidate.year, candidate.month)),
+        hour,
+        minute,
+      }))
+    }
+
+    return null
+  }
+
+  private findNextLocalDate(
+    timezone: string,
+    from: Date,
+    includeCurrent: boolean,
+    buildCandidate: (local: LocalDateParts) => LocalDateTimeParts,
+  ) {
+    let local = this.toLocalParts(from, timezone)
+    for (let i = 0; i < 370; i++) {
+      const candidate = this.fromLocalParts(buildCandidate(local), timezone)
+      if (includeCurrent ? candidate >= from : candidate > from) {
+        return candidate
+      }
+      local = this.addLocalDays(local, 1)
+    }
+    return null
+  }
+
+  private toLocalParts(value: Date, timezone: string): LocalDateParts {
+    const offsetMinutes = this.timezoneOffsetMinutes(timezone)
+    const shifted = new Date(value.getTime() + offsetMinutes * 60_000)
+    return {
+      year: shifted.getUTCFullYear(),
+      month: shifted.getUTCMonth() + 1,
+      day: shifted.getUTCDate(),
+      dayOfWeek: shifted.getUTCDay(),
+    }
+  }
+
+  private fromLocalParts(value: LocalDateTimeParts, timezone: string) {
+    const offsetMinutes = this.timezoneOffsetMinutes(timezone)
+    return new Date(Date.UTC(
+      value.year,
+      value.month - 1,
+      value.day,
+      value.hour,
+      value.minute,
+    ) - offsetMinutes * 60_000)
+  }
+
+  private addLocalDays(value: LocalDateParts, days: number): LocalDateParts {
+    const date = new Date(Date.UTC(value.year, value.month - 1, value.day + days))
+    return {
+      year: date.getUTCFullYear(),
+      month: date.getUTCMonth() + 1,
+      day: date.getUTCDate(),
+      dayOfWeek: date.getUTCDay(),
+    }
+  }
+
+  private daysInMonth(year: number, month: number) {
+    return new Date(Date.UTC(year, month, 0)).getUTCDate()
+  }
+
+  private timezoneOffsetMinutes(timezone: string) {
+    if (timezone === 'UTC') return 0
+    return 7 * 60
   }
 
   private toPublicGroup(row: GroupRow) {
@@ -346,3 +678,18 @@ export class GroupContextService {
 }
 
 export const groupContextService = new GroupContextService()
+
+interface LocalDateParts {
+  year: number
+  month: number
+  day: number
+  dayOfWeek: number
+}
+
+interface LocalDateTimeParts {
+  year: number
+  month: number
+  day: number
+  hour: number
+  minute: number
+}

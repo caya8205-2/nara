@@ -4,6 +4,7 @@ import { env } from '../config/env.js'
 import { db } from '../db/index.js'
 import { backupService } from './backup.service.js'
 import { backupWorkerService } from './backup-worker.service.js'
+import { groupSummaryWorkerService } from './group-summary-worker.service.js'
 import { openClawService } from './openclaw.service.js'
 import { reminderWorkerService } from './reminder-worker.service.js'
 
@@ -23,6 +24,7 @@ export type ReadinessReport = {
     redis: DependencyStatus
     backup: DependencyStatus
     backupWorker: DependencyStatus
+    groupSummaryWorker: DependencyStatus
     reminderWorker: DependencyStatus
     openclaw: DependencyStatus
     whatsapp: DependencyStatus
@@ -158,6 +160,28 @@ export class ReadinessService {
     }
   }
 
+  checkGroupSummaryWorker(): DependencyStatus {
+    const status = groupSummaryWorkerService.getStatus()
+    return {
+      ok: status.ok,
+      status: status.status,
+      message: status.message,
+      details: {
+        enabled: status.enabled,
+        configured: status.configured,
+        started: status.started,
+        queueName: status.queueName,
+        jobName: status.jobName,
+        intervalMs: status.intervalMs,
+        startedAt: status.startedAt,
+        scheduledAt: status.scheduledAt,
+        lastRunAt: status.lastRunAt,
+        lastRunStatus: status.lastRunStatus,
+        lastError: status.lastError,
+      },
+    }
+  }
+
   async getReport(): Promise<ReadinessReport> {
     const [database, redis, backup, openclaw, whatsapp] = await Promise.all([
       this.checkDatabase(),
@@ -168,12 +192,13 @@ export class ReadinessService {
     ])
     const backupWorker = this.checkBackupWorker()
     const reminderWorker = this.checkReminderWorker()
+    const groupSummaryWorker = this.checkGroupSummaryWorker()
 
     return {
-      ok: database.ok && redis.ok && backup.ok && backupWorker.ok && reminderWorker.ok && openclaw.ok && whatsapp.ok,
+      ok: database.ok && redis.ok && backup.ok && backupWorker.ok && reminderWorker.ok && groupSummaryWorker.ok && openclaw.ok && whatsapp.ok,
       service: 'nara-backend',
       timestamp: new Date().toISOString(),
-      dependencies: { database, redis, backup, backupWorker, reminderWorker, openclaw, whatsapp },
+      dependencies: { database, redis, backup, backupWorker, reminderWorker, groupSummaryWorker, openclaw, whatsapp },
     }
   }
 }
