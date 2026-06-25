@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertCircle,
@@ -19,12 +19,22 @@ import {
   type CreateClientContactInput,
   type CreateClientInput,
 } from '../lib/api'
+import {
+  AdminButton,
+  EmptyState,
+  InlineNotice,
+  MetricTile,
+  PageHeader,
+  Panel,
+  PanelHeader,
+  StatusBadge,
+} from '../components/admin-ui'
 
-const statusClass = {
-  active: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  lead: 'border-blue-200 bg-blue-50 text-blue-700',
-  inactive: 'border-slate-200 bg-slate-50 text-slate-600',
-  archived: 'border-amber-200 bg-amber-50 text-amber-700',
+const statusTone: Record<NonNullable<CreateClientInput['status']>, 'neutral' | 'success' | 'warning' | 'info'> = {
+  active: 'success',
+  lead: 'info',
+  inactive: 'neutral',
+  archived: 'warning',
 }
 
 const contactIcon = {
@@ -32,6 +42,14 @@ const contactIcon = {
   phone: Phone,
   whatsapp: MessageSquare,
   other: UserRound,
+}
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (typeof error === 'object' && error && 'response' in error) {
+    const response = (error as { response?: { data?: { error?: string } } }).response
+    return response?.data?.error ?? fallback
+  }
+  return fallback
 }
 
 export default function Clients() {
@@ -68,8 +86,8 @@ export default function Clients() {
       setFormError(null)
       refreshClients()
     },
-    onError: (error: any) => {
-      setFormError(error.response?.data?.error || 'Failed to create client')
+    onError: (error: unknown) => {
+      setFormError(getErrorMessage(error, 'Failed to create client'))
     },
   })
 
@@ -84,12 +102,12 @@ export default function Clients() {
       setFormError(null)
       refreshClients()
     },
-    onError: (error: any) => {
-      setFormError(error.response?.data?.error || 'Failed to add contact')
+    onError: (error: unknown) => {
+      setFormError(getErrorMessage(error, 'Failed to add contact'))
     },
   })
 
-  const handleCreateClient = (event: React.FormEvent) => {
+  const handleCreateClient = (event: FormEvent) => {
     event.preventDefault()
     setFormError(null)
 
@@ -107,7 +125,7 @@ export default function Clients() {
     })
   }
 
-  const handleAddContact = (event: React.FormEvent) => {
+  const handleAddContact = (event: FormEvent) => {
     event.preventDefault()
     setFormError(null)
 
@@ -128,6 +146,10 @@ export default function Clients() {
   }
 
   const clients = clientsQuery.data ?? []
+  const activeCount = clients.filter((client) => client.status === 'active').length
+  const leadCount = clients.filter((client) => client.status === 'lead').length
+  const contactCount = clients.reduce((total, client) => total + client.contacts.length, 0)
+  const selectedClient = clients.find((client) => client.id === contactClientId)
 
   const renderClient = (client: Client) => {
     const primaryContact = client.contacts.find((contact) => contact.isPrimary) ?? client.contacts[0] ?? null
@@ -136,7 +158,7 @@ export default function Clients() {
       <tr key={client.id} className="hover:bg-slate-50">
         <td className="px-4 py-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-100">
+            <div className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-slate-50">
               <Building2 className="h-4 w-4 text-slate-600" />
             </div>
             <div className="min-w-0">
@@ -160,22 +182,14 @@ export default function Clients() {
           )}
         </td>
         <td className="px-4 py-3">
-          <span className={['inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold', statusClass[client.status]].join(' ')}>
-            {client.status}
-          </span>
+          <StatusBadge tone={statusTone[client.status]}>{client.status}</StatusBadge>
         </td>
-        <td className="px-4 py-3 text-sm text-slate-500">
-          {client.contacts.length}
-        </td>
-        <td className="px-4 py-3">
-          <button
-            type="button"
-            onClick={() => setContactClientId(client.id)}
-            className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          >
+        <td className="px-4 py-3 text-sm text-slate-500">{client.contacts.length}</td>
+        <td className="px-4 py-3 text-right">
+          <AdminButton variant="secondary" className="h-9" onClick={() => setContactClientId(client.id)}>
             <Plus className="h-4 w-4" />
             Contact
-          </button>
+          </AdminButton>
         </td>
       </tr>
     )
@@ -184,201 +198,173 @@ export default function Clients() {
   return (
     <main className="min-h-screen bg-stone-50 text-slate-950">
       <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-950">Clients</h1>
-            <p className="mt-1 text-sm text-slate-600">
-              Manage client records and practical contact details
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={refreshClients}
-              disabled={clientsQuery.isFetching}
-              className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <RefreshCw className={['h-4 w-4', clientsQuery.isFetching && 'animate-spin'].join(' ')} />
-              Refresh
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowCreateForm(!showCreateForm)}
-              className="inline-flex h-10 items-center gap-2 rounded-md bg-teal-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-teal-700"
-            >
-              <Plus className="h-4 w-4" />
-              New Client
-            </button>
-          </div>
+        <PageHeader
+          title="Clients"
+          description="Keep client records and practical contact details available for follow-up context."
+          actions={
+            <>
+              <AdminButton variant="secondary" onClick={refreshClients} disabled={clientsQuery.isFetching}>
+                <RefreshCw className={['h-4 w-4', clientsQuery.isFetching && 'animate-spin'].filter(Boolean).join(' ')} />
+                Refresh
+              </AdminButton>
+              <AdminButton onClick={() => setShowCreateForm((value) => !value)}>
+                <Plus className="h-4 w-4" />
+                New Client
+              </AdminButton>
+            </>
+          }
+        />
+
+        <div className="grid gap-4 lg:grid-cols-3">
+          <MetricTile label="Clients" value={clients.length} description={`${activeCount} active`} icon={Building2} tone="neutral" />
+          <MetricTile label="Leads" value={leadCount} description="Open follow-up records" icon={UserRound} tone={leadCount > 0 ? 'info' : 'neutral'} />
+          <MetricTile label="Contacts" value={contactCount} description="Saved contact methods" icon={MessageSquare} tone={contactCount > 0 ? 'success' : 'neutral'} />
         </div>
 
         {formError && (
-          <div className="mb-6 flex items-start gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4">
-            <AlertCircle className="h-5 w-5 shrink-0 text-rose-600" />
-            <p className="text-sm font-semibold text-rose-800">{formError}</p>
+          <div className="mt-5">
+            <InlineNotice tone="danger" title="Client action failed">
+              {formError}
+            </InlineNotice>
           </div>
         )}
 
         {showCreateForm && (
-          <form onSubmit={handleCreateClient} className="mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-950">New Client</h2>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <label className="text-sm font-medium text-slate-700">
-                Name
-                <input
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm"
-                  required
-                />
-              </label>
-              <label className="text-sm font-medium text-slate-700">
-                Company
-                <input
-                  value={company}
-                  onChange={(event) => setCompany(event.target.value)}
-                  className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm"
-                />
-              </label>
-              <label className="text-sm font-medium text-slate-700">
-                Status
-                <select
-                  value={status}
-                  onChange={(event) => setStatus(event.target.value as CreateClientInput['status'])}
-                  className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm"
-                >
-                  <option value="active">Active</option>
-                  <option value="lead">Lead</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="archived">Archived</option>
-                </select>
-              </label>
-              <label className="text-sm font-medium text-slate-700">
-                Quick Contact
-                <input
-                  value={contactInfo}
-                  onChange={(event) => setContactInfo(event.target.value)}
-                  className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm"
-                />
-              </label>
-              <label className="text-sm font-medium text-slate-700 sm:col-span-2 lg:col-span-4">
-                Notes
-                <textarea
-                  value={notes}
-                  onChange={(event) => setNotes(event.target.value)}
-                  className="mt-1 min-h-20 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-                />
-              </label>
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowCreateForm(false)}
-                className="inline-flex h-10 items-center rounded-md border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={createMutation.isPending}
-                className="inline-flex h-10 items-center gap-2 rounded-md bg-teal-600 px-4 text-sm font-semibold text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Plus className="h-4 w-4" />
-                Create Client
-              </button>
-            </div>
-          </form>
+          <Panel className="mt-5">
+            <PanelHeader title="New Client" description="Create a client record for admin and agent context." />
+            <form onSubmit={handleCreateClient} className="p-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <label className="text-sm font-medium text-slate-700">
+                  Name
+                  <input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                    required
+                  />
+                </label>
+                <label className="text-sm font-medium text-slate-700">
+                  Company
+                  <input
+                    value={company}
+                    onChange={(event) => setCompany(event.target.value)}
+                    className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                  />
+                </label>
+                <label className="text-sm font-medium text-slate-700">
+                  Status
+                  <select
+                    value={status}
+                    onChange={(event) => setStatus(event.target.value as CreateClientInput['status'])}
+                    className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                  >
+                    <option value="active">Active</option>
+                    <option value="lead">Lead</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </label>
+                <label className="text-sm font-medium text-slate-700">
+                  Quick Contact
+                  <input
+                    value={contactInfo}
+                    onChange={(event) => setContactInfo(event.target.value)}
+                    className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                  />
+                </label>
+                <label className="text-sm font-medium text-slate-700 sm:col-span-2 lg:col-span-4">
+                  Notes
+                  <textarea
+                    value={notes}
+                    onChange={(event) => setNotes(event.target.value)}
+                    className="mt-1 min-h-20 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                  />
+                </label>
+              </div>
+              <div className="mt-4 flex justify-end gap-2">
+                <AdminButton type="button" variant="secondary" onClick={() => setShowCreateForm(false)}>
+                  Cancel
+                </AdminButton>
+                <AdminButton type="submit" disabled={createMutation.isPending}>
+                  <Plus className="h-4 w-4" />
+                  Create Client
+                </AdminButton>
+              </div>
+            </form>
+          </Panel>
         )}
 
         {contactClientId && (
-          <form onSubmit={handleAddContact} className="mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-950">
-              Add Contact
-            </h2>
-            <div className="mt-4 grid gap-4 sm:grid-cols-4">
-              <label className="text-sm font-medium text-slate-700">
-                Type
-                <select
-                  value={contactType}
-                  onChange={(event) => setContactType(event.target.value as CreateClientContactInput['type'])}
-                  className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm"
-                >
-                  <option value="whatsapp">WhatsApp</option>
-                  <option value="phone">Phone</option>
-                  <option value="email">Email</option>
-                  <option value="other">Other</option>
-                </select>
-              </label>
-              <label className="text-sm font-medium text-slate-700">
-                Value
-                <input
-                  value={contactValue}
-                  onChange={(event) => setContactValue(event.target.value)}
-                  className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm"
-                  required
-                />
-              </label>
-              <label className="text-sm font-medium text-slate-700">
-                Label
-                <input
-                  value={contactLabel}
-                  onChange={(event) => setContactLabel(event.target.value)}
-                  className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm"
-                />
-              </label>
-              <label className="flex items-center gap-2 pt-6 text-sm font-semibold text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={contactPrimary}
-                  onChange={(event) => setContactPrimary(event.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300"
-                />
-                Primary
-              </label>
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setContactClientId(null)}
-                className="inline-flex h-10 items-center rounded-md border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={addContactMutation.isPending}
-                className="inline-flex h-10 items-center gap-2 rounded-md bg-teal-600 px-4 text-sm font-semibold text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Plus className="h-4 w-4" />
-                Add Contact
-              </button>
-            </div>
-          </form>
+          <Panel className="mt-5">
+            <PanelHeader title="Add Contact" description={selectedClient ? selectedClient.name : 'Selected client'} />
+            <form onSubmit={handleAddContact} className="p-4">
+              <div className="grid gap-4 sm:grid-cols-4">
+                <label className="text-sm font-medium text-slate-700">
+                  Type
+                  <select
+                    value={contactType}
+                    onChange={(event) => setContactType(event.target.value as CreateClientContactInput['type'])}
+                    className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                  >
+                    <option value="whatsapp">WhatsApp</option>
+                    <option value="phone">Phone</option>
+                    <option value="email">Email</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+                <label className="text-sm font-medium text-slate-700">
+                  Value
+                  <input
+                    value={contactValue}
+                    onChange={(event) => setContactValue(event.target.value)}
+                    className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                    required
+                  />
+                </label>
+                <label className="text-sm font-medium text-slate-700">
+                  Label
+                  <input
+                    value={contactLabel}
+                    onChange={(event) => setContactLabel(event.target.value)}
+                    className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                  />
+                </label>
+                <label className="flex items-center gap-2 pt-6 text-sm font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={contactPrimary}
+                    onChange={(event) => setContactPrimary(event.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                  />
+                  Primary
+                </label>
+              </div>
+              <div className="mt-4 flex justify-end gap-2">
+                <AdminButton type="button" variant="secondary" onClick={() => setContactClientId(null)}>
+                  Cancel
+                </AdminButton>
+                <AdminButton type="submit" disabled={addContactMutation.isPending}>
+                  <Plus className="h-4 w-4" />
+                  Add Contact
+                </AdminButton>
+              </div>
+            </form>
+          </Panel>
         )}
 
-        <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 p-4">
-            <h2 className="text-sm font-semibold text-slate-950">Client Records</h2>
-            <p className="mt-0.5 text-sm text-slate-600">{clients.length} total clients</p>
-          </div>
+        <Panel className="mt-5">
+          <PanelHeader title="Client Records" description={`${clients.length} total clients`} />
 
           {clientsQuery.isLoading ? (
-            <div className="p-8 text-center text-sm text-slate-500">Loading clients...</div>
+            <div className="px-4 py-10 text-center text-sm text-slate-500">Loading clients...</div>
           ) : clientsQuery.isError ? (
-            <div className="p-8">
-              <div className="flex items-start gap-3 rounded-md border border-rose-200 bg-rose-50 p-4">
-                <AlertCircle className="h-5 w-5 shrink-0 text-rose-600" />
-                <p className="text-sm font-semibold text-rose-800">Failed to load clients.</p>
-              </div>
+            <div className="p-4">
+              <InlineNotice tone="danger" title="Failed to load clients">
+                Check the operator session and backend connection.
+              </InlineNotice>
             </div>
           ) : clients.length === 0 ? (
-            <div className="p-8 text-center">
-              <Building2 className="mx-auto h-12 w-12 text-slate-300" />
-              <h3 className="mt-4 text-sm font-semibold text-slate-950">No clients yet</h3>
-              <p className="mt-1 text-sm text-slate-600">
-                Create a client record to start tracking contacts and follow-up context.
-              </p>
-            </div>
+            <EmptyState icon={Building2} title="No clients yet" description="Create a client record to start tracking contacts and follow-up context." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -388,16 +374,14 @@ export default function Clients() {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Primary Contact</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Status</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Contacts</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Action</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {clients.map(renderClient)}
-                </tbody>
+                <tbody className="divide-y divide-slate-100">{clients.map(renderClient)}</tbody>
               </table>
             </div>
           )}
-        </section>
+        </Panel>
       </div>
     </main>
   )

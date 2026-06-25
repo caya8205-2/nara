@@ -106,11 +106,11 @@ Use the 21st.dev-style references as visual inspiration only. Do not add a new U
 
 Next refresh pass:
 
-1. Apply the new admin UI primitives to Agent Tools, Users, Clients, and Context. Backup, Reports, WhatsApp Access, Logs, and Config have been refreshed.
+1. Apply the new admin UI primitives across the active admin pages. Overview, Health, Agent Tools, Users, Clients, Tasks, Context, Group Digests, WhatsApp Access, Backup, Reports, Logs, and Config have been refreshed.
 2. Replace remaining placeholder/scaffold copy with operator-facing copy.
 3. Keep admin pages dense and scannable: rows, tables, status badges, compact panels.
 4. Avoid landing-page treatment, decorative gradients, nested cards, and user-facing development copy.
-5. Revisit `/tasks`; either remove it from admin navigation or rebuild it as an explicitly scoped admin/user task inspection screen.
+5. `/tasks` is now an explicitly read-only inspection screen. Keep task creation and mutation in user-scoped mobile or agent flows after context resolution.
 
 ## Screen: Health
 

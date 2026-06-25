@@ -1,8 +1,9 @@
-﻿import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertCircle,
   CheckCircle2,
+  Mail,
   Plus,
   RefreshCw,
   Shield,
@@ -10,6 +11,24 @@ import {
   XCircle,
 } from 'lucide-react'
 import { createUser, listUsers, type CreateUserInput } from '../lib/api'
+import {
+  AdminButton,
+  EmptyState,
+  InlineNotice,
+  MetricTile,
+  PageHeader,
+  Panel,
+  PanelHeader,
+  StatusBadge,
+} from '../components/admin-ui'
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (typeof error === 'object' && error && 'response' in error) {
+    const response = (error as { response?: { data?: { error?: string } } }).response
+    return response?.data?.error ?? fallback
+  }
+  return fallback
+}
 
 export default function Users() {
   const queryClient = useQueryClient()
@@ -24,6 +43,8 @@ export default function Users() {
     queryFn: listUsers,
   })
 
+  const refreshUsers = () => queryClient.invalidateQueries({ queryKey: ['users'] })
+
   const createMutation = useMutation({
     mutationFn: createUser,
     onSuccess: () => {
@@ -32,15 +53,15 @@ export default function Users() {
       setRole('user')
       setFormError(null)
       setShowCreateForm(false)
-      queryClient.invalidateQueries({ queryKey: ['users'] })
+      refreshUsers()
     },
-    onError: (error: any) => {
-      setFormError(error.response?.data?.error || 'Failed to create user')
+    onError: (error: unknown) => {
+      setFormError(getErrorMessage(error, 'Failed to create user'))
     },
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = (event: FormEvent) => {
+    event.preventDefault()
     setFormError(null)
 
     if (!displayName.trim()) {
@@ -53,155 +74,118 @@ export default function Users() {
       role,
     }
 
-    if (email.trim()) {
-      input.email = email.trim()
-    }
+    if (email.trim()) input.email = email.trim()
 
     createMutation.mutate(input)
   }
 
   const users = usersQuery.data ?? []
+  const adminCount = users.filter((user) => user.role === 'admin').length
+  const disabledCount = users.filter((user) => user.disabled).length
+  const activeCount = users.length - disabledCount
 
   return (
     <main className="min-h-screen bg-stone-50 text-slate-950">
       <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-950">Users</h1>
-            <p className="mt-1 text-sm text-slate-600">
-              Manage app users and their access permissions
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => queryClient.invalidateQueries({ queryKey: ['users'] })}
-              disabled={usersQuery.isFetching}
-              className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <RefreshCw className={['h-4 w-4', usersQuery.isFetching && 'animate-spin'].join(' ')} />
-              Refresh
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowCreateForm(!showCreateForm)}
-              className="inline-flex h-10 items-center gap-2 rounded-md bg-teal-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-teal-700"
-            >
-              <Plus className="h-4 w-4" />
-              Create User
-            </button>
-          </div>
+        <PageHeader
+          title="Users"
+          description="Create app users, review roles, and keep access state visible for operator handoff."
+          actions={
+            <>
+              <AdminButton variant="secondary" onClick={refreshUsers} disabled={usersQuery.isFetching}>
+                <RefreshCw className={['h-4 w-4', usersQuery.isFetching && 'animate-spin'].filter(Boolean).join(' ')} />
+                Refresh
+              </AdminButton>
+              <AdminButton onClick={() => setShowCreateForm((value) => !value)}>
+                <Plus className="h-4 w-4" />
+                Create User
+              </AdminButton>
+            </>
+          }
+        />
+
+        <div className="grid gap-4 lg:grid-cols-3">
+          <MetricTile label="Total Users" value={users.length} description={`${activeCount} active`} icon={UserIcon} tone="neutral" />
+          <MetricTile label="Admins" value={adminCount} description="Operator-level accounts" icon={Shield} tone={adminCount > 0 ? 'success' : 'warning'} />
+          <MetricTile label="Disabled" value={disabledCount} description="Accounts blocked from login" icon={XCircle} tone={disabledCount > 0 ? 'warning' : 'success'} />
         </div>
 
         {showCreateForm && (
-          <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-950">New User</h2>
-            <form onSubmit={handleSubmit} className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-sm font-medium text-slate-700">
-                  Display Name
-                  <input
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-950 placeholder:text-slate-400 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100"
-                    placeholder="John Doe"
-                    required
-                  />
-                </label>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700">
-                  Email (optional)
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-950 placeholder:text-slate-400 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100"
-                    placeholder="john@example.com"
-                  />
-                </label>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700">
-                  Role
-                  <select
-                    value={role}
-                    onChange={(e) => setRole(e.target.value as 'user' | 'admin')}
-                    className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-950 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100"
-                  >
-                    <option value="user">User</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </label>
-              </div>
+          <Panel className="mt-5">
+            <PanelHeader title="New User" description="Create a Nara app user record." />
+            <form onSubmit={handleSubmit} className="grid gap-4 p-4 sm:grid-cols-2">
+              <label className="block text-sm font-medium text-slate-700">
+                Display Name
+                <input
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-950 outline-none placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                  placeholder="John Doe"
+                  required
+                />
+              </label>
+              <label className="block text-sm font-medium text-slate-700">
+                Email
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-950 outline-none placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                  placeholder="john@example.com"
+                />
+              </label>
+              <label className="block text-sm font-medium text-slate-700">
+                Role
+                <select
+                  value={role}
+                  onChange={(event) => setRole(event.target.value as 'user' | 'admin')}
+                  className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-950 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                >
+                  <option value="user">User</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </label>
               <div className="flex items-end gap-2">
-                <button
+                <AdminButton
                   type="button"
+                  variant="secondary"
+                  className="flex-1"
                   onClick={() => {
                     setShowCreateForm(false)
                     setFormError(null)
                   }}
-                  className="inline-flex h-10 flex-1 items-center justify-center rounded-md border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 >
                   Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={createMutation.isPending}
-                  className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-md bg-teal-600 px-4 text-sm font-semibold text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
+                </AdminButton>
+                <AdminButton type="submit" className="flex-1" disabled={createMutation.isPending}>
                   <Plus className="h-4 w-4" />
                   Create
-                </button>
+                </AdminButton>
               </div>
               {formError && (
                 <div className="sm:col-span-2">
-                  <div className="flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 p-3">
-                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
-                    <p className="text-sm text-rose-700">{formError}</p>
-                  </div>
+                  <InlineNotice tone="danger" title="User action failed">
+                    {formError}
+                  </InlineNotice>
                 </div>
               )}
             </form>
-          </div>
+          </Panel>
         )}
 
-        <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 p-4">
-            <h2 className="text-sm font-semibold text-slate-950">All Users</h2>
-            <p className="mt-0.5 text-sm text-slate-600">{users.length} total users</p>
-          </div>
+        <Panel className="mt-5">
+          <PanelHeader title="User Records" description={`${users.length} total users`} />
 
           {usersQuery.isLoading ? (
-            <div className="p-8 text-center text-sm text-slate-500">Loading users...</div>
+            <div className="px-4 py-10 text-center text-sm text-slate-500">Loading users...</div>
           ) : usersQuery.isError ? (
-            <div className="p-8">
-              <div className="flex items-start gap-3 rounded-md border border-rose-200 bg-rose-50 p-4">
-                <AlertCircle className="h-5 w-5 shrink-0 text-rose-600" />
-                <div>
-                  <h3 className="text-sm font-semibold text-rose-900">Failed to load users</h3>
-                  <p className="mt-1 text-sm text-rose-700">
-                    Could not fetch users from backend. Make sure you are logged in.
-                  </p>
-                </div>
-              </div>
+            <div className="p-4">
+              <InlineNotice tone="danger" title="Failed to load users">
+                Could not fetch users from backend. Make sure the operator session is active.
+              </InlineNotice>
             </div>
           ) : users.length === 0 ? (
-            <div className="p-8 text-center">
-              <UserIcon className="mx-auto h-12 w-12 text-slate-300" />
-              <h3 className="mt-4 text-sm font-semibold text-slate-950">No users yet</h3>
-              <p className="mt-1 text-sm text-slate-600">
-                Create your first user to get started with access management.
-              </p>
-              <button
-                type="button"
-                onClick={() => setShowCreateForm(true)}
-                className="mt-4 inline-flex h-10 items-center gap-2 rounded-md bg-teal-600 px-4 text-sm font-semibold text-white hover:bg-teal-700"
-              >
-                <Plus className="h-4 w-4" />
-                Create User
-              </button>
-            </div>
+            <EmptyState icon={UserIcon} title="No users yet" description="Create the first app user before testing user-scoped agent flows." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -219,45 +203,32 @@ export default function Users() {
                     <tr key={user.id} className="hover:bg-slate-50">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-100">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-slate-50">
                             <UserIcon className="h-4 w-4 text-slate-600" />
                           </div>
                           <span className="text-sm font-medium text-slate-950">{user.displayName}</span>
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-sm text-slate-600">{user.email || '—'}</span>
+                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                          <Mail className="h-4 w-4 text-slate-400" />
+                          <span>{user.email || '-'}</span>
+                        </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span
-                          className={[
-                            'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-semibold',
-                            user.role === 'admin'
-                              ? 'border-purple-200 bg-purple-50 text-purple-700'
-                              : 'border-slate-200 bg-slate-50 text-slate-600',
-                          ].join(' ')}
-                        >
+                        <StatusBadge tone={user.role === 'admin' ? 'info' : 'neutral'}>
                           {user.role === 'admin' && <Shield className="h-3 w-3" />}
                           {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-                        </span>
+                        </StatusBadge>
                       </td>
                       <td className="px-4 py-3">
-                        {user.disabled ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-700">
-                            <XCircle className="h-3 w-3" />
-                            Disabled
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                            <CheckCircle2 className="h-3 w-3" />
-                            Active
-                          </span>
-                        )}
+                        <StatusBadge tone={user.disabled ? 'danger' : 'success'}>
+                          {user.disabled ? <XCircle className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
+                          {user.disabled ? 'Disabled' : 'Active'}
+                        </StatusBadge>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-sm text-slate-500">
-                          {new Date(user.createdAt).toLocaleDateString()}
-                        </span>
+                        <span className="text-sm text-slate-500">{new Date(user.createdAt).toLocaleDateString()}</span>
                       </td>
                     </tr>
                   ))}
@@ -265,17 +236,12 @@ export default function Users() {
               </table>
             </div>
           )}
-        </div>
+        </Panel>
 
-        <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-950">User Management Notes</h3>
-          <ul className="mt-3 space-y-2 text-sm text-slate-600">
-            <li>• Users can be assigned admin or user roles</li>
-            <li>• Admin users have full access to all dashboard features</li>
-            <li>• User contacts (WhatsApp, email) are managed separately per user</li>
-            <li>• Navigate to WhatsApp Access screen to manage Nara Bot allowlist</li>
-            <li>• Disabling a user prevents login but preserves their data</li>
-          </ul>
+        <div className="mt-5">
+          <InlineNotice tone="info" title="User scope">
+            WhatsApp access, contacts, tasks, reminders, clients, and context are user-scoped. Use this page for records, then review channel access in WhatsApp Access.
+          </InlineNotice>
         </div>
       </div>
     </main>

@@ -10,6 +10,7 @@ import {
   FileText,
   HardDrive,
   Info,
+  ListChecks,
   LogOut,
   Menu,
   MessageSquare,
@@ -50,6 +51,7 @@ const navGroups = [
     items: [
       { path: '/users', label: 'Users', icon: Users },
       { path: '/clients', label: 'Clients', icon: Building2 },
+      { path: '/tasks', label: 'Tasks', icon: ListChecks },
       { path: '/logs', label: 'Logs', icon: FileText },
     ],
   },
