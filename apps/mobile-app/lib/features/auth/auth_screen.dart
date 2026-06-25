@@ -81,63 +81,79 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
-  static String _friendlyError(Object err) {
+  String _friendlyError(Object err) {
     final msg = err.toString().toLowerCase();
     if (msg.contains('invalid') ||
         msg.contains('401') ||
         msg.contains('wrong')) {
-      return 'Email atau kata sandi tidak cocok.';
+      return _isIndonesian
+          ? 'Email atau kata sandi tidak cocok.'
+          : 'Email or password does not match.';
     }
     if (msg.contains('already exists') || msg.contains('409')) {
-      return 'Akun dengan email ini sudah terdaftar.';
+      return _isIndonesian
+          ? 'Akun dengan email ini sudah terdaftar.'
+          : 'An account with this email already exists.';
     }
     if (msg.contains('network') ||
         msg.contains('socket') ||
         msg.contains('timeout')) {
-      return 'Tidak bisa terhubung. Periksa koneksi internet kamu.';
+      return _isIndonesian
+          ? 'Tidak bisa terhubung. Periksa koneksi internet kamu.'
+          : 'Could not connect. Check your internet connection.';
     }
-    return 'Terjadi kesalahan. Coba lagi sebentar.';
+    return _isIndonesian
+        ? 'Terjadi kesalahan. Coba lagi sebentar.'
+        : 'Something went wrong. Try again in a moment.';
   }
 
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          const _AnimatedGradient(progress: 0.5),
-          _StaticCircle(
-            size: 160,
-            color: NaraColors.primary,
-            right: 50,
-            bottom: 60,
-            opacity: dark ? 0.08 : 0.04,
-          ),
-          _StaticCircle(
-            size: 120,
-            color: NaraColors.agent,
-            right: -20,
-            bottom: 25,
-            opacity: dark ? 0.08 : 0.04,
-          ),
-          _StaticCircle(
-            size: 200,
-            color: NaraColors.primary,
-            right: 30,
-            bottom: 15,
-            opacity: dark ? 0.06 : 0.04,
-          ),
-          SafeArea(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 480),
-                child:
-                    _onboardingDone ? _buildAppContent() : _buildOnboarding(),
+    return PopScope(
+      canPop: !_showingForm,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _showingForm) {
+          _closeForm();
+        }
+      },
+      child: Scaffold(
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            const _AnimatedGradient(progress: 0.5),
+            _StaticCircle(
+              size: 160,
+              color: NaraColors.primary,
+              right: 50,
+              bottom: 60,
+              opacity: dark ? 0.08 : 0.04,
+            ),
+            _StaticCircle(
+              size: 120,
+              color: NaraColors.agent,
+              right: -20,
+              bottom: 25,
+              opacity: dark ? 0.08 : 0.04,
+            ),
+            _StaticCircle(
+              size: 200,
+              color: NaraColors.primary,
+              right: 30,
+              bottom: 15,
+              opacity: dark ? 0.06 : 0.04,
+            ),
+            SafeArea(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480),
+                  child:
+                      _onboardingDone ? _buildAppContent() : _buildOnboarding(),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -149,21 +165,21 @@ class _AuthScreenState extends State<AuthScreen> {
         ? const [
             _OnboardingSlide(
               icon: Icons.checklist_rounded,
-              title: 'Mulai hari dengan daftar yang jelas',
+              title: 'Lihat kerjaan penting tanpa bongkar chat',
               body:
-                  'Tugas dan pengingat dirapikan agar kamu tahu apa yang perlu diselesaikan lebih dulu.',
+                  'Nara merapikan tugas, jadwal, dan hal yang perlu ditindaklanjuti di satu tempat.',
             ),
             _OnboardingSlide(
               icon: Icons.chat_bubble_outline_rounded,
-              title: 'Siapkan bantuan dari Nara Bot',
+              title: 'Siapkan Nara Bot saat WhatsApp sudah siap',
               body:
-                  'Hubungkan WhatsApp saat sudah siap, lalu pakai Nara untuk menjaga follow-up tetap rapi.',
+                  'Hubungkan nomor kerja, atur izin, lalu biarkan Nara membantu mengingatkan hal penting.',
             ),
             _OnboardingSlide(
-              icon: Icons.tune_rounded,
-              title: 'Atur sesuai gaya kerja kamu',
+              icon: Icons.verified_user_outlined,
+              title: 'Tindakan penting tetap minta izin',
               body:
-                  'Pilih cara Nara merespons, seberapa mandiri ia membantu, dan kapan ia perlu meminta izin.',
+                  'Kamu tetap pegang kontrol untuk tugas, pengingat, dan akses yang butuh persetujuan.',
             ),
           ]
         : const [
@@ -262,10 +278,10 @@ class _AuthScreenState extends State<AuthScreen> {
     final theme = Theme.of(context);
     return ListView(
       key: const ValueKey('welcome'),
-      padding: const EdgeInsets.fromLTRB(22, 28, 22, 24),
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
       children: [
         Container(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
@@ -301,7 +317,7 @@ class _AuthScreenState extends State<AuthScreen> {
             children: [
               Row(
                 children: [
-                  const NaraLogoMark(size: 54, showWordmark: false, pulse: 0),
+                  const NaraLogoMark(size: 48, showWordmark: false, pulse: 0),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -320,7 +336,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         const SizedBox(height: 2),
                         Text(
                           _isIndonesian
-                              ? 'Asisten kerja pribadi'
+                              ? 'Ruang kerja pribadi'
                               : 'Personal work assistant',
                           style: TextStyle(
                             fontSize: 12,
@@ -333,18 +349,22 @@ class _AuthScreenState extends State<AuthScreen> {
                       ],
                     ),
                   ),
+                  _WorkspaceStatusPill(
+                    icon: Icons.lock_outline_rounded,
+                    label: _isIndonesian ? 'Privat' : 'Private',
+                  ),
                 ],
               ),
               const SizedBox(height: 26),
               Text(
                 _isIndonesian
-                    ? 'Tugas, pengingat, dan follow-up tetap rapi.'
-                    : 'Keep tasks, reminders, and follow-ups tidy.',
+                    ? 'Satu tempat buat kerjaan yang gampang kelewat.'
+                    : 'One place for the work that is easy to miss.',
                 style: TextStyle(
-                  fontSize: 29,
+                  fontSize: 30,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 0,
-                  height: 1.08,
+                  height: 1.06,
                   color:
                       dark ? const Color(0xFFF1F7F5) : NaraColors.textPrimary,
                 ),
@@ -352,7 +372,7 @@ class _AuthScreenState extends State<AuthScreen> {
               const SizedBox(height: 10),
               Text(
                 _isIndonesian
-                    ? 'Catat yang perlu dikerjakan, siapkan pengingat, dan atur cara Nara membantu sesuai ritme kerja kamu.'
+                    ? 'Catat tugas, siapkan pengingat, dan atur kapan Nara Bot boleh membantu lewat WhatsApp.'
                     : 'Capture what needs doing, prepare reminders, and tune Nara to support your working rhythm.',
                 style: TextStyle(
                   fontSize: 14,
@@ -363,80 +383,22 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              const _MiniAgendaPreview(),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _WelcomePill(
-                    icon: Icons.checklist_rounded,
-                    label: _isIndonesian ? 'Tugas' : 'Tasks',
-                  ),
-                  _WelcomePill(
-                    icon: Icons.notifications_active_outlined,
-                    label: _isIndonesian ? 'Pengingat' : 'Reminders',
-                  ),
-                  const _WelcomePill(
-                    icon: Icons.chat_bubble_outline_rounded,
-                    label: 'Nara Bot',
-                  ),
-                ],
-              ),
+              _WelcomeWorkspacePreview(isIndonesian: _isIndonesian),
             ],
           ),
         ),
         const SizedBox(height: 18),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardTheme.color ?? NaraColors.surface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: Theme.of(context).dividerTheme.color ?? NaraColors.border,
-            ),
-          ),
-          child: Column(
-            children: [
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: FilledButton.icon(
-                  onPressed: () => _openForm(register: true),
-                  icon: const Icon(Icons.person_add_alt_rounded, size: 20),
-                  label: Text(
-                    _isIndonesian ? 'Buat akun Nara' : 'Create my Nara account',
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: OutlinedButton.icon(
-                  onPressed: () => _openForm(register: false),
-                  icon: const Icon(Icons.login_rounded, size: 20),
-                  label: Text(_isIndonesian ? 'Masuk' : 'Sign in'),
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: widget.onTryAsGuest,
-                child: Text(
-                  _isIndonesian
-                      ? 'Lihat tampilan dulu'
-                      : 'Preview the app first',
-                ),
-              ),
-            ],
-          ),
+        _WelcomeActionPanel(
+          isIndonesian: _isIndonesian,
+          onRegister: () => _openForm(register: true),
+          onSignIn: () => _openForm(register: false),
+          onPreview: widget.onTryAsGuest,
         ),
         const SizedBox(height: 14),
-        _TrustRow(
-          icon: Icons.verified_user_outlined,
+        _WelcomeSecurityNote(
           text: _isIndonesian
-              ? 'Akses Nara Bot dan tindakan penting tetap meminta izin sesuai pengaturan kamu.'
-              : 'Nara Bot access and sensitive actions stay permission-based.',
+              ? 'Nara Bot, persetujuan, dan pengingat bisa kamu atur lagi setelah masuk.'
+              : 'Nara Bot, approvals, and reminders can be adjusted after sign-in.',
         ),
       ],
     );
@@ -455,12 +417,9 @@ class _AuthScreenState extends State<AuthScreen> {
         Align(
           alignment: Alignment.centerLeft,
           child: IconButton(
-            onPressed: () => setState(() {
-              _showingForm = false;
-              _error = null;
-            }),
+            onPressed: _closeForm,
             icon: const Icon(Icons.arrow_back_rounded),
-            tooltip: 'Kembali',
+            tooltip: _isIndonesian ? 'Kembali' : 'Back',
             style: IconButton.styleFrom(
               backgroundColor: theme.colorScheme.surfaceContainerHighest,
               foregroundColor: theme.colorScheme.onSurface,
@@ -475,7 +434,9 @@ class _AuthScreenState extends State<AuthScreen> {
 
         // Title
         Text(
-          _isRegister ? 'Buat akun baru' : 'Masuk ke Nara',
+          _isRegister
+              ? (_isIndonesian ? 'Buat akun baru' : 'Create account')
+              : (_isIndonesian ? 'Masuk ke Nara' : 'Sign in to Nara'),
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.w800,
@@ -487,8 +448,12 @@ class _AuthScreenState extends State<AuthScreen> {
         const SizedBox(height: 6),
         Text(
           _isRegister
-              ? 'Siapkan akun agar tugas dan pengingat tetap tersimpan.'
-              : 'Lanjutkan mengelola tugas dan pengingat kamu.',
+              ? (_isIndonesian
+                  ? 'Siapkan akun agar tugas dan pengingat tetap tersimpan.'
+                  : 'Create an account so your tasks and reminders stay saved.')
+              : (_isIndonesian
+                  ? 'Lanjutkan mengelola tugas dan pengingat kamu.'
+                  : 'Continue managing your tasks and reminders.'),
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w400,
@@ -541,13 +506,15 @@ class _AuthScreenState extends State<AuthScreen> {
                   controller: _displayNameController,
                   textInputAction: TextInputAction.next,
                   textCapitalization: TextCapitalization.words,
-                  decoration: const InputDecoration(
-                    labelText: 'Nama',
-                    hintText: 'Nama kamu',
-                    prefixIcon: Icon(Icons.person_outline, size: 20),
+                  decoration: InputDecoration(
+                    labelText: _isIndonesian ? 'Nama' : 'Name',
+                    hintText: _isIndonesian ? 'Nama kamu' : 'Your name',
+                    prefixIcon: const Icon(Icons.person_outline, size: 20),
                   ),
                   validator: (v) => (v ?? '').trim().isEmpty
-                      ? 'Nama tidak boleh kosong'
+                      ? (_isIndonesian
+                          ? 'Nama tidak boleh kosong'
+                          : 'Name is required')
                       : null,
                 ),
                 const SizedBox(height: 14),
@@ -563,10 +530,14 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
                 validator: (v) {
                   if ((v ?? '').trim().isEmpty) {
-                    return 'Email tidak boleh kosong';
+                    return _isIndonesian
+                        ? 'Email tidak boleh kosong'
+                        : 'Email is required';
                   }
                   if (!v!.contains('@')) {
-                    return 'Format email tidak valid';
+                    return _isIndonesian
+                        ? 'Format email tidak valid'
+                        : 'Enter a valid email address';
                   }
                   return null;
                 },
@@ -577,7 +548,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 textInputAction: TextInputAction.done,
                 obscureText: _obscurePassword,
                 decoration: InputDecoration(
-                  labelText: 'Kata sandi',
+                  labelText: _isIndonesian ? 'Kata sandi' : 'Password',
                   prefixIcon: const Icon(Icons.lock_outline, size: 20),
                   suffixIcon: IconButton(
                     icon: Icon(
@@ -586,15 +557,19 @@ class _AuthScreenState extends State<AuthScreen> {
                           : Icons.visibility_off_outlined,
                       size: 20,
                     ),
-                    tooltip:
-                        _obscurePassword ? 'Lihat kata sandi' : 'Sembunyikan',
+                    tooltip: _obscurePassword
+                        ? (_isIndonesian ? 'Lihat kata sandi' : 'Show password')
+                        : (_isIndonesian ? 'Sembunyikan' : 'Hide password'),
                     onPressed: () => setState(
                       () => _obscurePassword = !_obscurePassword,
                     ),
                   ),
                 ),
-                validator: (v) =>
-                    (v ?? '').length < 6 ? 'Minimal 6 karakter' : null,
+                validator: (v) => (v ?? '').length < 6
+                    ? (_isIndonesian
+                        ? 'Minimal 6 karakter'
+                        : 'Use at least 6 characters')
+                    : null,
                 onFieldSubmitted: (_) => _submit(),
               ),
             ],
@@ -625,8 +600,12 @@ class _AuthScreenState extends State<AuthScreen> {
                   ),
             label: Text(
               _loading
-                  ? (_isRegister ? 'Membuat akun...' : 'Masuk...')
-                  : (_isRegister ? 'Buat Akun' : 'Masuk'),
+                  ? (_isRegister
+                      ? (_isIndonesian ? 'Membuat akun...' : 'Creating...')
+                      : (_isIndonesian ? 'Masuk...' : 'Signing in...'))
+                  : (_isRegister
+                      ? (_isIndonesian ? 'Buat Akun' : 'Create Account')
+                      : (_isIndonesian ? 'Masuk' : 'Sign In')),
             ),
           ),
         ),
@@ -637,7 +616,13 @@ class _AuthScreenState extends State<AuthScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              _isRegister ? 'Sudah punya akun?' : 'Belum punya akun?',
+              _isRegister
+                  ? (_isIndonesian
+                      ? 'Sudah punya akun?'
+                      : 'Already have an account?')
+                  : (_isIndonesian
+                      ? 'Belum punya akun?'
+                      : 'Do not have an account yet?'),
               style: TextStyle(
                 fontSize: 13,
                 color: theme.textTheme.bodyMedium?.color,
@@ -649,7 +634,9 @@ class _AuthScreenState extends State<AuthScreen> {
                 _error = null;
               }),
               child: Text(
-                _isRegister ? 'Masuk' : 'Buat akun',
+                _isRegister
+                    ? (_isIndonesian ? 'Masuk' : 'Sign in')
+                    : (_isIndonesian ? 'Buat akun' : 'Create account'),
                 style: const TextStyle(fontSize: 13),
               ),
             ),
@@ -671,12 +658,21 @@ class _AuthScreenState extends State<AuthScreen> {
       _obscurePassword = true;
     });
   }
+
+  void _closeForm() {
+    setState(() {
+      _showingForm = false;
+      _error = null;
+    });
+  }
 }
 
 // ── Background & Floating Elements ─────────────────────────────────────
 
-class _MiniAgendaPreview extends StatelessWidget {
-  const _MiniAgendaPreview();
+class _WelcomeWorkspacePreview extends StatelessWidget {
+  const _WelcomeWorkspacePreview({required this.isIndonesian});
+
+  final bool isIndonesian;
 
   @override
   Widget build(BuildContext context) {
@@ -694,26 +690,48 @@ class _MiniAgendaPreview extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: border),
       ),
-      child: const Column(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _PreviewRow(
-            icon: Icons.check_circle_outline_rounded,
-            title: 'Follow up pesanan klien',
-            meta: 'Hari ini',
+          Row(
+            children: [
+              _WorkspaceStatusPill(
+                icon: Icons.today_outlined,
+                label: isIndonesian ? 'Hari ini' : 'Today',
+              ),
+              const Spacer(),
+              Icon(
+                Icons.more_horiz_rounded,
+                size: 20,
+                color: dark ? const Color(0xFF91AAA5) : NaraColors.textMuted,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _WorkspaceAgendaRow(
+            icon: Icons.assignment_turned_in_outlined,
+            title: isIndonesian
+                ? 'Follow up proposal yang belum dijawab'
+                : 'Follow up the proposal still waiting',
+            meta: isIndonesian ? 'Sore ini' : 'This afternoon',
             color: NaraColors.primary,
           ),
-          SizedBox(height: 10),
-          _PreviewRow(
-            icon: Icons.notifications_none_rounded,
-            title: 'Ingatkan pembayaran DP',
-            meta: 'Besok 09.00',
+          const SizedBox(height: 10),
+          _WorkspaceAgendaRow(
+            icon: Icons.notifications_active_outlined,
+            title: isIndonesian
+                ? 'Ingatkan pembayaran DP'
+                : 'Remind about the deposit payment',
+            meta: isIndonesian ? 'Besok 09.00' : 'Tomorrow 09:00',
             color: NaraColors.warning,
           ),
-          SizedBox(height: 10),
-          _PreviewRow(
-            icon: Icons.chat_bubble_outline_rounded,
-            title: 'Nara Bot siap bantu follow-up',
-            meta: 'Minta izin dulu',
+          const SizedBox(height: 10),
+          _WorkspaceAgendaRow(
+            icon: Icons.verified_user_outlined,
+            title: isIndonesian
+                ? 'Nara Bot minta izin sebelum jalan'
+                : 'Nara Bot asks before acting',
+            meta: isIndonesian ? 'Menunggu persetujuan' : 'Waiting approval',
             color: NaraColors.agent,
           ),
         ],
@@ -722,8 +740,8 @@ class _MiniAgendaPreview extends StatelessWidget {
   }
 }
 
-class _PreviewRow extends StatelessWidget {
-  const _PreviewRow({
+class _WorkspaceAgendaRow extends StatelessWidget {
+  const _WorkspaceAgendaRow({
     required this.icon,
     required this.title,
     required this.meta,
@@ -783,13 +801,78 @@ class _PreviewRow extends StatelessWidget {
   }
 }
 
-class _TrustRow extends StatelessWidget {
-  const _TrustRow({
-    required this.icon,
-    required this.text,
+class _WelcomeActionPanel extends StatelessWidget {
+  const _WelcomeActionPanel({
+    required this.isIndonesian,
+    required this.onRegister,
+    required this.onSignIn,
+    required this.onPreview,
   });
 
-  final IconData icon;
+  final bool isIndonesian;
+  final VoidCallback onRegister;
+  final VoidCallback onSignIn;
+  final VoidCallback onPreview;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardTheme.color ?? NaraColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: Theme.of(context).dividerTheme.color ?? NaraColors.border,
+        ),
+      ),
+      child: Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: FilledButton.icon(
+              onPressed: onRegister,
+              icon: const Icon(Icons.person_add_alt_rounded, size: 20),
+              label: Text(
+                isIndonesian ? 'Mulai pakai Nara' : 'Start using Nara',
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 46,
+                  child: OutlinedButton.icon(
+                    onPressed: onSignIn,
+                    icon: const Icon(Icons.login_rounded, size: 20),
+                    label: Text(isIndonesian ? 'Masuk' : 'Sign in'),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: SizedBox(
+                  height: 46,
+                  child: TextButton.icon(
+                    onPressed: onPreview,
+                    icon: const Icon(Icons.visibility_outlined, size: 19),
+                    label: Text(isIndonesian ? 'Coba dulu' : 'Preview'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WelcomeSecurityNote extends StatelessWidget {
+  const _WelcomeSecurityNote({required this.text});
+
   final String text;
 
   @override
@@ -809,7 +892,11 @@ class _TrustRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
+          Icon(
+            Icons.verified_user_outlined,
+            size: 18,
+            color: Theme.of(context).colorScheme.primary,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -829,8 +916,8 @@ class _TrustRow extends StatelessWidget {
   }
 }
 
-class _WelcomePill extends StatelessWidget {
-  const _WelcomePill({
+class _WorkspaceStatusPill extends StatelessWidget {
+  const _WorkspaceStatusPill({
     required this.icon,
     required this.label,
   });

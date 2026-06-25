@@ -98,7 +98,10 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           // ── Guest banner ──
           if (isGuest) ...[
-            _GuestBanner(onSignIn: widget.onSignIn),
+            _GuestBanner(
+              isIndonesian: isId,
+              onSignIn: widget.onSignIn,
+            ),
             const SizedBox(height: 16),
           ],
 
@@ -282,7 +285,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: widget.state.activity
                       .take(5)
-                      .map((a) => _ActivityRow(activity: a))
+                      .map((a) => _ActivityRow(
+                            activity: a,
+                            isIndonesian: isId,
+                          ))
                       .toList(),
                 ),
               ),
@@ -449,24 +455,30 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showGuestDialog(BuildContext context) {
+    final isIndonesian =
+        widget.state.languagePreference == NaraLanguagePreference.indonesia;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Sign in to continue'),
-        content: const Text(
-          'You need an account to create or edit tasks.',
+        title: Text(
+          isIndonesian ? 'Masuk dulu untuk lanjut' : 'Sign in to continue',
+        ),
+        content: Text(
+          isIndonesian
+              ? 'Kamu perlu akun untuk membuat atau mengubah tugas.'
+              : 'You need an account to create or edit tasks.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
+            child: Text(isIndonesian ? 'Batal' : 'Cancel'),
           ),
           FilledButton(
             onPressed: () {
               Navigator.of(ctx).pop();
               widget.onSignIn();
             },
-            child: const Text('Sign In'),
+            child: Text(isIndonesian ? 'Masuk' : 'Sign In'),
           ),
         ],
       ),
@@ -477,7 +489,12 @@ class _HomeScreenState extends State<HomeScreen> {
 // ── Guest Banner ───────────────────────────────────────────────────────
 
 class _GuestBanner extends StatelessWidget {
-  const _GuestBanner({required this.onSignIn});
+  const _GuestBanner({
+    required this.isIndonesian,
+    required this.onSignIn,
+  });
+
+  final bool isIndonesian;
   final VoidCallback onSignIn;
 
   @override
@@ -499,7 +516,9 @@ class _GuestBanner extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'You\'re in preview mode — sign in to save your data.',
+              isIndonesian
+                  ? 'Kamu sedang melihat pratinjau. Masuk untuk menyimpan data.'
+                  : 'You\'re in preview mode. Sign in to save your data.',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
@@ -517,8 +536,8 @@ class _GuestBanner extends StatelessWidget {
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            child: const Text(
-              'Sign In',
+            child: Text(
+              isIndonesian ? 'Masuk' : 'Sign In',
               style: TextStyle(fontSize: 13),
             ),
           ),
@@ -680,8 +699,13 @@ class _GreetingRow extends StatelessWidget {
 // ── Activity Row ───────────────────────────────────────────────────────
 
 class _ActivityRow extends StatelessWidget {
-  const _ActivityRow({required this.activity});
+  const _ActivityRow({
+    required this.activity,
+    required this.isIndonesian,
+  });
+
   final NaraActivity activity;
+  final bool isIndonesian;
 
   @override
   Widget build(BuildContext context) {
@@ -707,7 +731,7 @@ class _ActivityRow extends StatelessWidget {
                     style: const TextStyle(fontWeight: FontWeight.w500),
                   ),
                   TextSpan(
-                    text: ' • ${_timeAgo(activity.timestamp)}',
+                    text: ' - ${_timeAgo(activity.timestamp)}',
                     style: TextStyle(
                       color: context.naraTextMuted,
                       fontWeight: FontWeight.w400,
@@ -738,9 +762,17 @@ class _ActivityRow extends StatelessWidget {
 
   String _timeAgo(DateTime dt) {
     final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 1) return 'just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    return '${diff.inDays}d ago';
+    if (diff.inMinutes < 1) {
+      return isIndonesian ? 'baru saja' : 'just now';
+    }
+    if (diff.inMinutes < 60) {
+      return isIndonesian
+          ? '${diff.inMinutes} menit lalu'
+          : '${diff.inMinutes}m ago';
+    }
+    if (diff.inHours < 24) {
+      return isIndonesian ? '${diff.inHours} jam lalu' : '${diff.inHours}h ago';
+    }
+    return isIndonesian ? '${diff.inDays} hari lalu' : '${diff.inDays}d ago';
   }
 }

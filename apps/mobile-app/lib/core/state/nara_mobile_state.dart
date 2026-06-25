@@ -367,12 +367,12 @@ class NaraActivity {
 
 class NaraMobileState {
   NaraConnectionState connectionState = NaraConnectionState.unknown;
-  String connectionMessage = 'Not checked yet';
+  String connectionMessage = 'Belum dicek';
   DateTime? lastConnectionCheck;
 
   bool isGuest = false;
   NaraThemePreference themePreference = NaraThemePreference.light;
-  NaraLanguagePreference languagePreference = NaraLanguagePreference.english;
+  NaraLanguagePreference languagePreference = NaraLanguagePreference.indonesia;
 
   bool tasksLoading = false;
   String? tasksError;

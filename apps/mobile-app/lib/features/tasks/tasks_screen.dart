@@ -439,24 +439,30 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   void _showGuestDialog(BuildContext context) {
+    final isIndonesian =
+        widget.state.languagePreference == NaraLanguagePreference.indonesia;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Sign in to continue'),
-        content: const Text(
-          'You need an account to create or edit tasks.',
+        title: Text(
+          isIndonesian ? 'Masuk dulu untuk lanjut' : 'Sign in to continue',
+        ),
+        content: Text(
+          isIndonesian
+              ? 'Kamu perlu akun untuk membuat atau mengubah tugas.'
+              : 'You need an account to create or edit tasks.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
+            child: Text(isIndonesian ? 'Batal' : 'Cancel'),
           ),
           FilledButton(
             onPressed: () {
               Navigator.of(ctx).pop();
               // Guest can't sign in from here — use callback if available
             },
-            child: const Text('Sign In'),
+            child: Text(isIndonesian ? 'Masuk' : 'Sign In'),
           ),
         ],
       ),
@@ -473,9 +479,15 @@ class _TasksScreenState extends State<TasksScreen> {
       await widget.onCreateTask(draft);
     } catch (_) {
       if (!context.mounted) return;
+      final isIndonesian =
+          widget.state.languagePreference == NaraLanguagePreference.indonesia;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not create task. Check your connection.'),
+        SnackBar(
+          content: Text(
+            isIndonesian
+                ? 'Tugas belum bisa dibuat. Periksa koneksi kamu.'
+                : 'Could not create task. Check your connection.',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );

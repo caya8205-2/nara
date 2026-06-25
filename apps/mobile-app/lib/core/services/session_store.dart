@@ -107,7 +107,7 @@ class NaraSessionStore {
     final raw = prefs.getString(_languagePreferenceKey);
     return NaraLanguagePreference.values.firstWhere(
       (value) => value.name == raw,
-      orElse: () => NaraLanguagePreference.english,
+      orElse: () => NaraLanguagePreference.indonesia,
     );
   }
 

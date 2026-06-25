@@ -24,6 +24,8 @@ class ApprovalsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final approvals = state.approvals;
+    final isIndonesian =
+        state.languagePreference == NaraLanguagePreference.indonesia;
 
     return RefreshIndicator(
       onRefresh: () => onRefresh(silent: false),
@@ -38,13 +40,13 @@ class ApprovalsScreen extends StatelessWidget {
                 IconButton(
                   onPressed: onBack,
                   icon: const Icon(Icons.arrow_back),
-                  tooltip: 'Back',
+                  tooltip: isIndonesian ? 'Kembali' : 'Back',
                 ),
                 const SizedBox(width: 4),
               ],
               Expanded(
                 child: Text(
-                  'Approvals',
+                  isIndonesian ? 'Persetujuan' : 'Approvals',
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
               ),
@@ -53,8 +55,12 @@ class ApprovalsScreen extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             approvals.isEmpty
-                ? 'Actions that need your review will appear here.'
-                : '${approvals.length} pending action${approvals.length == 1 ? '' : 's'} need your review.',
+                ? (isIndonesian
+                    ? 'Permintaan yang butuh persetujuan akan muncul di sini.'
+                    : 'Actions that need your review will appear here.')
+                : (isIndonesian
+                    ? '${approvals.length} permintaan menunggu persetujuan.'
+                    : '${approvals.length} pending action${approvals.length == 1 ? '' : 's'} need your review.'),
             style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w400,
@@ -83,12 +89,15 @@ class ApprovalsScreen extends StatelessWidget {
 
           // Empty state
           if (approvals.isEmpty)
-            const NaraCard(
+            NaraCard(
               child: NaraEmptyState(
                 icon: Icons.checklist_outlined,
-                title: 'No pending approvals',
-                body:
-                    'Actions that need your review will appear here — like tasks from WhatsApp or bot suggestions.',
+                title: isIndonesian
+                    ? 'Tidak ada persetujuan'
+                    : 'No pending approvals',
+                body: isIndonesian
+                    ? 'Permintaan dari WhatsApp atau Nara Bot akan muncul di sini sebelum dijalankan.'
+                    : 'Actions that need your review will appear here, like tasks from WhatsApp or bot suggestions.',
               ),
             ),
 
@@ -104,9 +113,11 @@ class ApprovalsScreen extends StatelessWidget {
                       const Divider(height: 1, indent: 52, endIndent: 16),
                     _ApprovalTile(
                       approval: approvals[i],
+                      isIndonesian: isIndonesian,
                       onTap: () => _showApprovalDetail(
                         context,
                         approvals[i],
+                        isIndonesian,
                         onApprove,
                         onReject,
                       ),
@@ -123,6 +134,7 @@ class ApprovalsScreen extends StatelessWidget {
   void _showApprovalDetail(
     BuildContext context,
     NaraApproval approval,
+    bool isIndonesian,
     Future<void> Function(NaraApproval) onApprove,
     Future<void> Function(NaraApproval) onReject,
   ) {
@@ -135,6 +147,7 @@ class ApprovalsScreen extends StatelessWidget {
       ),
       builder: (_) => _ApprovalDetailSheet(
         approval: approval,
+        isIndonesian: isIndonesian,
         onApprove: () => onApprove(approval),
         onReject: () => onReject(approval),
       ),
@@ -143,15 +156,22 @@ class ApprovalsScreen extends StatelessWidget {
 }
 
 class _ApprovalTile extends StatelessWidget {
-  const _ApprovalTile({required this.approval, required this.onTap});
+  const _ApprovalTile({
+    required this.approval,
+    required this.isIndonesian,
+    required this.onTap,
+  });
+
   final NaraApproval approval;
+  final bool isIndonesian;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final (IconData icon, Color iconColor, Color iconBg) =
         _actionTypeVisual(approval.actionType);
-    final (Color riskColor, String riskLabel) = _riskVisual(approval.riskLevel);
+    final (Color riskColor, String riskLabel) =
+        _riskVisual(approval.riskLevel, isIndonesian: isIndonesian);
 
     return ListTile(
       onTap: onTap,
@@ -180,7 +200,7 @@ class _ApprovalTile extends StatelessWidget {
           _SourceChip(source: approval.source),
           const SizedBox(width: 8),
           Text(
-            _timeAgo(approval.createdAt),
+            _timeAgo(approval.createdAt, isIndonesian: isIndonesian),
             style: const TextStyle(
               fontSize: 11,
               color: NaraColors.textMuted,
@@ -210,11 +230,13 @@ class _ApprovalTile extends StatelessWidget {
 class _ApprovalDetailSheet extends StatefulWidget {
   const _ApprovalDetailSheet({
     required this.approval,
+    required this.isIndonesian,
     required this.onApprove,
     required this.onReject,
   });
 
   final NaraApproval approval;
+  final bool isIndonesian;
   final Future<void> Function() onApprove;
   final Future<void> Function() onReject;
 
@@ -246,8 +268,12 @@ class _ApprovalDetailSheetState extends State<_ApprovalDetailSheet> {
         _action = null;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not process this action. Try again.'),
+        SnackBar(
+          content: Text(
+            widget.isIndonesian
+                ? 'Permintaan belum bisa diproses. Coba lagi.'
+                : 'Could not process this action. Try again.',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -257,9 +283,11 @@ class _ApprovalDetailSheetState extends State<_ApprovalDetailSheet> {
   @override
   Widget build(BuildContext context) {
     final a = widget.approval;
+    final isIndonesian = widget.isIndonesian;
     final (IconData icon, Color iconColor, Color iconBg) =
         _actionTypeVisual(a.actionType);
-    final (Color riskColor, String riskLabel) = _riskVisual(a.riskLevel);
+    final (Color riskColor, String riskLabel) =
+        _riskVisual(a.riskLevel, isIndonesian: isIndonesian);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
@@ -318,7 +346,9 @@ class _ApprovalDetailSheetState extends State<_ApprovalDetailSheet> {
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            'Risk: $riskLabel',
+                            isIndonesian
+                                ? 'Risiko: $riskLabel'
+                                : 'Risk: $riskLabel',
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
@@ -337,7 +367,9 @@ class _ApprovalDetailSheetState extends State<_ApprovalDetailSheet> {
 
           // Timestamp
           Text(
-            'Requested ${_timeAgo(a.createdAt)}',
+            isIndonesian
+                ? 'Diajukan ${_timeAgo(a.createdAt, isIndonesian: true)}'
+                : 'Requested ${_timeAgo(a.createdAt, isIndonesian: false)}',
             style: const TextStyle(
               fontSize: 12,
               color: NaraColors.textMuted,
@@ -347,8 +379,8 @@ class _ApprovalDetailSheetState extends State<_ApprovalDetailSheet> {
 
           // Payload preview
           if (a.payload != null && a.payload!.isNotEmpty) ...[
-            const Text(
-              'Payload',
+            Text(
+              isIndonesian ? 'Detail' : 'Payload',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
@@ -397,7 +429,7 @@ class _ApprovalDetailSheetState extends State<_ApprovalDetailSheet> {
                             color: NaraColors.danger,
                           ),
                         )
-                      : const Text('Reject'),
+                      : Text(isIndonesian ? 'Tolak' : 'Reject'),
                 ),
               ),
               const SizedBox(width: 12),
@@ -416,7 +448,7 @@ class _ApprovalDetailSheetState extends State<_ApprovalDetailSheet> {
                             color: Colors.white,
                           ),
                         )
-                      : const Text('Approve'),
+                      : Text(isIndonesian ? 'Setujui' : 'Approve'),
                 ),
               ),
             ],
@@ -478,20 +510,36 @@ class _ApprovalDetailSheetState extends State<_ApprovalDetailSheet> {
   };
 }
 
-(Color, String) _riskVisual(String risk) {
+(Color, String) _riskVisual(
+  String risk, {
+  required bool isIndonesian,
+}) {
   return switch (risk) {
-    'high' => (NaraColors.danger, 'High'),
-    'medium' => (NaraColors.warning, 'Med'),
-    _ => (NaraColors.agent, 'Low'),
+    'high' => (NaraColors.danger, isIndonesian ? 'Tinggi' : 'High'),
+    'medium' => (NaraColors.warning, isIndonesian ? 'Sedang' : 'Med'),
+    _ => (NaraColors.agent, isIndonesian ? 'Rendah' : 'Low'),
   };
 }
 
-String _timeAgo(DateTime dt) {
+String _timeAgo(
+  DateTime dt, {
+  required bool isIndonesian,
+}) {
   final diff = DateTime.now().difference(dt);
-  if (diff.inMinutes < 1) return 'just now';
-  if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-  if (diff.inHours < 24) return '${diff.inHours}h ago';
-  if (diff.inDays < 7) return '${diff.inDays}d ago';
+  if (diff.inMinutes < 1) {
+    return isIndonesian ? 'baru saja' : 'just now';
+  }
+  if (diff.inMinutes < 60) {
+    return isIndonesian
+        ? '${diff.inMinutes} menit lalu'
+        : '${diff.inMinutes}m ago';
+  }
+  if (diff.inHours < 24) {
+    return isIndonesian ? '${diff.inHours} jam lalu' : '${diff.inHours}h ago';
+  }
+  if (diff.inDays < 7) {
+    return isIndonesian ? '${diff.inDays} hari lalu' : '${diff.inDays}d ago';
+  }
   return '${dt.day}/${dt.month}/${dt.year}';
 }
 

@@ -40,6 +40,9 @@ class _NaraMobileAppState extends State<NaraMobileApp>
   bool restoringSession = true;
   bool whatsAppPromptVisible = false;
 
+  bool get isIndonesian =>
+      appState.languagePreference == NaraLanguagePreference.indonesia;
+
   @override
   void initState() {
     super.initState();
@@ -103,7 +106,8 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     setState(() {
       currentUser = session.user;
       restoringSession = false;
-      appState.connectionMessage = 'Restored session';
+      appState.connectionMessage =
+          isIndonesian ? 'Sesi dipulihkan' : 'Restored session';
     });
 
     try {
@@ -123,7 +127,8 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       if (!mounted) return;
       setState(() {
         currentUser = null;
-        appState.connectionMessage = 'Session expired';
+        appState.connectionMessage =
+            isIndonesian ? 'Sesi berakhir' : 'Session expired';
       });
       return;
     }
@@ -173,7 +178,8 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       appState.approvalsLoading = false;
       appState.activity = [];
       appState.connectionState = NaraConnectionState.unknown;
-      appState.connectionMessage = 'Guest mode';
+      appState.connectionMessage =
+          isIndonesian ? 'Mode pratinjau' : 'Guest mode';
     });
   }
 
@@ -190,7 +196,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       appState.isGuest = false;
       selectedIndex = 0;
       appState.connectionState = NaraConnectionState.unknown;
-      appState.connectionMessage = 'Signed out';
+      appState.connectionMessage = isIndonesian ? 'Sudah keluar' : 'Signed out';
       appState.lastConnectionCheck = null;
       appState.tasks = [];
       appState.tasksError = null;
@@ -231,7 +237,8 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     if (showChecking) {
       setState(() {
         appState.connectionState = NaraConnectionState.checking;
-        appState.connectionMessage = 'Checking server';
+        appState.connectionMessage =
+            isIndonesian ? 'Memeriksa server' : 'Checking server';
       });
     }
 
@@ -241,14 +248,16 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       setState(() {
         appState.connectionState =
             ok ? NaraConnectionState.connected : NaraConnectionState.attention;
-        appState.connectionMessage =
-            ok ? 'Nara is ready' : 'Nara needs attention';
+        appState.connectionMessage = ok
+            ? (isIndonesian ? 'Nara siap dipakai' : 'Nara is ready')
+            : (isIndonesian ? 'Nara butuh perhatian' : 'Nara needs attention');
         appState.lastConnectionCheck = DateTime.now();
       });
     } catch (error) {
       setState(() {
         appState.connectionState = NaraConnectionState.offline;
-        appState.connectionMessage = 'Could not reach Nara';
+        appState.connectionMessage =
+            isIndonesian ? 'Nara belum bisa dijangkau' : 'Could not reach Nara';
         appState.lastConnectionCheck = DateTime.now();
       });
     }
@@ -277,7 +286,8 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       });
     } catch (error) {
       setState(() {
-        appState.tasksError = 'Could not load tasks';
+        appState.tasksError =
+            isIndonesian ? 'Tugas belum bisa dimuat' : 'Could not load tasks';
       });
     } finally {
       if (!silent) {
@@ -308,7 +318,9 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       await reconcileLocalReminderNotifications(reminders);
     } catch (_) {
       if (!mounted) return;
-      setState(() => appState.remindersError = 'Could not load reminders');
+      setState(() => appState.remindersError = isIndonesian
+          ? 'Pengingat belum bisa dimuat'
+          : 'Could not load reminders');
     } finally {
       if (!silent && mounted) {
         setState(() => appState.remindersLoading = false);
@@ -335,7 +347,9 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       setState(() => appState.approvals = approvals);
     } catch (_) {
       if (!mounted) return;
-      setState(() => appState.approvalsError = 'Could not load approvals');
+      setState(() => appState.approvalsError = isIndonesian
+          ? 'Persetujuan belum bisa dimuat'
+          : 'Could not load approvals');
     } finally {
       if (!silent && mounted) {
         setState(() => appState.approvalsLoading = false);
@@ -403,7 +417,9 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        appState.assistantError = 'Could not load assistant setup';
+        appState.assistantError = isIndonesian
+            ? 'Pengaturan Nara Bot belum bisa dimuat'
+            : 'Could not load assistant setup';
       });
     } finally {
       if (!silent && mounted) {
@@ -433,6 +449,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       context: context,
       barrierDismissible: false,
       builder: (context) => _WhatsAppSetupPrompt(
+        isIndonesian: isIndonesian,
         onLater: () async {
           await sessionStore.markWhatsAppPromptSeen(userId);
           if (!context.mounted) return;
@@ -460,7 +477,9 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     setState(() {
       appState.assistantPreferences = preferences;
       appState.assistantSaving = true;
-      appState.assistantMessage = 'Assistant settings saved';
+      appState.assistantMessage = isIndonesian
+          ? 'Pengaturan Nara Bot tersimpan'
+          : 'Assistant settings saved';
       appState.assistantError = null;
     });
     await sessionStore.saveAssistantPreferences(preferences);
@@ -482,13 +501,16 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       if (!mounted) return;
       setState(() {
         appState.assistantPreferences = profile;
-        appState.assistantMessage = 'Assistant settings saved';
+        appState.assistantMessage = isIndonesian
+            ? 'Pengaturan Nara Bot tersimpan'
+            : 'Assistant settings saved';
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        appState.assistantError =
-            'Saved on this phone. Nara Bot will sync when the server is reachable.';
+        appState.assistantError = isIndonesian
+            ? 'Tersimpan di ponsel ini. Nara Bot akan sinkron saat server bisa dijangkau.'
+            : 'Saved on this phone. Nara Bot will sync when the server is reachable.';
       });
     } finally {
       if (mounted) {
@@ -508,13 +530,16 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     final number = rawNumber.trim();
     if (userId == null) {
       setState(() {
-        appState.assistantError = 'Please sign in again';
+        appState.assistantError =
+            isIndonesian ? 'Silakan masuk lagi' : 'Please sign in again';
       });
       return;
     }
     if (number.length < 8) {
       setState(() {
-        appState.assistantError = 'Enter a valid WhatsApp number';
+        appState.assistantError = isIndonesian
+            ? 'Masukkan nomor WhatsApp yang valid'
+            : 'Enter a valid WhatsApp number';
       });
       return;
     }
@@ -549,12 +574,16 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       setState(() {
         appState.whatsappContact = contact;
         appState.whatsappAccess = access;
-        appState.assistantMessage = 'WhatsApp access requested';
+        appState.assistantMessage = isIndonesian
+            ? 'Akses WhatsApp sudah diajukan'
+            : 'WhatsApp access requested';
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        appState.assistantError = 'Could not request WhatsApp access';
+        appState.assistantError = isIndonesian
+            ? 'Akses WhatsApp belum bisa diajukan'
+            : 'Could not request WhatsApp access';
       });
     } finally {
       if (mounted) {
@@ -586,7 +615,8 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       });
     } catch (error) {
       setState(() {
-        appState.tasksError = 'Could not create task';
+        appState.tasksError =
+            isIndonesian ? 'Tugas belum bisa dibuat' : 'Could not create task';
       });
       rethrow;
     }
@@ -615,7 +645,9 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     } catch (error) {
       setState(() {
         appState.tasks = previousTasks;
-        appState.tasksError = 'Could not complete task';
+        appState.tasksError = isIndonesian
+            ? 'Tugas belum bisa diselesaikan'
+            : 'Could not complete task';
       });
     }
   }
@@ -651,7 +683,9 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       if (!mounted) return;
       setState(() {
         appState.tasks = previousTasks;
-        appState.tasksError = 'Could not update task';
+        appState.tasksError = isIndonesian
+            ? 'Tugas belum bisa diperbarui'
+            : 'Could not update task';
       });
       rethrow;
     }
@@ -673,7 +707,8 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       if (!mounted) return;
       setState(() {
         appState.tasks = previousTasks;
-        appState.tasksError = 'Could not delete task';
+        appState.tasksError =
+            isIndonesian ? 'Tugas belum bisa dihapus' : 'Could not delete task';
       });
       rethrow;
     }
@@ -720,7 +755,9 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       if (!mounted) return;
       setState(() {
         appState.reminders = previous;
-        appState.remindersError = 'Could not update reminder';
+        appState.remindersError = isIndonesian
+            ? 'Pengingat belum bisa diperbarui'
+            : 'Could not update reminder';
       });
     }
   }
@@ -737,7 +774,9 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       if (!mounted) return;
       setState(() {
         appState.reminders = previous;
-        appState.remindersError = 'Could not delete reminder';
+        appState.remindersError = isIndonesian
+            ? 'Pengingat belum bisa dihapus'
+            : 'Could not delete reminder';
       });
     }
   }
@@ -795,8 +834,12 @@ class _NaraMobileAppState extends State<NaraMobileApp>
       setState(() {
         appState.approvals = previous;
         appState.approvalsError = approve
-            ? 'Could not approve this request'
-            : 'Could not reject this request';
+            ? (isIndonesian
+                ? 'Permintaan belum bisa disetujui'
+                : 'Could not approve this request')
+            : (isIndonesian
+                ? 'Permintaan belum bisa ditolak'
+                : 'Could not reject this request');
       });
       rethrow;
     }
@@ -820,21 +863,24 @@ class _NaraMobileAppState extends State<NaraMobileApp>
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Sign in to continue'),
-        content: const Text(
-          'You need an account to use this feature.',
+        title: Text(
+            isIndonesian ? 'Masuk dulu untuk lanjut' : 'Sign in to continue'),
+        content: Text(
+          isIndonesian
+              ? 'Kamu perlu akun untuk memakai fitur ini.'
+              : 'You need an account to use this feature.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
+            child: Text(isIndonesian ? 'Batal' : 'Cancel'),
           ),
           FilledButton(
             onPressed: () {
               Navigator.of(ctx).pop();
               handleSignIn();
             },
-            child: const Text('Sign In'),
+            child: Text(isIndonesian ? 'Masuk' : 'Sign In'),
           ),
         ],
       ),
@@ -1071,10 +1117,12 @@ class _SessionLoadingScreen extends StatelessWidget {
 
 class _WhatsAppSetupPrompt extends StatelessWidget {
   const _WhatsAppSetupPrompt({
+    required this.isIndonesian,
     required this.onLater,
     required this.onSetup,
   });
 
+  final bool isIndonesian;
   final Future<void> Function() onLater;
   final Future<void> Function() onSetup;
 
@@ -1100,7 +1148,9 @@ class _WhatsAppSetupPrompt extends StatelessWidget {
               const NaraLogoMark(size: 72),
               const SizedBox(height: 16),
               Text(
-                'Connect WhatsApp to unlock Nara Bot',
+                isIndonesian
+                    ? 'Hubungkan WhatsApp untuk memakai Nara Bot'
+                    : 'Connect WhatsApp to unlock Nara Bot',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w800,
@@ -1108,7 +1158,9 @@ class _WhatsAppSetupPrompt extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Without your WhatsApp number, Nara still works for manual tasks and reminders, but the main bot workflow cannot reach you yet.',
+                isIndonesian
+                    ? 'Tanpa nomor WhatsApp, Nara tetap bisa dipakai untuk tugas dan pengingat manual. Nara Bot baru bisa membantu lewat chat setelah nomor terhubung.'
+                    : 'Without your WhatsApp number, Nara still works for manual tasks and reminders, but the main bot workflow cannot reach you yet.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium,
               ),
@@ -1118,14 +1170,14 @@ class _WhatsAppSetupPrompt extends StatelessWidget {
                   onSetup();
                 },
                 icon: const Icon(Icons.chat_outlined),
-                label: const Text('Set Up WhatsApp'),
+                label: Text(isIndonesian ? 'Atur WhatsApp' : 'Set Up WhatsApp'),
               ),
               const SizedBox(height: 8),
               TextButton(
                 onPressed: () {
                   onLater();
                 },
-                child: const Text('Later'),
+                child: Text(isIndonesian ? 'Nanti saja' : 'Later'),
               ),
             ],
           ),

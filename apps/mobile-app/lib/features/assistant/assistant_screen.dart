@@ -318,9 +318,15 @@ class _AssistantScreenState extends State<AssistantScreen> {
                     savePreference(p.copyWith(allowTaskCreation: value));
                   },
                   secondary: const Icon(Icons.add_task_outlined),
-                  title: const Text('Create tasks from chats'),
-                  subtitle: const Text(
-                    'Nara Bot can turn clear requests into tasks.',
+                  title: Text(
+                    isIndonesian
+                        ? 'Buat tugas dari chat'
+                        : 'Create tasks from chats',
+                  ),
+                  subtitle: Text(
+                    isIndonesian
+                        ? 'Nara Bot boleh mengubah permintaan yang jelas menjadi tugas.'
+                        : 'Nara Bot can turn clear requests into tasks.',
                   ),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                 ),
@@ -331,9 +337,13 @@ class _AssistantScreenState extends State<AssistantScreen> {
                     savePreference(p.copyWith(allowReminderDrafts: value));
                   },
                   secondary: const Icon(Icons.notifications_outlined),
-                  title: const Text('Draft reminders'),
-                  subtitle: const Text(
-                    'Reminder drafts will wait for your approval.',
+                  title: Text(
+                    isIndonesian ? 'Siapkan draf pengingat' : 'Draft reminders',
+                  ),
+                  subtitle: Text(
+                    isIndonesian
+                        ? 'Draf pengingat tetap menunggu persetujuanmu.'
+                        : 'Reminder drafts will wait for your approval.',
                   ),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                 ),
@@ -344,9 +354,13 @@ class _AssistantScreenState extends State<AssistantScreen> {
                     savePreference(p.copyWith(allowSensitiveActions: value));
                   },
                   secondary: const Icon(Icons.lock_outline),
-                  title: const Text('Sensitive actions'),
-                  subtitle: const Text(
-                    'Allow Nara Bot to handle sensitive operations.',
+                  title: Text(
+                    isIndonesian ? 'Tindakan sensitif' : 'Sensitive actions',
+                  ),
+                  subtitle: Text(
+                    isIndonesian
+                        ? 'Izinkan Nara Bot menangani tindakan yang lebih berisiko.'
+                        : 'Allow Nara Bot to handle sensitive operations.',
                   ),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                 ),

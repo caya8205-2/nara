@@ -140,7 +140,7 @@ class SettingsScreen extends StatelessWidget {
                 _SettingsTile(
                   icon: Icons.smart_toy_outlined,
                   title: 'Nara Bot & WhatsApp',
-                  subtitle: _botSubtitle(state),
+                  subtitle: _botSubtitle(state, isIndonesian: isIndonesian),
                   trailing: _StatusDot(color: _botStatusColor(state)),
                   onTap: onOpenAssistant,
                 ),
@@ -248,11 +248,14 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  String _botSubtitle(NaraMobileState state) {
+  String _botSubtitle(
+    NaraMobileState state, {
+    required bool isIndonesian,
+  }) {
     if (state.whatsappContact == null) {
-      return 'Not connected';
+      return isIndonesian ? 'Belum terhubung' : 'Not connected';
     }
-    return '${state.whatsappContact!.value} · ${state.whatsappStatusLabel}';
+    return '${state.whatsappContact!.value} - ${_whatsappStatusLabel(state, isIndonesian: isIndonesian)}';
   }
 
   Color _botStatusColor(NaraMobileState state) {
@@ -278,7 +281,24 @@ class SettingsScreen extends StatelessWidget {
       NaraLanguagePreference.english => 'English',
       NaraLanguagePreference.indonesia => 'Bahasa Indonesia',
     };
-    return '$theme mode · $language';
+    return isIndonesian ? 'Mode $theme - $language' : '$theme mode - $language';
+  }
+
+  String _whatsappStatusLabel(
+    NaraMobileState state, {
+    required bool isIndonesian,
+  }) {
+    if (!isIndonesian) return state.whatsappStatusLabel;
+
+    if (state.assistantLoading) return 'Memeriksa';
+    return switch (state.whatsappAccess?.status) {
+      'allowed' => 'Diizinkan',
+      'blocked' => 'Diblokir',
+      'sync_failed' => 'Sinkron gagal',
+      'pending_verification' => 'Perlu verifikasi',
+      'pending_allowlist' => 'Menunggu persetujuan',
+      _ => 'Menunggu persetujuan',
+    };
   }
 }
 
