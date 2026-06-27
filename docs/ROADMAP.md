@@ -17,6 +17,19 @@ This file combines the current planning, architecture, ADR, deployment, and desi
 
 ## Next Handoff Plan
 
+Date: 2026-06-26
+
+Dedicated WhatsApp SIM is still the live-channel blocker. Until it is available, continue with the no-SIM Nara Bot validation plan in [No-SIM Nara Bot Testing Plan](no-sim-nara-bot-plan.md).
+
+Focus for the next no-code/code-light pass:
+
+1. Run existing no-WhatsApp smoke commands against the current server state.
+2. Verify an existing mobile user through `--user-id` and, when available, `--contact-value`.
+3. If coding resumes later, implement the local `agent:simulate` harness described in the no-SIM plan.
+4. Do not claim live WhatsApp or group summary delivery is ready until the dedicated number is linked and tested.
+
+## Previous Handoff Plan
+
 Date: 2026-06-23
 
 Continue from commit `f2d73a6e` after pulling on the server PC.

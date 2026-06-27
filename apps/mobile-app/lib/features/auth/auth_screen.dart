@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import '../../core/services/api_client.dart';
@@ -109,7 +107,6 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
     return PopScope(
       canPop: !_showingForm,
       onPopInvokedWithResult: (didPop, result) {
@@ -121,28 +118,7 @@ class _AuthScreenState extends State<AuthScreen> {
         body: Stack(
           fit: StackFit.expand,
           children: [
-            const _AnimatedGradient(progress: 0.5),
-            _StaticCircle(
-              size: 160,
-              color: NaraColors.primary,
-              right: 50,
-              bottom: 60,
-              opacity: dark ? 0.08 : 0.04,
-            ),
-            _StaticCircle(
-              size: 120,
-              color: NaraColors.agent,
-              right: -20,
-              bottom: 25,
-              opacity: dark ? 0.08 : 0.04,
-            ),
-            _StaticCircle(
-              size: 200,
-              color: NaraColors.primary,
-              right: 30,
-              bottom: 15,
-              opacity: dark ? 0.06 : 0.04,
-            ),
+            const _WelcomeBackground(),
             SafeArea(
               child: Center(
                 child: ConstrainedBox(
@@ -276,129 +252,175 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget _buildWelcome() {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final theme = Theme.of(context);
+    final accent = theme.colorScheme.primary;
+    final headingColor =
+        dark ? const Color(0xFFF1F7F5) : NaraColors.textPrimary;
+    final bodyColor =
+        dark ? const Color(0xFFC5D6D2) : NaraColors.textSecondary;
+    final mutedColor = dark ? const Color(0xFF91AAA5) : NaraColors.textMuted;
+
     return ListView(
       key: const ValueKey('welcome'),
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
       children: [
-        Container(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: dark
-                  ? const [
-                      Color(0xFF1B302D),
-                      Color(0xFF244742),
-                      Color(0xFF3B3A25),
-                    ]
-                  : const [
-                      NaraColors.surface,
-                      NaraColors.primaryMuted,
-                      NaraColors.warningMuted,
-                    ],
-              stops: const [0, 0.62, 1],
-            ),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: Theme.of(context).dividerTheme.color ?? NaraColors.border,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: (dark ? const Color(0xFF0B1413) : NaraColors.primary)
-                    .withValues(alpha: 0.12),
-                blurRadius: 30,
-                offset: const Offset(0, 16),
+        // ── Top bar: logo + wordmark ──
+        Row(
+          children: [
+            const NaraLogoMark(size: 32, showWordmark: false, pulse: 0),
+            const SizedBox(width: 10),
+            Text(
+              'Nara',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.3,
+                color: headingColor,
               ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const NaraLogoMark(size: 48, showWordmark: false, pulse: 0),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Nara',
-                          style: theme.textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0,
-                            color: dark
-                                ? const Color(0xFFF1F7F5)
-                                : NaraColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _isIndonesian
-                              ? 'Ruang kerja pribadi'
-                              : 'Personal work assistant',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: dark
-                                ? const Color(0xFFC5D6D2)
-                                : NaraColors.textSecondary,
-                          ),
-                        ),
-                      ],
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 44),
+
+        // ── Editorial headline ──
+        // Mixed weight + accent on the key phrase; feels hand-set, not templated.
+        RichText(
+          text: TextSpan(
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.6,
+              height: 1.08,
+              color: headingColor,
+              fontFamily: theme.textTheme.headlineMedium?.fontFamily,
+            ),
+            children: _isIndonesian
+                ? <InlineSpan>[
+                    const TextSpan(text: 'Satu tempat buat\n'),
+                    const TextSpan(text: 'kerjaan yang '),
+                    TextSpan(
+                      text: 'gampang kelewat.',
+                      style: TextStyle(
+                        color: accent,
+                        fontStyle: FontStyle.italic,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                  _WorkspaceStatusPill(
-                    icon: Icons.lock_outline_rounded,
-                    label: _isIndonesian ? 'Privat' : 'Private',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 26),
-              Text(
-                _isIndonesian
-                    ? 'Satu tempat buat kerjaan yang gampang kelewat.'
-                    : 'One place for the work that is easy to miss.',
-                style: TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0,
-                  height: 1.06,
-                  color:
-                      dark ? const Color(0xFFF1F7F5) : NaraColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                _isIndonesian
-                    ? 'Catat tugas, siapkan pengingat, dan atur kapan Nara Bot boleh membantu lewat WhatsApp.'
-                    : 'Capture what needs doing, prepare reminders, and tune Nara to support your working rhythm.',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w400,
-                  height: 1.5,
-                  color:
-                      dark ? const Color(0xFFC5D6D2) : NaraColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 20),
-              _WelcomeWorkspacePreview(isIndonesian: _isIndonesian),
-            ],
+                  ]
+                : <InlineSpan>[
+                    const TextSpan(text: 'One place for\n'),
+                    const TextSpan(text: 'the work that '),
+                    TextSpan(
+                      text: 'is easy to miss.',
+                      style: TextStyle(
+                        color: accent,
+                        fontStyle: FontStyle.italic,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
           ),
         ),
-        const SizedBox(height: 18),
-        _WelcomeActionPanel(
-          isIndonesian: _isIndonesian,
-          onRegister: () => _openForm(register: true),
-          onSignIn: () => _openForm(register: false),
-          onPreview: widget.onTryAsGuest,
-        ),
+
         const SizedBox(height: 14),
-        _WelcomeSecurityNote(
-          text: _isIndonesian
-              ? 'Nara Bot, persetujuan, dan pengingat bisa kamu atur lagi setelah masuk.'
-              : 'Nara Bot, approvals, and reminders can be adjusted after sign-in.',
+
+        // ── Subhead — warmer, specific ──
+        Text(
+          _isIndonesian
+              ? 'Catat tugas, siapkan pengingat, dan atur kapan Nara boleh membantu lewat WhatsApp.'
+              : 'Capture tasks, prepare reminders, and choose when Nara may help via WhatsApp.',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+            height: 1.55,
+            color: bodyColor,
+          ),
+        ),
+
+        const SizedBox(height: 32),
+
+        // ── Bespoke "moment" preview (not a SaaS mock) ──
+        _WelcomeMomentPreview(isIndonesian: _isIndonesian),
+
+        const SizedBox(height: 28),
+
+        // ── Single primary CTA ──
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: FilledButton.icon(
+            onPressed: () => _openForm(register: true),
+            icon: const Icon(Icons.arrow_forward_rounded, size: 20),
+            label: Text(
+              _isIndonesian ? 'Mulai pakai Nara' : 'Start using Nara',
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.1,
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 14),
+
+        // ── Inline text links (not chunky buttons) ──
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _isIndonesian ? 'Sudah punya akun?' : 'Have an account?',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: bodyColor,
+              ),
+            ),
+            TextButton(
+              onPressed: () => _openForm(register: false),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                minimumSize: const Size(0, 32),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(
+                _isIndonesian ? 'Masuk' : 'Sign in',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: accent,
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 20),
+
+        // ── Inline microcopy (not a boxed card) ──
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.lock_outline_rounded,
+              size: 14,
+              color: mutedColor,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _isIndonesian
+                    ? 'Tugas, pengingat, dan izin Nara Bot bisa kamu atur lagi setelah masuk.'
+                    : 'Tasks, reminders, and Nara Bot permissions can be adjusted after sign-in.',
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.45,
+                  fontWeight: FontWeight.w500,
+                  color: mutedColor,
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -669,326 +691,27 @@ class _AuthScreenState extends State<AuthScreen> {
 
 // ── Background & Floating Elements ─────────────────────────────────────
 
-class _WelcomeWorkspacePreview extends StatelessWidget {
-  const _WelcomeWorkspacePreview({required this.isIndonesian});
-
-  final bool isIndonesian;
+class _WelcomeBackground extends StatelessWidget {
+  const _WelcomeBackground();
 
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final surface = dark
-        ? Colors.white.withValues(alpha: 0.08)
-        : NaraColors.surface.withValues(alpha: 0.86);
-    final border =
-        dark ? Colors.white.withValues(alpha: 0.1) : NaraColors.border;
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              _WorkspaceStatusPill(
-                icon: Icons.today_outlined,
-                label: isIndonesian ? 'Hari ini' : 'Today',
-              ),
-              const Spacer(),
-              Icon(
-                Icons.more_horiz_rounded,
-                size: 20,
-                color: dark ? const Color(0xFF91AAA5) : NaraColors.textMuted,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _WorkspaceAgendaRow(
-            icon: Icons.assignment_turned_in_outlined,
-            title: isIndonesian
-                ? 'Follow up proposal yang belum dijawab'
-                : 'Follow up the proposal still waiting',
-            meta: isIndonesian ? 'Sore ini' : 'This afternoon',
-            color: NaraColors.primary,
-          ),
-          const SizedBox(height: 10),
-          _WorkspaceAgendaRow(
-            icon: Icons.notifications_active_outlined,
-            title: isIndonesian
-                ? 'Ingatkan pembayaran DP'
-                : 'Remind about the deposit payment',
-            meta: isIndonesian ? 'Besok 09.00' : 'Tomorrow 09:00',
-            color: NaraColors.warning,
-          ),
-          const SizedBox(height: 10),
-          _WorkspaceAgendaRow(
-            icon: Icons.verified_user_outlined,
-            title: isIndonesian
-                ? 'Nara Bot minta izin sebelum jalan'
-                : 'Nara Bot asks before acting',
-            meta: isIndonesian ? 'Menunggu persetujuan' : 'Waiting approval',
-            color: NaraColors.agent,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WorkspaceAgendaRow extends StatelessWidget {
-  const _WorkspaceAgendaRow({
-    required this.icon,
-    required this.title,
-    required this.meta,
-    required this.color,
-  });
-
-  final IconData icon;
-  final String title;
-  final String meta;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-
-    return Row(
-      children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: dark ? 0.22 : 0.12),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, color: color, size: 18),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color:
-                      dark ? const Color(0xFFF1F7F5) : NaraColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                meta,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: dark ? const Color(0xFF91AAA5) : NaraColors.textMuted,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _WelcomeActionPanel extends StatelessWidget {
-  const _WelcomeActionPanel({
-    required this.isIndonesian,
-    required this.onRegister,
-    required this.onSignIn,
-    required this.onPreview,
-  });
-
-  final bool isIndonesian;
-  final VoidCallback onRegister;
-  final VoidCallback onSignIn;
-  final VoidCallback onPreview;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardTheme.color ?? NaraColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Theme.of(context).dividerTheme.color ?? NaraColors.border,
-        ),
-      ),
-      child: Column(
-        children: [
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: FilledButton.icon(
-              onPressed: onRegister,
-              icon: const Icon(Icons.person_add_alt_rounded, size: 20),
-              label: Text(
-                isIndonesian ? 'Mulai pakai Nara' : 'Start using Nara',
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 46,
-                  child: OutlinedButton.icon(
-                    onPressed: onSignIn,
-                    icon: const Icon(Icons.login_rounded, size: 20),
-                    label: Text(isIndonesian ? 'Masuk' : 'Sign in'),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: SizedBox(
-                  height: 46,
-                  child: TextButton.icon(
-                    onPressed: onPreview,
-                    icon: const Icon(Icons.visibility_outlined, size: 19),
-                    label: Text(isIndonesian ? 'Coba dulu' : 'Preview'),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WelcomeSecurityNote extends StatelessWidget {
-  const _WelcomeSecurityNote({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: dark
-            ? Colors.white.withValues(alpha: 0.06)
-            : NaraColors.surface.withValues(alpha: 0.78),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: dark ? const Color(0xFF23423E) : NaraColors.border,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.verified_user_outlined,
-            size: 18,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.45,
-                fontWeight: FontWeight.w600,
-                color:
-                    dark ? const Color(0xFFC5D6D2) : NaraColors.textSecondary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WorkspaceStatusPill extends StatelessWidget {
-  const _WorkspaceStatusPill({
-    required this.icon,
-    required this.label,
-  });
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: dark
-            ? Colors.white.withValues(alpha: 0.08)
-            : NaraColors.surface.withValues(alpha: 0.82),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: dark ? const Color(0xFF23423E) : NaraColors.border,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: dark ? const Color(0xFFE5F5F2) : NaraColors.textPrimary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AnimatedGradient extends StatelessWidget {
-  const _AnimatedGradient({required this.progress});
-  final double progress;
-
-  @override
-  Widget build(BuildContext context) {
-    // Cycle the teal tint angle slowly
-    final t = (progress * 2 * math.pi) % (2 * math.pi);
-    final dark = Theme.of(context).brightness == Brightness.dark;
-
     return Positioned.fill(
       child: DecoratedBox(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
-            end: Alignment(
-              math.sin(t) * 0.3,
-              1.0 + math.cos(t) * 0.2,
-            ),
+            end: Alignment.bottomCenter,
             colors: dark
                 ? const [
                     Color(0xFF111C1B),
                     Color(0xFF162522),
-                    Color(0xFF203431),
                   ]
                 : const [
                     NaraColors.background,
                     Color(0xFFF4F4F0),
-                    Color(0xFFF0FDFA),
                   ],
-            stops: const [0.0, 0.65, 1.0],
           ),
         ),
       ),
@@ -996,37 +719,182 @@ class _AnimatedGradient extends StatelessWidget {
   }
 }
 
-class _StaticCircle extends StatelessWidget {
-  const _StaticCircle({
-    required this.size,
-    required this.color,
-    required this.right,
-    required this.bottom,
-    this.opacity = 0.04,
-  });
+/// Bespoke "moment" preview — an open-notebook feel rather than a SaaS mock.
+/// Shows one task awaiting action + one reminder + a quiet Nara Bot line.
+class _WelcomeMomentPreview extends StatelessWidget {
+  const _WelcomeMomentPreview({required this.isIndonesian});
 
-  final double size;
-  final Color color;
-  final double right;
-  final double bottom;
-  final double opacity;
+  final bool isIndonesian;
 
   @override
   Widget build(BuildContext context) {
-    return Positioned(
-      right: right,
-      bottom: bottom,
-      child: ExcludeSemantics(
-        child: RepaintBoundary(
-          child: Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: color.withValues(alpha: opacity),
-            ),
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final surface = dark ? const Color(0xFF182725) : NaraColors.surface;
+    final border = dark ? const Color(0xFF34504C) : NaraColors.border;
+    final titleColor =
+        dark ? const Color(0xFFF1F7F5) : NaraColors.textPrimary;
+    final metaColor =
+        dark ? const Color(0xFF91AAA5) : NaraColors.textMuted;
+    final dividerColor = dark ? const Color(0xFF23423E) : NaraColors.border;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: border),
+        boxShadow: [
+          BoxShadow(
+            color: dark
+                ? Colors.black.withValues(alpha: 0.18)
+                : const Color(0xFF0D9488).withValues(alpha: 0.05),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
           ),
-        ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Date label with a small accent dot
+          Row(
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                isIndonesian ? 'Hari ini' : 'Today',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.4,
+                  color: metaColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // One task — checkbox + title + meta
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              _PreviewCheckbox(color: theme.colorScheme.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isIndonesian
+                          ? 'Follow up proposal yang belum dijawab'
+                          : 'Follow up the proposal still waiting',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        height: 1.3,
+                        color: titleColor,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isIndonesian ? 'Sore ini' : 'This afternoon',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w500,
+                        color: metaColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+          Divider(height: 1, color: dividerColor),
+          const SizedBox(height: 14),
+
+          // One reminder — bell icon + chip-like text
+          Row(
+            children: [
+              const Icon(
+                Icons.notifications_active_outlined,
+                size: 16,
+                color: NaraColors.warning,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  isIndonesian
+                      ? 'Ingatkan pembayaran DP — Besok 09.00'
+                      : 'Remind about the deposit — Tomorrow 09:00',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: titleColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+          Divider(height: 1, color: dividerColor),
+          const SizedBox(height: 12),
+
+          // Quiet Nara Bot line — agent dot + text
+          Row(
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: const BoxDecoration(
+                  color: NaraColors.agent,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  isIndonesian
+                      ? 'Nara Bot minta izin sebelum menjalankan tindakan ini.'
+                      : 'Nara Bot asks before taking this action.',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: metaColor,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreviewCheckbox extends StatelessWidget {
+  const _PreviewCheckbox({required this.color});
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 18,
+      height: 18,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: color, width: 1.8),
       ),
     );
   }

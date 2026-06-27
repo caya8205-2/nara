@@ -19,6 +19,7 @@ class TasksScreen extends StatefulWidget {
     required this.onCreateTask,
     required this.onCompleteTask,
     required this.onOpenTaskDetail,
+    required this.onDeleteTask,
     super.key,
   });
 
@@ -27,6 +28,7 @@ class TasksScreen extends StatefulWidget {
   final Future<void> Function(NaraTaskDraft draft) onCreateTask;
   final Future<void> Function(String id) onCompleteTask;
   final Future<void> Function(NaraTask task) onOpenTaskDetail;
+  final Future<void> Function(String id) onDeleteTask;
 
   @override
   State<TasksScreen> createState() => _TasksScreenState();
@@ -112,10 +114,15 @@ class _TasksScreenState extends State<TasksScreen> {
     final focusTask = _focusTask;
     final isId =
         widget.state.languagePreference == NaraLanguagePreference.indonesia;
+    // Hide FAB when there are zero tasks — empty state owns the CTA there.
+    final hasAnyTask = widget.state.tasks.isNotEmpty;
+    // Focus panel only shows when there is an actionable task to highlight;
+    // never show its standalone "Add" button to avoid duplicate CTAs.
+    final showFocusPanel = focusTask != null;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      floatingActionButton: _isGuest
+      floatingActionButton: _isGuest || !hasAnyTask
           ? null
           : FloatingActionButton.extended(
               onPressed: widget.state.tasksLoading
@@ -272,15 +279,15 @@ class _TasksScreenState extends State<TasksScreen> {
                 ],
               ),
               const SizedBox(height: 18),
-              _FocusTaskPanel(
-                task: focusTask,
-                isGuest: _isGuest,
-                onOpenTaskDetail: widget.onOpenTaskDetail,
-                onCompleteTask: widget.onCompleteTask,
-                onCreateTask: () => _showCreateTaskSheet(context),
-                onGuestAction: () => _showGuestDialog(context),
-              ),
-              const SizedBox(height: 18),
+              if (showFocusPanel) ...[
+                _FocusTaskPanel(
+                  task: focusTask,
+                  isGuest: _isGuest,
+                  onOpenTaskDetail: widget.onOpenTaskDetail,
+                  onCompleteTask: widget.onCompleteTask,
+                ),
+                const SizedBox(height: 18),
+              ],
             ],
 
             // ── Filter chips ──
@@ -369,12 +376,18 @@ class _TasksScreenState extends State<TasksScreen> {
                     .map(
                       (task) => Padding(
                         padding: const EdgeInsets.only(bottom: 10),
-                        child: _TaskQueueCard(
+                        child: _DismissibleTaskCard(
                           task: task,
+                          isGuest: _isGuest,
+                          isIndonesian: isId,
                           onOpen: () => widget.onOpenTaskDetail(task),
                           onToggleComplete: _isGuest
                               ? (_) async => _showGuestDialog(context)
                               : widget.onCompleteTask,
+                          onDelete: _isGuest
+                              ? (_) async => _showGuestDialog(context)
+                              : widget.onDeleteTask,
+                          onGuestAction: () => _showGuestDialog(context),
                         ),
                       ),
                     )
@@ -512,20 +525,15 @@ class _FocusTaskPanel extends StatelessWidget {
     required this.isGuest,
     required this.onOpenTaskDetail,
     required this.onCompleteTask,
-    required this.onCreateTask,
-    required this.onGuestAction,
   });
 
-  final NaraTask? task;
+  final NaraTask task;
   final bool isGuest;
   final Future<void> Function(NaraTask task) onOpenTaskDetail;
   final Future<void> Function(String id) onCompleteTask;
-  final VoidCallback onCreateTask;
-  final VoidCallback onGuestAction;
 
   @override
   Widget build(BuildContext context) {
-    final currentTask = task;
     final dark = context.isNaraDark;
 
     return Container(
@@ -593,7 +601,7 @@ class _FocusTaskPanel extends StatelessWidget {
                             : NaraColors.textPrimary,
                       ),
                     ),
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
                       'Keep the queue moving without scanning everything.',
                       style: TextStyle(
@@ -610,115 +618,135 @@ class _FocusTaskPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          if (currentTask == null)
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'No urgent task right now. Add one when something needs attention.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: dark
-                          ? const Color(0xFFF1F7F5)
-                          : NaraColors.textPrimary,
-                      height: 1.4,
+          Text(
+            task.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: dark ? const Color(0xFFF1F7F5) : NaraColors.textPrimary,
+              height: 1.25,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => onOpenTaskDetail(task),
+                  icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                  label: const Text('Open'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.primary,
+                    side: BorderSide(
+                      color: dark ? context.naraBorder : NaraColors.border,
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                FilledButton(
-                  onPressed: isGuest ? onGuestAction : onCreateTask,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: isGuest
+                      ? null
+                      : () => onCompleteTask(task.id),
+                  icon: const Icon(Icons.check_rounded, size: 16),
+                  label: const Text('Done'),
                   style: FilledButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.primary,
                     foregroundColor: dark
                         ? const Color(0xFF063F3A)
                         : NaraColors.textOnPrimary,
                   ),
-                  child: const Text('Add'),
                 ),
-              ],
-            )
-          else
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  currentTask.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color:
-                        dark ? const Color(0xFFF1F7F5) : NaraColors.textPrimary,
-                    height: 1.25,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => onOpenTaskDetail(currentTask),
-                        icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                        label: const Text('Open'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor:
-                              Theme.of(context).colorScheme.primary,
-                          side: BorderSide(
-                            color:
-                                dark ? context.naraBorder : NaraColors.border,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: isGuest
-                            ? onGuestAction
-                            : () => onCompleteTask(currentTask.id),
-                        icon: const Icon(Icons.check_rounded, size: 16),
-                        label: const Text('Done'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor:
-                              Theme.of(context).colorScheme.primary,
-                          foregroundColor: dark
-                              ? const Color(0xFF063F3A)
-                              : NaraColors.textOnPrimary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-class _TaskQueueCard extends StatelessWidget {
-  const _TaskQueueCard({
+class _DismissibleTaskCard extends StatelessWidget {
+  const _DismissibleTaskCard({
     required this.task,
+    required this.isGuest,
+    required this.isIndonesian,
     required this.onOpen,
     required this.onToggleComplete,
+    required this.onDelete,
+    required this.onGuestAction,
   });
 
   final NaraTask task;
+  final bool isGuest;
+  final bool isIndonesian;
   final VoidCallback onOpen;
   final Future<void> Function(String id) onToggleComplete;
+  final Future<void> Function(String id) onDelete;
+  final VoidCallback onGuestAction;
+
+  Future<bool?> _confirmDismiss(BuildContext context) async {
+    if (isGuest) {
+      onGuestAction();
+      return false;
+    }
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isIndonesian ? 'Hapus tugas' : 'Delete task'),
+        content: Text(
+          isIndonesian
+              ? 'Yakin ingin menghapus "${task.title}"? Tindakan ini tidak bisa dibatalkan.'
+              : 'Are you sure you want to delete "${task.title}"? This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(isIndonesian ? 'Batal' : 'Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: NaraColors.danger,
+            ),
+            child: Text(isIndonesian ? 'Hapus' : 'Delete'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return NaraCard.tappable(
-      onTap: onOpen,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      child: NaraTaskRow(
-        task: task,
-        onToggleComplete: onToggleComplete,
-        showSource: true,
+    return Dismissible(
+      key: ValueKey('task-${task.id}'),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) => _confirmDismiss(context),
+      onDismissed: (_) => onDelete(task.id),
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(
+          color: NaraColors.danger.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Icon(
+          Icons.delete_outline_rounded,
+          color: NaraColors.danger,
+          size: 24,
+        ),
+      ),
+      child: NaraCard.tappable(
+        onTap: onOpen,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: NaraTaskRow(
+          task: task,
+          onToggleComplete: onToggleComplete,
+          showSource: true,
+        ),
       ),
     );
   }

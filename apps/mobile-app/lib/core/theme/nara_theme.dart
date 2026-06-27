@@ -315,7 +315,37 @@ ThemeData buildNaraTheme() {
     ),
 
     // ── Checkboxes / Switches ──
-    // Uses Material 3 defaults, tinted by colorScheme.
+    // Explicit switch theme: Material 3 defaults make the OFF thumb fade into
+    // the track (both use muted surface colors). Force a solid, contrasting
+    // thumb so the toggle reads clearly in both states.
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return NaraColors.textOnPrimary;
+        }
+        return NaraColors.surface; // solid white, never fades into track
+      }),
+      trackColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return NaraColors.primary;
+        }
+        return NaraColors.borderStrong; // slate-300, clearly distinct from white thumb
+      }),
+      trackOutlineColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return Colors.transparent;
+        }
+        return NaraColors.borderStrong;
+      }),
+      overlayColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.pressed)) {
+          return NaraColors.primary.withValues(alpha: 0.12);
+        }
+        return Colors.transparent;
+      }),
+      splashRadius: 0,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    ),
 
     // ── Floating Action Button ──
     floatingActionButtonTheme: FloatingActionButtonThemeData(
@@ -522,6 +552,34 @@ ThemeData buildNaraDarkTheme() {
       space: 1,
     ),
     iconTheme: const IconThemeData(color: darkTextSecondary, size: 22),
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return const Color(0xFF063F3A); // dark teal text on bright thumb
+        }
+        return darkTextMuted; // solid muted thumb, distinct from dark track
+      }),
+      trackColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return darkPrimary;
+        }
+        return darkSurfaceRaised; // distinct from muted thumb
+      }),
+      trackOutlineColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return Colors.transparent;
+        }
+        return darkBorder;
+      }),
+      overlayColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.pressed)) {
+          return darkPrimary.withValues(alpha: 0.18);
+        }
+        return Colors.transparent;
+      }),
+      splashRadius: 0,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    ),
     chipTheme: ChipThemeData(
       backgroundColor: darkSurfaceRaised,
       selectedColor: const Color(0xFF254C47),
