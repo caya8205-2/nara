@@ -10,6 +10,7 @@
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
     "agent:smoke": "node --env-file-if-exists=../../.env ../../node_modules/tsx/dist/cli.mjs src/scripts/agent-smoke.ts",
+    "agent:simulate": "node --env-file-if-exists=../../.env ../../node_modules/tsx/dist/cli.mjs src/scripts/agent-simulate.ts",
     "db:generate": "node --env-file-if-exists=../../.env ../../node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate": "node --env-file-if-exists=../../.env ../../node_modules/drizzle-kit/bin.cjs migrate",
     "db:push": "node --env-file-if-exists=../../.env ../../node_modules/drizzle-kit/bin.cjs push"

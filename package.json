@@ -30,6 +30,7 @@
     "agent:smoke": "npm --workspace @nara/backend run agent:smoke --",
     "agent:smoke:approval": "npm --workspace @nara/backend run agent:smoke -- --approval-flow",
     "agent:smoke:group": "npm --workspace @nara/backend run agent:smoke -- --group-flow",
+    "agent:simulate": "npm --workspace @nara/backend run agent:simulate --",
     "infra:up": "docker compose up -d postgres redis",
     "infra:down": "docker compose stop postgres redis",
     "infra:logs": "docker compose logs -f postgres redis",

@@ -923,6 +923,7 @@ class _NaraMobileAppState extends State<NaraMobileApp>
         onCreateTask: createTask,
         onCompleteTask: completeTask,
         onOpenTaskDetail: _showTaskDetail,
+        onDeleteTask: deleteTask,
       ),
       // 2 — Reminders
       RemindersScreen(
