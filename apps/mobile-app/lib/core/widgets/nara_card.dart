@@ -2,40 +2,55 @@ import 'package:flutter/material.dart';
 
 import '../theme/nara_theme.dart';
 
-/// Standard Nara card: white surface, subtle border, 12px radius, no elevation.
-///
-/// Use [NaraCard] for grouping related content. Prefer [NaraCard.tappable]
-/// when the card responds to tap.
+/// Thin panel surface — list grouping without heavy card chrome.
+class NaraPanel extends StatelessWidget {
+  const NaraPanel({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+    this.margin,
+  });
+
+  final Widget child;
+  final EdgeInsets padding;
+  final EdgeInsets? margin;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: margin,
+      padding: padding,
+      decoration: BoxDecoration(
+        color: context.naraSurface,
+        borderRadius: BorderRadius.circular(NaraColors.radiusMd),
+        border: Border.all(color: context.naraBorder),
+      ),
+      child: child,
+    );
+  }
+}
+
+/// Standard Nara card — use sparingly; prefer [NaraPanel] for lists.
 class NaraCard extends StatelessWidget {
   const NaraCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(16),
+    this.padding = const EdgeInsets.all(14),
     this.margin,
     this.onTap,
     this.header,
   });
 
-  /// The content inside the card.
   final Widget child;
-
-  /// Internal padding. Defaults to 16px all sides.
   final EdgeInsets padding;
-
-  /// External margin. Typically set by the parent list/column.
   final EdgeInsets? margin;
-
-  /// Optional tap handler. When provided, the card gets a hover/ripple.
   final VoidCallback? onTap;
-
-  /// Optional header row shown above the card content.
   final Widget? header;
 
-  /// Named constructor for tappable cards — calls [onTap] via [InkWell].
   factory NaraCard.tappable({
     Key? key,
     required Widget child,
-    EdgeInsets padding = const EdgeInsets.all(16),
+    EdgeInsets padding = const EdgeInsets.all(14),
     EdgeInsets? margin,
     required VoidCallback onTap,
     Widget? header,
@@ -52,15 +67,13 @@ class NaraCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = context.naraBorder;
-
     Widget card = Container(
       margin: margin,
       padding: padding,
       decoration: BoxDecoration(
         color: context.naraSurface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor, width: 1),
+        borderRadius: BorderRadius.circular(NaraColors.radiusMd),
+        border: Border.all(color: context.naraBorder),
       ),
       child: child,
     );
@@ -70,9 +83,9 @@ class NaraCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(NaraColors.radiusMd),
           splashColor: context.naraTint,
-          highlightColor: context.naraTint.withValues(alpha: 0.6),
+          highlightColor: context.naraTint.withValues(alpha: 0.5),
           child: card,
         ),
       );
@@ -84,7 +97,7 @@ class NaraCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           header!,
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           card,
         ],
       );
@@ -94,7 +107,6 @@ class NaraCard extends StatelessWidget {
   }
 }
 
-/// Horizontal row of small metric tiles (today / open / done).
 class NaraMetricRow extends StatelessWidget {
   const NaraMetricRow({
     super.key,
@@ -109,9 +121,7 @@ class NaraMetricRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final List<Widget> rowChildren = [];
     for (int i = 0; i < children.length; i++) {
-      if (i > 0) {
-        rowChildren.add(SizedBox(width: spacing));
-      }
+      if (i > 0) rowChildren.add(SizedBox(width: spacing));
       rowChildren.add(Expanded(child: children[i]));
     }
     return Row(children: rowChildren);

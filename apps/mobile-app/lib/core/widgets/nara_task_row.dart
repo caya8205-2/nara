@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../theme/nara_fonts.dart';
 
 import '../state/nara_mobile_state.dart';
+import '../theme/nara_motion.dart';
 import '../theme/nara_theme.dart';
 
-/// Consistent task row for Home and Tasks screens.
-///
-/// Shows: completion checkbox → title + metadata → priority dot.
-class NaraTaskRow extends StatelessWidget {
+class NaraTaskRow extends StatefulWidget {
   const NaraTaskRow({
     super.key,
     required this.task,
@@ -21,122 +21,113 @@ class NaraTaskRow extends StatelessWidget {
   final bool showSource;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final effectiveTitleStyle = compact
-        ? TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: theme.textTheme.titleMedium?.color,
-            height: 1.35,
-          )
-        : TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: theme.textTheme.titleMedium?.color,
-            height: 1.35,
-          );
+  State<NaraTaskRow> createState() => _NaraTaskRowState();
+}
 
-    final textDecoration = task.done ? TextDecoration.lineThrough : null;
-    final textColor = task.done
-        ? theme.textTheme.bodySmall?.color
-        : theme.textTheme.titleMedium?.color;
+class _NaraTaskRowState extends State<NaraTaskRow> {
+  bool _completing = false;
+
+  Future<void> _toggle() async {
+    if (_completing) return;
+    setState(() => _completing = true);
+    HapticFeedback.lightImpact();
+    await widget.onToggleComplete(widget.task.id);
+    if (mounted) setState(() => _completing = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final priorityColor = _priorityColor(widget.task.priority);
+    final titleStyle = GoogleFonts.plusJakartaSans(
+      fontSize: widget.compact ? 13 : 14,
+      fontWeight: FontWeight.w600,
+      height: 1.35,
+      decoration: widget.task.done ? TextDecoration.lineThrough : null,
+      color: widget.task.done
+          ? context.naraTextMuted
+          : context.naraTextPrimary,
+    );
 
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: compact ? 4 : 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Checkbox
-          GestureDetector(
-            onTap: () => onToggleComplete(task.id),
-            behavior: HitTestBehavior.opaque,
-            child: Container(
-              width: 22,
-              height: 22,
-              margin: EdgeInsets.only(top: compact ? 0 : 1),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: task.done ? NaraColors.agent : Colors.transparent,
-                border: Border.all(
-                  color: task.done
-                      ? NaraColors.agent
-                      : (theme.dividerTheme.color ?? NaraColors.borderStrong),
-                  width: 1.5,
+      padding: EdgeInsets.symmetric(vertical: widget.compact ? 6 : 8),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!widget.task.done)
+              Container(
+                width: 3,
+                margin: const EdgeInsets.only(right: 10, top: 2, bottom: 2),
+                decoration: BoxDecoration(
+                  color: priorityColor,
+                  borderRadius: BorderRadius.circular(2),
                 ),
-              ),
-              child: task.done
-                  ? const Icon(Icons.check, size: 14, color: Colors.white)
-                  : null,
-            ),
-          ),
-          const SizedBox(width: 12),
+              )
+            else
+              const SizedBox(width: 13),
 
-          // Content
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  task.title,
-                  style: effectiveTitleStyle.copyWith(
-                    decoration: textDecoration,
-                    color: textColor,
+            GestureDetector(
+              onTap: _toggle,
+              behavior: HitTestBehavior.opaque,
+              child: AnimatedContainer(
+                duration: NaraMotion.fast,
+                curve: NaraMotion.easeOut,
+                width: 22,
+                height: 22,
+                margin: const EdgeInsets.only(top: 1),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: widget.task.done ? NaraColors.agent : Colors.transparent,
+                  border: Border.all(
+                    color: widget.task.done
+                        ? NaraColors.agent
+                        : NaraColors.borderStrong,
+                    width: 1.5,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
-                if (!compact) ...[
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      if (task.dueAt != null) ...[
-                        Icon(
-                          task.isDueToday && !task.done
-                              ? Icons.schedule
-                              : Icons.calendar_today_outlined,
-                          size: 12,
-                          color: task.isDueToday && !task.done
-                              ? NaraColors.warning
-                              : theme.textTheme.bodySmall?.color,
-                        ),
-                        const SizedBox(width: 4),
+                child: widget.task.done
+                    ? const Icon(Icons.check, size: 14, color: Colors.white)
+                    : null,
+              ),
+            ),
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.task.title,
+                    style: titleStyle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (!widget.compact && widget.task.dueAt != null) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
                         Text(
-                          _dueLabel(task),
-                          style: TextStyle(
+                          _dueLabel(widget.task),
+                          style: GoogleFonts.plusJakartaSans(
                             fontSize: 11,
                             fontWeight: FontWeight.w500,
-                            color: task.isDueToday && !task.done
+                            color: widget.task.isDueToday && !widget.task.done
                                 ? NaraColors.warning
-                                : theme.textTheme.bodySmall?.color,
-                            height: 1.3,
+                                : context.naraTextMuted,
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        if (widget.showSource && widget.task.source != 'manual') ...[
+                          const SizedBox(width: 8),
+                          _SourceBadge(source: widget.task.source),
+                        ],
                       ],
-                      // Source badge
-                      if (showSource && task.source != 'manual')
-                        _SourceBadge(source: task.source),
-                    ],
-                  ),
+                    ),
+                  ],
                 ],
-              ],
-            ),
-          ),
-
-          // Priority indicator
-          if (!task.done)
-            Container(
-              width: 8,
-              height: 8,
-              margin: EdgeInsets.only(top: compact ? 4 : 6),
-              decoration: BoxDecoration(
-                color: _priorityColor(task.priority),
-                shape: BoxShape.circle,
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -144,33 +135,20 @@ class NaraTaskRow extends StatelessWidget {
   String _dueLabel(NaraTask task) {
     if (task.dueAt == null) return '';
     final due = task.dueAt!.toLocal();
-    final now = DateTime.now();
-    final diff = due.difference(now);
+    final diff = due.difference(DateTime.now());
 
     if (diff.isNegative && !task.done) {
       final days = diff.inDays.abs();
       if (days == 0) return 'Overdue';
       return '$days days overdue';
     }
-    if (diff.inDays == 0) {
-      return 'Today';
-    }
+    if (diff.inDays == 0) return 'Today';
     if (diff.inDays == 1) return 'Tomorrow';
     if (diff.inDays <= 7) return '${diff.inDays}d left';
 
-    final months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec'
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
     ];
     return '${due.day} ${months[due.month - 1]}';
   }
@@ -180,12 +158,11 @@ class NaraTaskRow extends StatelessWidget {
       'urgent' => NaraColors.priorityUrgent,
       'high' => NaraColors.priorityHigh,
       'low' => NaraColors.priorityLow,
-      _ => NaraColors.primary,
+      _ => NaraColors.priorityNormal,
     };
   }
 }
 
-/// Tiny source badge for task origin (app, WhatsApp, schedule, agent).
 class _SourceBadge extends StatelessWidget {
   const _SourceBadge({required this.source});
 
@@ -193,39 +170,20 @@ class _SourceBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final (IconData icon, String label) = switch (source) {
-      'whatsapp' => (Icons.message_outlined, 'WhatsApp'),
-      'schedule' => (Icons.schedule, 'Schedule'),
-      'agent' => (Icons.smart_toy_outlined, 'Nara Bot'),
-      _ => (Icons.edit_note, 'App'),
+    final label = switch (source) {
+      'whatsapp' => 'WA',
+      'schedule' => 'Sched',
+      'agent' => 'Bot',
+      _ => 'App',
     };
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(
-          color: theme.dividerTheme.color ?? NaraColors.border,
-          width: 1,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 10, color: theme.textTheme.bodySmall?.color),
-          const SizedBox(width: 3),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: theme.textTheme.bodySmall?.color,
-              height: 1.3,
-            ),
-          ),
-        ],
+    return Text(
+      label.toUpperCase(),
+      style: GoogleFonts.plusJakartaSans(
+        fontSize: 9,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.4,
+        color: context.naraTextMuted,
       ),
     );
   }

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../theme/nara_fonts.dart';
+
+import '../theme/nara_theme.dart';
 
 class NaraLogoMark extends StatelessWidget {
   const NaraLogoMark({
@@ -14,7 +17,6 @@ class NaraLogoMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final scale = 1 + (pulse * 0.035);
 
     return Column(
@@ -34,12 +36,14 @@ class NaraLogoMark extends StatelessWidget {
           ),
         ),
         if (showWordmark) ...[
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Text(
             'Nara',
-            style: theme.textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0,
+            style: GoogleFonts.fraunces(
+              fontSize: 28,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.3,
+              color: context.naraTextPrimary,
             ),
           ),
         ],
@@ -55,38 +59,62 @@ class _FallbackLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(size * 0.28),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.18),
-        ),
+        color: NaraColors.primaryMuted,
+        borderRadius: BorderRadius.circular(size * 0.22),
+        border: Border.all(color: NaraColors.border),
       ),
       child: Center(
-        child: Container(
-          width: size * 0.58,
-          height: size * 0.58,
+        child: Text(
+          'N',
+          style: GoogleFonts.fraunces(
+            color: NaraColors.primary,
+            fontSize: size * 0.38,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class NaraAvatarButton extends StatelessWidget {
+  const NaraAvatarButton({
+    super.key,
+    required this.displayName,
+    required this.onTap,
+  });
+
+  final String displayName;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = displayName.isNotEmpty
+        ? displayName.trim()[0].toUpperCase()
+        : '?';
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(NaraColors.radiusMd),
+        child: Ink(
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
-            color: theme.colorScheme.primary,
-            borderRadius: BorderRadius.circular(size * 0.18),
-            boxShadow: [
-              BoxShadow(
-                color: theme.colorScheme.primary.withValues(alpha: 0.22),
-                blurRadius: 22,
-                offset: const Offset(0, 10),
-              ),
-            ],
+            color: context.naraSurfaceRaised,
+            borderRadius: BorderRadius.circular(NaraColors.radiusMd),
+            border: Border.all(color: context.naraBorder),
           ),
           child: Center(
             child: Text(
-              'N',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: size * 0.32,
-                fontWeight: FontWeight.w900,
+              initial,
+              style: GoogleFonts.fraunces(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: NaraColors.primary,
               ),
             ),
           ),

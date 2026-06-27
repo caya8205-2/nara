@@ -31,20 +31,14 @@ class _AuthScreenState extends State<AuthScreen> {
   final _passwordController = TextEditingController();
 
   bool _isRegister = false;
-  bool _showingForm = false;
   bool _loading = false;
   bool _obscurePassword = true;
   String? _error;
-
-  final _pageController = PageController();
-  int _onboardingPage = 0;
-  bool _onboardingDone = false;
 
   bool get _isIndonesian => widget.language == NaraLanguagePreference.indonesia;
 
   @override
   void dispose() {
-    _pageController.dispose();
     _displayNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -72,6 +66,9 @@ class _AuthScreenState extends State<AuthScreen> {
               password: _passwordController.text,
             );
       widget.onAuthenticated(user, isNewUser: _isRegister);
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
     } catch (err) {
       setState(() => _error = _friendlyError(err));
     } finally {
@@ -107,143 +104,21 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: !_showingForm,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && _showingForm) {
-          _closeForm();
-        }
-      },
-      child: Scaffold(
-        body: Stack(
-          fit: StackFit.expand,
-          children: [
-            const _WelcomeBackground(),
-            SafeArea(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 480),
-                  child:
-                      _onboardingDone ? _buildAppContent() : _buildOnboarding(),
-                ),
+    return Scaffold(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          const _WelcomeBackground(),
+          SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: _buildWelcome(),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
-
-  // ── Onboarding ─────────────────────────────────────────────────────────
-
-  Widget _buildOnboarding() {
-    final slides = _isIndonesian
-        ? const [
-            _OnboardingSlide(
-              icon: Icons.checklist_rounded,
-              title: 'Lihat kerjaan penting tanpa bongkar chat',
-              body:
-                  'Nara merapikan tugas, jadwal, dan hal yang perlu ditindaklanjuti di satu tempat.',
-            ),
-            _OnboardingSlide(
-              icon: Icons.chat_bubble_outline_rounded,
-              title: 'Siapkan Nara Bot saat WhatsApp sudah siap',
-              body:
-                  'Hubungkan nomor kerja, atur izin, lalu biarkan Nara membantu mengingatkan hal penting.',
-            ),
-            _OnboardingSlide(
-              icon: Icons.verified_user_outlined,
-              title: 'Tindakan penting tetap minta izin',
-              body:
-                  'Kamu tetap pegang kontrol untuk tugas, pengingat, dan akses yang butuh persetujuan.',
-            ),
-          ]
-        : const [
-            _OnboardingSlide(
-              icon: Icons.checklist_rounded,
-              title: 'Start the day with a clear list',
-              body:
-                  'Tasks and reminders stay organized so you know what needs attention first.',
-            ),
-            _OnboardingSlide(
-              icon: Icons.chat_bubble_outline_rounded,
-              title: 'Prepare help from Nara Bot',
-              body:
-                  'Connect WhatsApp when you are ready, then let Nara keep follow-ups tidy.',
-            ),
-            _OnboardingSlide(
-              icon: Icons.tune_rounded,
-              title: 'Match your working style',
-              body:
-                  'Choose how Nara responds, how independently it helps, and when it should ask first.',
-            ),
-          ];
-
-    return Column(
-      children: [
-        // Skip button (top-right)
-        Align(
-          alignment: Alignment.topRight,
-          child: Padding(
-            padding: const EdgeInsets.only(right: 16, top: 8),
-            child: TextButton(
-              onPressed: () => setState(() => _onboardingDone = true),
-              child: Text(_isIndonesian ? 'Lewati' : 'Skip'),
-            ),
-          ),
-        ),
-
-        // Slides
-        Expanded(
-          child: PageView(
-            controller: _pageController,
-            onPageChanged: (page) => setState(() => _onboardingPage = page),
-            children: slides,
-          ),
-        ),
-
-        // Dots + CTA
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _OnboardingDots(active: _onboardingPage, count: 3),
-              const Spacer(),
-              FilledButton(
-                onPressed: () {
-                  if (_onboardingPage < 2) {
-                    _pageController.nextPage(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeOut,
-                    );
-                  } else {
-                    setState(() => _onboardingDone = true);
-                  }
-                },
-                child: Text(
-                  _onboardingPage < 2
-                      ? (_isIndonesian ? 'Lanjut' : 'Next')
-                      : (_isIndonesian ? 'Mulai' : 'Get Started'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ── App content (welcome or form) ─────────────────────────────────────
-
-  Widget _buildAppContent() {
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 400),
-      switchInCurve: Curves.easeOutCubic,
-      switchOutCurve: Curves.easeInCubic,
-      transitionBuilder: (child, animation) =>
-          FadeTransition(opacity: animation, child: child),
-      child: _showingForm ? _buildForm() : _buildWelcome(),
     );
   }
 
@@ -260,7 +135,6 @@ class _AuthScreenState extends State<AuthScreen> {
     final mutedColor = dark ? const Color(0xFF91AAA5) : NaraColors.textMuted;
 
     return ListView(
-      key: const ValueKey('welcome'),
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
       children: [
         // ── Top bar: logo + wordmark ──
@@ -426,266 +300,217 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  // ── Auth Form ───────────────────────────────────────────────────────────
-
-  Widget _buildForm() {
+  Widget _buildFormSheet({required ScrollController scrollController}) {
     final theme = Theme.of(context);
-    return ListView(
-      key: const ValueKey('form'),
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-      children: [
-        const SizedBox(height: 24),
-        // Back button
-        Align(
-          alignment: Alignment.centerLeft,
-          child: IconButton(
-            onPressed: _closeForm,
-            icon: const Icon(Icons.arrow_back_rounded),
-            tooltip: _isIndonesian ? 'Kembali' : 'Back',
-            style: IconButton.styleFrom(
-              backgroundColor: theme.colorScheme.surfaceContainerHighest,
-              foregroundColor: theme.colorScheme.onSurface,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-                side: BorderSide(color: theme.colorScheme.outline),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // Title
-        Text(
-          _isRegister
-              ? (_isIndonesian ? 'Buat akun baru' : 'Create account')
-              : (_isIndonesian ? 'Masuk ke Nara' : 'Sign in to Nara'),
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.4,
-            height: 1.2,
-            color: theme.textTheme.headlineMedium?.color,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          _isRegister
-              ? (_isIndonesian
-                  ? 'Siapkan akun agar tugas dan pengingat tetap tersimpan.'
-                  : 'Create an account so your tasks and reminders stay saved.')
-              : (_isIndonesian
-                  ? 'Lanjutkan mengelola tugas dan pengingat kamu.'
-                  : 'Continue managing your tasks and reminders.'),
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w400,
-            height: 1.5,
-            color: theme.textTheme.bodyMedium?.color,
-          ),
-        ),
-        const SizedBox(height: 24),
-
-        // Error banner
-        if (_error != null) ...[
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: NaraColors.dangerLight,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: NaraColors.danger.withValues(alpha: 0.25),
-              ),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.error_outline,
-                    color: NaraColors.danger, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    _error!,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: NaraColors.danger,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
-
-        // Form fields
-        Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              if (_isRegister) ...[
-                TextFormField(
-                  controller: _displayNameController,
-                  textInputAction: TextInputAction.next,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: InputDecoration(
-                    labelText: _isIndonesian ? 'Nama' : 'Name',
-                    hintText: _isIndonesian ? 'Nama kamu' : 'Your name',
-                    prefixIcon: const Icon(Icons.person_outline, size: 20),
-                  ),
-                  validator: (v) => (v ?? '').trim().isEmpty
-                      ? (_isIndonesian
-                          ? 'Nama tidak boleh kosong'
-                          : 'Name is required')
-                      : null,
-                ),
-                const SizedBox(height: 14),
-              ],
-              TextFormField(
-                controller: _emailController,
-                textInputAction: TextInputAction.next,
-                keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  hintText: 'nama@email.com',
-                  prefixIcon: Icon(Icons.email_outlined, size: 20),
-                ),
-                validator: (v) {
-                  if ((v ?? '').trim().isEmpty) {
-                    return _isIndonesian
-                        ? 'Email tidak boleh kosong'
-                        : 'Email is required';
-                  }
-                  if (!v!.contains('@')) {
-                    return _isIndonesian
-                        ? 'Format email tidak valid'
-                        : 'Enter a valid email address';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 14),
-              TextFormField(
-                controller: _passwordController,
-                textInputAction: TextInputAction.done,
-                obscureText: _obscurePassword,
-                decoration: InputDecoration(
-                  labelText: _isIndonesian ? 'Kata sandi' : 'Password',
-                  prefixIcon: const Icon(Icons.lock_outline, size: 20),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscurePassword
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                      size: 20,
-                    ),
-                    tooltip: _obscurePassword
-                        ? (_isIndonesian ? 'Lihat kata sandi' : 'Show password')
-                        : (_isIndonesian ? 'Sembunyikan' : 'Hide password'),
-                    onPressed: () => setState(
-                      () => _obscurePassword = !_obscurePassword,
-                    ),
-                  ),
-                ),
-                validator: (v) => (v ?? '').length < 6
-                    ? (_isIndonesian
-                        ? 'Minimal 6 karakter'
-                        : 'Use at least 6 characters')
-                    : null,
-                onFieldSubmitted: (_) => _submit(),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // Submit
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: FilledButton.icon(
-            onPressed: _loading ? null : _submit,
-            icon: _loading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : Icon(
-                    _isRegister
-                        ? Icons.person_add_rounded
-                        : Icons.login_rounded,
-                    size: 20,
-                  ),
-            label: Text(
-              _loading
-                  ? (_isRegister
-                      ? (_isIndonesian ? 'Membuat akun...' : 'Creating...')
-                      : (_isIndonesian ? 'Masuk...' : 'Signing in...'))
-                  : (_isRegister
-                      ? (_isIndonesian ? 'Buat Akun' : 'Create Account')
-                      : (_isIndonesian ? 'Masuk' : 'Sign In')),
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
-
-        // Toggle register/login
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: SingleChildScrollView(
+        controller: scrollController,
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: context.naraBorder,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Text(
+              _isRegister
+                  ? (_isIndonesian ? 'Buat akun baru' : 'Create account')
+                  : (_isIndonesian ? 'Masuk ke Nara' : 'Sign in to Nara'),
+              style: theme.textTheme.titleLarge,
+            ),
+            const SizedBox(height: 6),
             Text(
               _isRegister
                   ? (_isIndonesian
-                      ? 'Sudah punya akun?'
-                      : 'Already have an account?')
+                      ? 'Siapkan akun agar tugas dan pengingat tetap tersimpan.'
+                      : 'Create an account so your tasks and reminders stay saved.')
                   : (_isIndonesian
-                      ? 'Belum punya akun?'
-                      : 'Do not have an account yet?'),
-              style: TextStyle(
-                fontSize: 13,
-                color: theme.textTheme.bodyMedium?.color,
+                      ? 'Lanjutkan mengelola tugas dan pengingat kamu.'
+                      : 'Continue managing your tasks and reminders.'),
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 20),
+            if (_error != null) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: NaraColors.dangerLight,
+                  borderRadius: BorderRadius.circular(NaraColors.radiusSm),
+                  border: Border.all(
+                    color: NaraColors.danger.withValues(alpha: 0.25),
+                  ),
+                ),
+                child: Text(
+                  _error!,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: NaraColors.danger,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+            Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  if (_isRegister) ...[
+                    TextFormField(
+                      controller: _displayNameController,
+                      textInputAction: TextInputAction.next,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: InputDecoration(
+                        labelText: _isIndonesian ? 'Nama' : 'Name',
+                        hintText: _isIndonesian ? 'Nama kamu' : 'Your name',
+                      ),
+                      validator: (v) => (v ?? '').trim().isEmpty
+                          ? (_isIndonesian
+                              ? 'Nama tidak boleh kosong'
+                              : 'Name is required')
+                          : null,
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+                  TextFormField(
+                    controller: _emailController,
+                    textInputAction: TextInputAction.next,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'Email',
+                      hintText: 'nama@email.com',
+                    ),
+                    validator: (v) {
+                      if ((v ?? '').trim().isEmpty) {
+                        return _isIndonesian
+                            ? 'Email tidak boleh kosong'
+                            : 'Email is required';
+                      }
+                      if (!v!.contains('@')) {
+                        return _isIndonesian
+                            ? 'Format email tidak valid'
+                            : 'Enter a valid email address';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _passwordController,
+                    textInputAction: TextInputAction.done,
+                    obscureText: _obscurePassword,
+                    onFieldSubmitted: (_) => _submit(),
+                    decoration: InputDecoration(
+                      labelText: _isIndonesian ? 'Kata sandi' : 'Password',
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                          size: 20,
+                        ),
+                        onPressed: () => setState(
+                          () => _obscurePassword = !_obscurePassword,
+                        ),
+                      ),
+                    ),
+                    validator: (v) => (v ?? '').length < 6
+                        ? (_isIndonesian
+                            ? 'Minimal 6 karakter'
+                            : 'Use at least 6 characters')
+                        : null,
+                  ),
+                ],
               ),
             ),
-            TextButton(
-              onPressed: () => setState(() {
-                _isRegister = !_isRegister;
-                _error = null;
-              }),
-              child: Text(
-                _isRegister
-                    ? (_isIndonesian ? 'Masuk' : 'Sign in')
-                    : (_isIndonesian ? 'Buat akun' : 'Create account'),
-                style: const TextStyle(fontSize: 13),
+            const SizedBox(height: 20),
+            SizedBox(
+              height: 48,
+              child: FilledButton(
+                onPressed: _loading ? null : _submit,
+                child: _loading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(_isRegister
+                        ? (_isIndonesian ? 'Buat Akun' : 'Create Account')
+                        : (_isIndonesian ? 'Masuk' : 'Sign In')),
               ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  _isRegister
+                      ? (_isIndonesian
+                          ? 'Sudah punya akun?'
+                          : 'Already have an account?')
+                      : (_isIndonesian
+                          ? 'Belum punya akun?'
+                          : 'Do not have an account yet?'),
+                  style: theme.textTheme.bodyMedium,
+                ),
+                TextButton(
+                  onPressed: () => setState(() {
+                    _isRegister = !_isRegister;
+                    _error = null;
+                  }),
+                  child: Text(
+                    _isRegister
+                        ? (_isIndonesian ? 'Masuk' : 'Sign in')
+                        : (_isIndonesian ? 'Buat akun' : 'Create account'),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
-        const SizedBox(height: 24),
-      ],
+      ),
     );
   }
 
-  void _openForm({required bool register}) {
+  Future<void> _openForm({required bool register}) async {
     setState(() {
       _isRegister = register;
-      _showingForm = true;
       _error = null;
       _displayNameController.clear();
       _emailController.clear();
       _passwordController.clear();
       _obscurePassword = true;
     });
-  }
 
-  void _closeForm() {
-    setState(() {
-      _showingForm = false;
-      _error = null;
-    });
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, sheetSetState) {
+          return DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: 0.72,
+            minChildSize: 0.45,
+            maxChildSize: 0.92,
+            builder: (_, scrollController) {
+              return _buildFormSheet(scrollController: scrollController);
+            },
+          );
+        },
+      ),
+    );
   }
 }
 
@@ -698,22 +523,8 @@ class _WelcomeBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return Positioned.fill(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: dark
-                ? const [
-                    Color(0xFF111C1B),
-                    Color(0xFF162522),
-                  ]
-                : const [
-                    NaraColors.background,
-                    Color(0xFFF4F4F0),
-                  ],
-          ),
-        ),
+      child: ColoredBox(
+        color: dark ? const Color(0xFF141A18) : NaraColors.background,
       ),
     );
   }
@@ -742,17 +553,8 @@ class _WelcomeMomentPreview extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
       decoration: BoxDecoration(
         color: surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(NaraColors.radiusMd),
         border: Border.all(color: border),
-        boxShadow: [
-          BoxShadow(
-            color: dark
-                ? Colors.black.withValues(alpha: 0.18)
-                : const Color(0xFF0D9488).withValues(alpha: 0.05),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -896,92 +698,6 @@ class _PreviewCheckbox extends StatelessWidget {
         borderRadius: BorderRadius.circular(5),
         border: Border.all(color: color, width: 1.8),
       ),
-    );
-  }
-}
-
-// ── Onboarding Components ───────────────────────────────────────────────
-
-class _OnboardingSlide extends StatelessWidget {
-  const _OnboardingSlide({
-    required this.icon,
-    required this.title,
-    required this.body,
-  });
-
-  final IconData icon;
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Icon in soft circle
-          Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 44, color: theme.colorScheme.primary),
-          ),
-          const SizedBox(height: 32),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.3,
-              height: 1.2,
-              color: theme.textTheme.headlineMedium?.color,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            body,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-              height: 1.55,
-              color: theme.textTheme.bodyMedium?.color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _OnboardingDots extends StatelessWidget {
-  const _OnboardingDots({required this.active, required this.count});
-  final int active;
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(count, (i) {
-        final isActive = i == active;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          width: isActive ? 20 : 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: isActive ? NaraColors.primary : NaraColors.borderStrong,
-            borderRadius: BorderRadius.circular(4),
-          ),
-        );
-      }),
     );
   }
 }

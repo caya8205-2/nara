@@ -1,54 +1,46 @@
 import 'package:flutter/material.dart';
+import 'nara_fonts.dart';
 
-// ── Nara Design Tokens ──────────────────────────────────────────────────────
-// Warm off-white base, teal primary accents, calm operational SaaS feel.
-// Inspired by: Soft UI Evolution + Minimal Swiss + Micro-interactions
-// References: Things 3 (task clarity), Linear (modern polish), Notion (warmth)
+// Warm Editorial Office — parchment base, pine accent, editorial typography.
 
-/// Semantic color values — used as raw Color constants across all screens.
-/// Prefer Theme.of(context).colorScheme in build methods; use these only for
-/// static or const contexts (badges, status dots, inline styling).
 class NaraColors {
   NaraColors._();
 
-  // ── Primary ──
-  static const Color primary = Color(0xFF0D9488); // teal-600
-  static const Color primaryLight = Color(0xFFCCFBF1); // teal-100
-  static const Color primaryMuted = Color(0xFFF0FDFA); // teal-50
+  static const Color primary = Color(0xFF2D4A46);
+  static const Color primaryLight = Color(0xFFD8E4E1);
+  static const Color primaryMuted = Color(0xFFE8EFED);
 
-  // ── Semantic accents ──
-  static const Color agent =
-      Color(0xFF059669); // emerald-600 (healthy/Nara Bot)
-  static const Color agentLight = Color(0xFFD1FAE5); // emerald-100
-  static const Color agentMuted = Color(0xFFECFDF5); // emerald-50
+  static const Color agent = Color(0xFF4A7C59);
+  static const Color agentLight = Color(0xFFDCE8DF);
+  static const Color agentMuted = Color(0xFFEDF4EF);
 
-  static const Color warning = Color(0xFFD97706); // amber-600
-  static const Color warningLight = Color(0xFFFEF3C7); // amber-100
-  static const Color warningMuted = Color(0xFFFFFBEB); // amber-50
+  static const Color warning = Color(0xFFB45309);
+  static const Color warningLight = Color(0xFFF5E6CC);
+  static const Color warningMuted = Color(0xFFFBF4E8);
 
-  static const Color danger = Color(0xFFE11D48); // rose-600
-  static const Color dangerLight = Color(0xFFFEE2E2); // rose-100
+  static const Color danger = Color(0xFF9F1239);
+  static const Color dangerLight = Color(0xFFFCE7EC);
 
-  // ── Surfaces ──
-  static const Color background = Color(0xFFFAFAF9); // stone-50
-  static const Color surface = Color(0xFFFFFFFF); // white
-  static const Color surfaceRaised = Color(0xFFF8FAFC); // slate-50
+  static const Color background = Color(0xFFF6F1E8);
+  static const Color surface = Color(0xFFFFFCF7);
+  static const Color surfaceRaised = Color(0xFFF0EBE2);
 
-  // ── Borders ──
-  static const Color border = Color(0xFFE2E8F0); // slate-200
-  static const Color borderStrong = Color(0xFFCBD5E1); // slate-300
+  static const Color border = Color(0xFFD9D0C4);
+  static const Color borderStrong = Color(0xFFC4B8A8);
 
-  // ── Text ──
-  static const Color textPrimary = Color(0xFF0F172A); // slate-900
-  static const Color textSecondary = Color(0xFF475569); // slate-600
-  static const Color textMuted = Color(0xFF94A3B8); // slate-400
-  static const Color textOnPrimary = Color(0xFFFFFFFF); // white
+  static const Color textPrimary = Color(0xFF1F1A17);
+  static const Color textSecondary = Color(0xFF5C534A);
+  static const Color textMuted = Color(0xFF8A8178);
+  static const Color textOnPrimary = Color(0xFFFFFCF7);
 
-  // ── Priority indicators ──
-  static const Color priorityUrgent = Color(0xFFE11D48); // rose-600
-  static const Color priorityHigh = Color(0xFFD97706); // amber-600
-  static const Color priorityNormal = Color(0xFF0D9488); // teal-600
-  static const Color priorityLow = Color(0xFF94A3B8); // slate-400
+  static const Color priorityUrgent = Color(0xFF9F1239);
+  static const Color priorityHigh = Color(0xFFB45309);
+  static const Color priorityNormal = Color(0xFF2D4A46);
+  static const Color priorityLow = Color(0xFF8A8178);
+
+  static const double radiusSm = 6;
+  static const double radiusMd = 8;
+  static const double radiusLg = 12;
 }
 
 extension NaraThemeTokens on BuildContext {
@@ -71,537 +63,337 @@ extension NaraThemeTokens on BuildContext {
       naraTheme.textTheme.bodySmall?.color ??
       naraScheme.onSurface.withValues(alpha: 0.56);
   Color get naraTint =>
-      naraScheme.primary.withValues(alpha: isNaraDark ? 0.14 : 0.1);
+      naraScheme.primary.withValues(alpha: isNaraDark ? 0.14 : 0.08);
   Color get naraSelectedTint =>
       naraScheme.primary.withValues(alpha: isNaraDark ? 0.2 : 0.12);
 }
 
-/// Builds the Nara Material 3 theme.
-///
-/// Light mode only for now — dark mode scaffolding is included via
-/// [buildNaraDarkTheme] for future implementation.
-ThemeData buildNaraTheme() {
-  const Color primary = NaraColors.primary;
-
-  final ColorScheme colorScheme = ColorScheme.fromSeed(
-    seedColor: primary,
-    brightness: Brightness.light,
-    // Override defaults from seed to match our warm palette.
-    surface: NaraColors.surface,
-    onSurface: NaraColors.textPrimary,
-    outline: NaraColors.border,
-    outlineVariant: NaraColors.border,
-    error: NaraColors.danger,
+TextTheme _buildNaraTextTheme({
+  required Color textPrimary,
+  required Color textSecondary,
+  required Color textMuted,
+}) {
+  final TextStyle bodyBase = GoogleFonts.plusJakartaSans(
+    color: textSecondary,
+    height: 1.5,
   );
+
+  return TextTheme(
+    headlineMedium: GoogleFonts.fraunces(
+      fontSize: 26,
+      fontWeight: FontWeight.w600,
+      letterSpacing: -0.4,
+      height: 1.15,
+      color: textPrimary,
+    ),
+    titleLarge: GoogleFonts.fraunces(
+      fontSize: 18,
+      fontWeight: FontWeight.w600,
+      letterSpacing: -0.2,
+      height: 1.25,
+      color: textPrimary,
+    ),
+    titleMedium: GoogleFonts.plusJakartaSans(
+      fontSize: 14,
+      fontWeight: FontWeight.w600,
+      letterSpacing: -0.05,
+      height: 1.35,
+      color: textPrimary,
+    ),
+    bodyMedium: bodyBase.copyWith(fontSize: 13),
+    bodySmall: GoogleFonts.plusJakartaSans(
+      fontSize: 12,
+      fontWeight: FontWeight.w400,
+      height: 1.4,
+      color: textMuted,
+    ),
+    displaySmall: GoogleFonts.fraunces(
+      fontSize: 28,
+      fontWeight: FontWeight.w600,
+      letterSpacing: -0.5,
+      height: 1.1,
+      color: textPrimary,
+    ),
+    labelLarge: GoogleFonts.plusJakartaSans(
+      fontSize: 13,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.2,
+      color: textSecondary,
+    ),
+  );
+}
+
+ThemeData _buildSharedTheme({
+  required Brightness brightness,
+  required ColorScheme colorScheme,
+  required Color scaffoldBackground,
+  required TextTheme textTheme,
+  required Color border,
+  required Color surfaceRaised,
+}) {
+  final Color primary = colorScheme.primary;
 
   return ThemeData(
     useMaterial3: true,
+    brightness: brightness,
     colorScheme: colorScheme,
-    scaffoldBackgroundColor: NaraColors.background,
-
-    // ── Typography ──
-    // Compact, readable, Swiss-inspired. Uses Material 3 default family
-    // (system default on each platform) with tightened sizing for mobile.
-    textTheme: const TextTheme(
-      // Screen titles: 24px mobile, 28px for larger screens
-      headlineMedium: TextStyle(
-        fontSize: 24,
-        fontWeight: FontWeight.w800,
-        letterSpacing: -0.3,
-        height: 1.2,
-        color: NaraColors.textPrimary,
-      ),
-      // Section headers inside cards: 16px
-      titleLarge: TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w700,
-        letterSpacing: -0.2,
-        height: 1.3,
-        color: NaraColors.textPrimary,
-      ),
-      // Card titles / list primary text: 14px
-      titleMedium: TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
-        letterSpacing: -0.1,
-        height: 1.35,
-      ),
-      // Supporting body: 13px
-      bodyMedium: TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w400,
-        letterSpacing: 0,
-        height: 1.5,
-      ),
-      // Metadata, captions, secondary labels: 12px
-      bodySmall: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w400,
-        letterSpacing: 0,
-        height: 1.4,
-      ),
-      // Metric values: 28px
-      displaySmall: TextStyle(
-        fontSize: 28,
-        fontWeight: FontWeight.w800,
-        letterSpacing: -0.5,
-        height: 1.1,
-      ),
-    ),
-
-    // ── App Bar ──
-    // Transparent background so scaffold color shows through.
-    appBarTheme: const AppBarTheme(
+    scaffoldBackgroundColor: scaffoldBackground,
+    textTheme: textTheme,
+    appBarTheme: AppBarTheme(
       backgroundColor: Colors.transparent,
-      foregroundColor: NaraColors.textPrimary,
+      foregroundColor: textTheme.titleMedium?.color,
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
-      titleTextStyle: TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.w700,
-        color: NaraColors.textPrimary,
-        letterSpacing: -0.2,
+      titleTextStyle: GoogleFonts.plusJakartaSans(
+        fontSize: 17,
+        fontWeight: FontWeight.w600,
+        color: textTheme.titleMedium?.color,
+        letterSpacing: -0.1,
       ),
     ),
-
-    // ── Cards ──
-    // White surface, subtle border, soft 12px radius. No elevation.
     cardTheme: CardThemeData(
-      color: NaraColors.surface,
+      color: colorScheme.surface,
       elevation: 0,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: NaraColors.border, width: 1),
+        borderRadius: BorderRadius.circular(NaraColors.radiusMd),
+        side: BorderSide(color: border, width: 1),
       ),
     ),
-
-    // ── Filled Buttons ──
-    // Primary CTAs — 44px height for touch targets.
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
+        backgroundColor: primary,
+        foregroundColor: brightness == Brightness.light
+            ? NaraColors.textOnPrimary
+            : const Color(0xFF141A18),
         minimumSize: const Size(0, 44),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        textStyle: const TextStyle(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(NaraColors.radiusMd),
+        ),
+        textStyle: GoogleFonts.plusJakartaSans(
           fontSize: 14,
           fontWeight: FontWeight.w600,
-          letterSpacing: -0.1,
         ),
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       ),
     ),
-
-    // ── Outlined Buttons ──
-    // Secondary actions — same dimensions as filled.
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
+        foregroundColor: primary,
         minimumSize: const Size(0, 44),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        side: const BorderSide(color: NaraColors.border),
-        textStyle: const TextStyle(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(NaraColors.radiusMd),
+        ),
+        side: BorderSide(color: border),
+        textStyle: GoogleFonts.plusJakartaSans(
           fontSize: 14,
           fontWeight: FontWeight.w600,
-          letterSpacing: -0.1,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       ),
     ),
-
-    // ── Text Buttons ──
-    // For inline actions like "All tasks" or "Edit".
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        textStyle: const TextStyle(
+        foregroundColor: primary,
+        textStyle: GoogleFonts.plusJakartaSans(
           fontSize: 13,
           fontWeight: FontWeight.w600,
-          letterSpacing: -0.1,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       ),
     ),
-
-    // ── Input Fields ──
-    // Clean bordered inputs with teal focus ring.
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: NaraColors.surface,
+      fillColor: brightness == Brightness.light
+          ? NaraColors.surface
+          : surfaceRaised,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: NaraColors.border),
+        borderRadius: BorderRadius.circular(NaraColors.radiusSm),
+        borderSide: BorderSide(color: border),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: NaraColors.border),
+        borderRadius: BorderRadius.circular(NaraColors.radiusSm),
+        borderSide: BorderSide(color: border),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: primary, width: 1.5),
+        borderRadius: BorderRadius.circular(NaraColors.radiusSm),
+        borderSide: BorderSide(color: primary, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: NaraColors.danger),
+        borderRadius: BorderRadius.circular(NaraColors.radiusSm),
+        borderSide: BorderSide(color: colorScheme.error),
       ),
-      labelStyle: const TextStyle(
+      labelStyle: GoogleFonts.plusJakartaSans(
         fontSize: 13,
-        color: NaraColors.textSecondary,
+        color: textTheme.bodyMedium?.color,
       ),
-      hintStyle: const TextStyle(
+      hintStyle: GoogleFonts.plusJakartaSans(
         fontSize: 13,
-        color: NaraColors.textMuted,
+        color: textTheme.bodySmall?.color,
       ),
     ),
-
-    // ── Bottom Navigation ──
-    // Clean bar with active teal indicator.
-    navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: NaraColors.surface,
-      indicatorColor: NaraColors.primaryMuted,
-      elevation: 0,
-      height: 64,
-      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-      iconTheme: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) {
-          return const IconThemeData(color: NaraColors.primary, size: 24);
-        }
-        return const IconThemeData(
-          color: NaraColors.textMuted,
-          size: 24,
-        );
-      }),
-      labelTextStyle: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) {
-          return const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: NaraColors.primary,
-            height: 1.2,
-          );
-        }
-        return const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w500,
-          color: NaraColors.textMuted,
-          height: 1.2,
-        );
-      }),
-    ),
-
-    // ── Bottom Sheets ──
-    bottomSheetTheme: const BottomSheetThemeData(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    bottomSheetTheme: BottomSheetThemeData(
+      backgroundColor: colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
-      backgroundColor: NaraColors.surface,
     ),
-
-    // ── Snackbar ──
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      contentTextStyle: const TextStyle(
+      backgroundColor: NaraColors.textPrimary,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(NaraColors.radiusSm),
+      ),
+      contentTextStyle: GoogleFonts.plusJakartaSans(
         fontSize: 13,
         color: NaraColors.textOnPrimary,
       ),
     ),
-
-    // ── Dividers ──
-    dividerTheme: const DividerThemeData(
-      color: NaraColors.border,
+    dividerTheme: DividerThemeData(
+      color: border,
       thickness: 1,
       space: 1,
     ),
-
-    // ── Checkboxes / Switches ──
-    // Explicit switch theme: Material 3 defaults make the OFF thumb fade into
-    // the track (both use muted surface colors). Force a solid, contrasting
-    // thumb so the toggle reads clearly in both states.
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.selected)) {
-          return NaraColors.textOnPrimary;
+          return brightness == Brightness.light
+              ? NaraColors.textOnPrimary
+              : const Color(0xFF141A18);
         }
-        return NaraColors.surface; // solid white, never fades into track
+        return brightness == Brightness.light
+            ? NaraColors.surface
+            : surfaceRaised;
       }),
       trackColor: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.selected)) {
-          return NaraColors.primary;
+          return primary;
         }
-        return NaraColors.borderStrong; // slate-300, clearly distinct from white thumb
+        return brightness == Brightness.light
+            ? NaraColors.borderStrong
+            : border;
       }),
       trackOutlineColor: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.selected)) {
           return Colors.transparent;
         }
-        return NaraColors.borderStrong;
-      }),
-      overlayColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.pressed)) {
-          return NaraColors.primary.withValues(alpha: 0.12);
-        }
-        return Colors.transparent;
+        return border;
       }),
       splashRadius: 0,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
     ),
-
-    // ── Floating Action Button ──
     floatingActionButtonTheme: FloatingActionButtonThemeData(
       backgroundColor: primary,
-      foregroundColor: NaraColors.textOnPrimary,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      extendedTextStyle: const TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
+      foregroundColor: brightness == Brightness.light
+          ? NaraColors.textOnPrimary
+          : const Color(0xFF141A18),
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(NaraColors.radiusMd),
       ),
     ),
-
-    // ── Icon theme default ──
-    iconTheme: const IconThemeData(
-      color: NaraColors.textSecondary,
+    iconTheme: IconThemeData(
+      color: textTheme.bodyMedium?.color,
       size: 22,
     ),
-
-    // ── Chip theme ──
     chipTheme: ChipThemeData(
-      backgroundColor: NaraColors.surfaceRaised,
-      selectedColor: NaraColors.primaryMuted,
-      labelStyle: const TextStyle(
+      backgroundColor: surfaceRaised,
+      selectedColor: colorScheme.primaryContainer,
+      labelStyle: GoogleFonts.plusJakartaSans(
         fontSize: 12,
         fontWeight: FontWeight.w500,
-        color: NaraColors.textPrimary,
+        color: textTheme.titleMedium?.color,
       ),
-      secondaryLabelStyle: const TextStyle(
+      secondaryLabelStyle: GoogleFonts.plusJakartaSans(
         fontSize: 12,
         fontWeight: FontWeight.w600,
-        color: NaraColors.primary,
+        color: primary,
       ),
-      side: const BorderSide(color: NaraColors.border),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      side: BorderSide(color: border),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(NaraColors.radiusSm),
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
     ),
   );
 }
 
-/// Dark mode scaffolding — returns a matching dark theme.
-/// Not wired yet; ready when dark mode feature is requested.
-ThemeData buildNaraDarkTheme() {
-  const darkBackground = Color(0xFF111C1B);
-  const darkSurface = Color(0xFF182725);
-  const darkSurfaceRaised = Color(0xFF203431);
-  const darkBorder = Color(0xFF34504C);
-  const darkTextPrimary = Color(0xFFF1F7F5);
-  const darkTextSecondary = Color(0xFFC5D6D2);
-  const darkTextMuted = Color(0xFF91AAA5);
-  const darkPrimary = Color(0xFF5EEAD4);
-
-  final ColorScheme colorScheme = ColorScheme.fromSeed(
-    seedColor: darkPrimary,
-    brightness: Brightness.dark,
-    surface: darkSurface,
-    onSurface: darkTextPrimary,
-    outline: darkBorder,
-    outlineVariant: darkBorder,
-    primary: darkPrimary,
-    error: const Color(0xFFFB7185),
+ThemeData buildNaraTheme() {
+  const ColorScheme colorScheme = ColorScheme(
+    brightness: Brightness.light,
+    primary: NaraColors.primary,
+    onPrimary: NaraColors.textOnPrimary,
+    primaryContainer: NaraColors.primaryMuted,
+    onPrimaryContainer: NaraColors.primary,
+    secondary: NaraColors.agent,
+    onSecondary: NaraColors.textOnPrimary,
+    secondaryContainer: NaraColors.agentMuted,
+    onSecondaryContainer: NaraColors.agent,
+    surface: NaraColors.surface,
+    onSurface: NaraColors.textPrimary,
+    surfaceContainerHighest: NaraColors.surfaceRaised,
+    outline: NaraColors.border,
+    outlineVariant: NaraColors.border,
+    error: NaraColors.danger,
+    onError: NaraColors.textOnPrimary,
   );
 
-  return ThemeData(
-    useMaterial3: true,
+  return _buildSharedTheme(
+    brightness: Brightness.light,
     colorScheme: colorScheme,
-    scaffoldBackgroundColor: darkBackground,
-    appBarTheme: const AppBarTheme(
-      backgroundColor: Colors.transparent,
-      foregroundColor: darkTextPrimary,
-      elevation: 0,
-      scrolledUnderElevation: 0,
-      centerTitle: false,
-      titleTextStyle: TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.w700,
-        color: darkTextPrimary,
-        letterSpacing: -0.2,
-      ),
+    scaffoldBackground: NaraColors.background,
+    border: NaraColors.border,
+    surfaceRaised: NaraColors.surfaceRaised,
+    textTheme: _buildNaraTextTheme(
+      textPrimary: NaraColors.textPrimary,
+      textSecondary: NaraColors.textSecondary,
+      textMuted: NaraColors.textMuted,
     ),
-    cardTheme: CardThemeData(
-      color: darkSurface,
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: darkBorder, width: 1),
-      ),
-    ),
-    textTheme: const TextTheme(
-      headlineMedium: TextStyle(
-        fontSize: 24,
-        fontWeight: FontWeight.w800,
-        letterSpacing: -0.3,
-        height: 1.2,
-        color: darkTextPrimary,
-      ),
-      titleLarge: TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w700,
-        letterSpacing: -0.2,
-        height: 1.3,
-        color: darkTextPrimary,
-      ),
-      titleMedium: TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
-        letterSpacing: -0.1,
-        height: 1.35,
-        color: darkTextPrimary,
-      ),
-      bodyMedium: TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w400,
-        letterSpacing: 0,
-        height: 1.5,
-        color: darkTextSecondary,
-      ),
-      bodySmall: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w400,
-        letterSpacing: 0,
-        height: 1.4,
-        color: darkTextMuted,
-      ),
-    ),
-    filledButtonTheme: FilledButtonThemeData(
-      style: FilledButton.styleFrom(
-        backgroundColor: darkPrimary,
-        foregroundColor: const Color(0xFF063F3A),
-        minimumSize: const Size(0, 44),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-        elevation: 0,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      ),
-    ),
-    outlinedButtonTheme: OutlinedButtonThemeData(
-      style: OutlinedButton.styleFrom(
-        foregroundColor: darkPrimary,
-        minimumSize: const Size(0, 44),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        side: const BorderSide(color: darkBorder),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      ),
-    ),
-    inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: darkSurfaceRaised,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: darkBorder),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: darkBorder),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: darkPrimary, width: 1.5),
-      ),
-      labelStyle: const TextStyle(fontSize: 13, color: darkTextSecondary),
-      hintStyle: const TextStyle(fontSize: 13, color: darkTextMuted),
-    ),
-    navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: darkSurface,
-      indicatorColor: const Color(0xFF254C47),
-      elevation: 0,
-      height: 64,
-      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-      iconTheme: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) {
-          return const IconThemeData(color: darkPrimary, size: 24);
-        }
-        return const IconThemeData(color: darkTextMuted, size: 24);
-      }),
-      labelTextStyle: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) {
-          return const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: darkPrimary,
-            height: 1.2,
-          );
-        }
-        return const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w500,
-          color: darkTextMuted,
-          height: 1.2,
-        );
-      }),
-    ),
-    bottomSheetTheme: const BottomSheetThemeData(
-      backgroundColor: darkSurface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-    ),
-    dividerTheme: const DividerThemeData(
-      color: darkBorder,
-      thickness: 1,
-      space: 1,
-    ),
-    iconTheme: const IconThemeData(color: darkTextSecondary, size: 22),
-    switchTheme: SwitchThemeData(
-      thumbColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) {
-          return const Color(0xFF063F3A); // dark teal text on bright thumb
-        }
-        return darkTextMuted; // solid muted thumb, distinct from dark track
-      }),
-      trackColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) {
-          return darkPrimary;
-        }
-        return darkSurfaceRaised; // distinct from muted thumb
-      }),
-      trackOutlineColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) {
-          return Colors.transparent;
-        }
-        return darkBorder;
-      }),
-      overlayColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.pressed)) {
-          return darkPrimary.withValues(alpha: 0.18);
-        }
-        return Colors.transparent;
-      }),
-      splashRadius: 0,
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-    ),
-    chipTheme: ChipThemeData(
-      backgroundColor: darkSurfaceRaised,
-      selectedColor: const Color(0xFF254C47),
-      labelStyle: const TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w500,
-        color: darkTextPrimary,
-      ),
-      secondaryLabelStyle: const TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        color: darkPrimary,
-      ),
-      side: const BorderSide(color: darkBorder),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-    ),
-    floatingActionButtonTheme: FloatingActionButtonThemeData(
-      backgroundColor: darkPrimary,
-      foregroundColor: const Color(0xFF063F3A),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+  );
+}
+
+ThemeData buildNaraDarkTheme() {
+  const darkBackground = Color(0xFF141A18);
+  const darkSurface = Color(0xFF1C2421);
+  const darkSurfaceRaised = Color(0xFF24302C);
+  const darkBorder = Color(0xFF3A4A45);
+  const darkTextPrimary = Color(0xFFF4EFE6);
+  const darkTextSecondary = Color(0xFFC9C0B4);
+  const darkTextMuted = Color(0xFF8E877E);
+  const darkPrimary = Color(0xFF8FB5AE);
+
+  const ColorScheme colorScheme = ColorScheme(
+    brightness: Brightness.dark,
+    primary: darkPrimary,
+    onPrimary: darkBackground,
+    primaryContainer: Color(0xFF2A3F3A),
+    onPrimaryContainer: darkPrimary,
+    secondary: Color(0xFF7FA889),
+    onSecondary: darkBackground,
+    secondaryContainer: Color(0xFF2A3A2E),
+    onSecondaryContainer: Color(0xFF7FA889),
+    surface: darkSurface,
+    onSurface: darkTextPrimary,
+    surfaceContainerHighest: darkSurfaceRaised,
+    outline: darkBorder,
+    outlineVariant: darkBorder,
+    error: Color(0xFFFB7185),
+    onError: darkBackground,
+  );
+
+  return _buildSharedTheme(
+    brightness: Brightness.dark,
+    colorScheme: colorScheme,
+    scaffoldBackground: darkBackground,
+    border: darkBorder,
+    surfaceRaised: darkSurfaceRaised,
+    textTheme: _buildNaraTextTheme(
+      textPrimary: darkTextPrimary,
+      textSecondary: darkTextSecondary,
+      textMuted: darkTextMuted,
     ),
   );
 }

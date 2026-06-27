@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/nara_fonts.dart';
 
 import '../../core/state/nara_mobile_state.dart';
 import '../../core/theme/nara_theme.dart';
@@ -84,6 +85,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
         widget.state.languagePreference == NaraLanguagePreference.indonesia;
 
     return RefreshIndicator(
+      color: NaraColors.primary,
       onRefresh: widget.onRefresh,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -422,11 +424,11 @@ class _AssistantScreenState extends State<AssistantScreen> {
               children: [
                 Text(
                   title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
+                  style: GoogleFonts.fraunces(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
                     color: theme.textTheme.titleMedium?.color,
-                    height: 1.3,
+                    height: 1.25,
                   ),
                 ),
                 Text(

@@ -28,6 +28,7 @@ class ApprovalsScreen extends StatelessWidget {
         state.languagePreference == NaraLanguagePreference.indonesia;
 
     return RefreshIndicator(
+      color: NaraColors.primary,
       onRefresh: () => onRefresh(silent: false),
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -89,9 +90,8 @@ class ApprovalsScreen extends StatelessWidget {
 
           // Empty state
           if (approvals.isEmpty)
-            NaraCard(
+            NaraPanel(
               child: NaraEmptyState(
-                icon: Icons.checklist_outlined,
                 title: isIndonesian
                     ? 'Tidak ada persetujuan'
                     : 'No pending approvals',
@@ -103,7 +103,7 @@ class ApprovalsScreen extends StatelessWidget {
 
           // Approval list
           if (approvals.isNotEmpty)
-            NaraCard(
+            NaraPanel(
               padding: EdgeInsets.zero,
               child: Column(
                 mainAxisSize: MainAxisSize.min,

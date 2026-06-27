@@ -6,7 +6,9 @@ import 'core/services/api_client.dart';
 import 'core/services/local_reminder_notification_service.dart';
 import 'core/services/session_store.dart';
 import 'core/state/nara_mobile_state.dart';
+import 'core/theme/nara_motion.dart';
 import 'core/theme/nara_theme.dart';
+import 'core/widgets/nara_bottom_nav.dart';
 import 'core/widgets/nara_logo_mark.dart';
 import 'features/approvals/approvals_screen.dart';
 import 'features/assistant/assistant_screen.dart';
@@ -991,78 +993,37 @@ class _NaraMobileAppState extends State<NaraMobileApp>
                     key: const ValueKey('app-shell'),
                     body: SafeArea(
                       child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 260),
-                        switchInCurve: Curves.easeOutCubic,
-                        switchOutCurve: Curves.easeInCubic,
-                        transitionBuilder: (child, animation) =>
-                            FadeTransition(opacity: animation, child: child),
+                        duration: NaraMotion.page,
+                        switchInCurve: NaraMotion.easeOut,
+                        switchOutCurve: NaraMotion.easeIn,
+                        transitionBuilder: (child, animation) {
+                          final slide = Tween<Offset>(
+                            begin: Offset(0, tabDirection * 0.02),
+                            end: Offset.zero,
+                          ).animate(animation);
+                          return FadeTransition(
+                            opacity: animation,
+                            child: SlideTransition(
+                              position: slide,
+                              child: child,
+                            ),
+                          );
+                        },
                         child: KeyedSubtree(
                           key: ValueKey(selectedIndex),
                           child: screens[selectedIndex],
                         ),
                       ),
                     ),
-                    bottomNavigationBar: selectedIndex == 4 ||
-                            selectedIndex == 5
+                    bottomNavigationBar: selectedIndex == 4
                         ? null
-                        : NavigationBar(
+                        : NaraBottomNav(
                             selectedIndex: selectedIndex,
                             onDestinationSelected: openTab,
-                            destinations: showAsGuest
-                                ? [
-                                    NavigationDestination(
-                                      icon: const Icon(Icons.home_outlined),
-                                      selectedIcon: const Icon(Icons.home),
-                                      label: isIndonesian ? 'Beranda' : 'Home',
-                                    ),
-                                    NavigationDestination(
-                                      icon:
-                                          const Icon(Icons.checklist_outlined),
-                                      selectedIcon: const Icon(Icons.checklist),
-                                      label: isIndonesian ? 'Tugas' : 'Tasks',
-                                    ),
-                                    NavigationDestination(
-                                      icon: const Icon(
-                                          Icons.notifications_outlined),
-                                      selectedIcon:
-                                          const Icon(Icons.notifications),
-                                      label: isIndonesian
-                                          ? 'Pengingat'
-                                          : 'Reminders',
-                                    ),
-                                    const NavigationDestination(
-                                      icon: Icon(Icons.smart_toy_outlined),
-                                      selectedIcon: Icon(Icons.smart_toy),
-                                      label: 'Nara',
-                                    ),
-                                  ]
-                                : [
-                                    NavigationDestination(
-                                      icon: const Icon(Icons.home_outlined),
-                                      selectedIcon: const Icon(Icons.home),
-                                      label: isIndonesian ? 'Beranda' : 'Home',
-                                    ),
-                                    NavigationDestination(
-                                      icon:
-                                          const Icon(Icons.checklist_outlined),
-                                      selectedIcon: const Icon(Icons.checklist),
-                                      label: isIndonesian ? 'Tugas' : 'Tasks',
-                                    ),
-                                    NavigationDestination(
-                                      icon: const Icon(
-                                          Icons.notifications_outlined),
-                                      selectedIcon:
-                                          const Icon(Icons.notifications),
-                                      label: isIndonesian
-                                          ? 'Pengingat'
-                                          : 'Reminders',
-                                    ),
-                                    const NavigationDestination(
-                                      icon: Icon(Icons.smart_toy_outlined),
-                                      selectedIcon: Icon(Icons.smart_toy),
-                                      label: 'Nara',
-                                    ),
-                                  ],
+                            isIndonesian: isIndonesian,
+                            showAsGuest: showAsGuest,
+                            approvalBadgeCount:
+                                appState.pendingApprovals.length,
                           ),
                   ),
       ),

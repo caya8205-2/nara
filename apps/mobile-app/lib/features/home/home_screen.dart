@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/nara_fonts.dart';
 
 import '../../core/state/nara_mobile_state.dart';
 import '../../core/theme/nara_theme.dart';
 import '../../core/widgets/nara_card.dart';
+import '../../core/widgets/nara_empty_state.dart';
+import '../../core/widgets/nara_logo_mark.dart';
 import '../../core/widgets/nara_metric_tile.dart';
 import '../../core/widgets/nara_section_header.dart';
 import '../../core/widgets/nara_status_chip.dart';
@@ -86,6 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
         widget.state.languagePreference == NaraLanguagePreference.indonesia;
 
     return RefreshIndicator(
+      color: NaraColors.primary,
       onRefresh: () async {
         if (isGuest) return;
         await widget.onRefreshConnection();
@@ -94,27 +98,29 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
         children: [
-          // ── Guest banner ──
           if (isGuest) ...[
-            _GuestBanner(
-              isIndonesian: isId,
-              onSignIn: widget.onSignIn,
-            ),
+            _GuestBanner(isIndonesian: isId, onSignIn: widget.onSignIn),
             const SizedBox(height: 16),
           ],
 
-          // ── Greeting + connection chip + settings gear ──
-          _GreetingRow(
+          _EditorialHeader(
             firstName: firstName,
             state: widget.state,
+            displayName: displayName,
             onRefreshConnection: isGuest ? null : widget.onRefreshConnection,
             onOpenSettings: widget.onOpenSettings,
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
 
           if (!isGuest && widget.state.pendingApprovals.isNotEmpty) ...[
+            NaraApprovalAlertStrip(
+              count: widget.state.pendingApprovals.length,
+              isIndonesian: isId,
+              onTap: widget.onOpenApprovals,
+            ),
+            const SizedBox(height: 12),
             PendingApprovalsModule(
               state: widget.state,
               compact: true,
@@ -122,206 +128,124 @@ class _HomeScreenState extends State<HomeScreen> {
               onApprove: widget.onApproveApproval,
               onReject: widget.onRejectApproval,
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
           ],
 
-          // ── Metric cards ──
-          Row(
-            children: [
-              Expanded(
-                child: NaraMetricTile(
-                  label: isId ? 'Hari ini' : 'Today',
-                  value: widget.state.todayTasks.length.toString(),
-                  icon: Icons.today_outlined,
-                  color: NaraColors.warning,
-                  bgColor: NaraColors.warningMuted,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: NaraMetricTile(
-                  label: isId ? 'Terbuka' : 'Open',
-                  value: widget.state.pendingTaskCount.toString(),
-                  icon: Icons.inbox_outlined,
-                  color: NaraColors.primary,
-                  bgColor: NaraColors.primaryMuted,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: NaraMetricTile(
-                  label: isId ? 'Selesai' : 'Done',
-                  value: widget.state.completedTaskCount.toString(),
-                  icon: Icons.check_circle_outline,
-                  color: NaraColors.agent,
-                  bgColor: NaraColors.agentMuted,
-                ),
-              ),
-            ],
+          NaraTodayBand(
+            todayCount: widget.state.todayTasks.length,
+            openCount: widget.state.pendingTaskCount,
+            nextReminderLabel: formatNextReminderLabel(
+              widget.state.reminders,
+              isId,
+            ),
+            isIndonesian: isId,
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 20),
 
-          // ── Today's tasks ──
           NaraSectionHeader(
             title: isId ? 'Tugas hari ini' : 'Today\'s tasks',
             subtitle: isId
                 ? '${widget.state.todayTasks.length} jatuh tempo'
-                : '${widget.state.todayTasks.length} task${widget.state.todayTasks.length == 1 ? '' : 's'} due',
-            actionLabel: isId ? 'Semua tugas' : 'All tasks',
+                : '${widget.state.todayTasks.length} due today',
+            actionLabel: isId ? 'Semua' : 'All',
             onActionTap: widget.onOpenTasks,
           ),
           if (widget.state.todayTasks.isEmpty)
-            NaraCard(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.celebration_outlined,
-                      size: 36, color: context.naraTextMuted),
-                  const SizedBox(height: 10),
-                  Text(
-                    isId ? 'Tidak ada tugas hari ini' : 'Nothing due today',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: context.naraTextPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    isId
-                        ? 'Harimu aman. Tambahkan tugas kalau ada yang perlu dikerjakan.'
-                        : 'Your day is clear. Add a task when something comes up.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w400,
-                      color: context.naraTextSecondary,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 14),
-                  FilledButton.icon(
-                    onPressed: isGuest
-                        ? null
-                        : () => widget.onCreateTask(
-                              const NaraTaskDraft(title: ''),
-                            ),
-                    icon: const Icon(Icons.add, size: 18),
-                    label: Text(isId ? 'Tambah Tugas' : 'Add Task'),
-                  ),
-                ],
+            NaraPanel(
+              child: NaraEmptyState(
+                title: isId ? 'Hari ini kosong' : 'Clear for today',
+                body: isId
+                    ? 'Tambahkan tugas kalau ada yang perlu dikerjakan.'
+                    : 'Add a task when something needs attention.',
+                actionLabel: isId ? 'Tambah tugas' : 'Add task',
+                onActionTap: isGuest
+                    ? widget.onSignIn
+                    : () => widget.onCreateTask(const NaraTaskDraft(title: '')),
               ),
             )
           else
-            NaraCard(
-              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+            NaraPanel(
               child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: widget.state.todayTasks
-                    .take(5)
-                    .map((task) => GestureDetector(
-                          onTap: () => widget.onOpenTaskDetail(task),
-                          behavior: HitTestBehavior.opaque,
-                          child: NaraTaskRow(
-                            task: task,
-                            onToggleComplete: isGuest
-                                ? (_) async {
-                                    _showGuestDialog(context);
-                                  }
-                                : widget.onCompleteTask,
-                            compact: true,
-                          ),
-                        ))
-                    .toList(),
-              ),
-            ),
-          const SizedBox(height: 18),
-
-          // ── Recent activity ──
-          if (!isGuest) ...[
-            NaraSectionHeader(
-              title: isId ? 'Aktivitas terbaru' : 'Recent activity',
-              subtitle: widget.state.activity.isEmpty
-                  ? (isId
-                      ? 'Aktivitas Kamu akan muncul di sini.'
-                      : 'Your actions will show up here.')
-                  : (isId ? 'Update terbaru' : 'Last few updates'),
-            ),
-            if (widget.state.activity.isEmpty)
-              NaraCard(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.timeline_outlined,
-                        size: 36, color: context.naraTextMuted),
-                    const SizedBox(height: 10),
-                    Text(
-                      isId ? 'Belum ada aktivitas' : 'No recent activity',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: context.naraTextPrimary,
+                children: [
+                  for (int i = 0; i < widget.state.todayTasks.take(5).length; i++) ...[
+                    if (i > 0) Divider(height: 1, color: context.naraBorder),
+                    GestureDetector(
+                      onTap: () =>
+                          widget.onOpenTaskDetail(widget.state.todayTasks[i]),
+                      behavior: HitTestBehavior.opaque,
+                      child: NaraTaskRow(
+                        task: widget.state.todayTasks[i],
+                        onToggleComplete: isGuest
+                            ? (_) async => _showGuestDialog(context)
+                            : widget.onCompleteTask,
+                        compact: true,
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      isId
-                          ? 'Aktivitas Kamu akan muncul di sini.'
-                          : 'Your actions will show up here.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w400,
-                        color: context.naraTextSecondary,
-                      ),
-                      textAlign: TextAlign.center,
                     ),
                   ],
+                ],
+              ),
+            ),
+          const SizedBox(height: 20),
+
+          if (!isGuest) ...[
+            NaraSectionHeader(
+              title: isId ? 'Aktivitas' : 'Activity',
+              subtitle: widget.state.activity.isEmpty
+                  ? (isId ? 'Belum ada update' : 'No updates yet')
+                  : (isId ? 'Terbaru' : 'Recent'),
+            ),
+            if (widget.state.activity.isEmpty)
+              NaraPanel(
+                child: NaraEmptyState(
+                  title: isId ? 'Belum ada aktivitas' : 'No activity yet',
+                  body: isId
+                      ? 'Tindakan kamu akan muncul di sini.'
+                      : 'Your actions will appear here.',
                 ),
               )
             else
-              NaraCard(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+              NaraPanel(
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: widget.state.activity
-                      .take(5)
-                      .map((a) => _ActivityRow(
-                            activity: a,
-                            isIndonesian: isId,
-                          ))
-                      .toList(),
+                  children: [
+                    for (int i = 0;
+                        i < widget.state.activity.take(5).length;
+                        i++) ...[
+                      if (i > 0)
+                        Divider(height: 1, color: context.naraBorder),
+                      _ActivityRow(
+                        activity: widget.state.activity[i],
+                        isIndonesian: isId,
+                      ),
+                    ],
+                  ],
                 ),
               ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 20),
           ],
 
-          // ── Nara Bot card ──
           NaraSectionHeader(
             title: 'Nara Bot',
-            subtitle: isId
-                ? 'Koneksi asisten WhatsApp'
-                : 'WhatsApp assistant connection',
+            subtitle: isId ? 'Asisten WhatsApp' : 'WhatsApp assistant',
             actionLabel: isId ? 'Atur' : 'Setup',
             onActionTap: widget.onOpenAssistant,
           ),
-          NaraCard(
+          NaraPanel(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
                   children: [
                     Container(
-                      width: 40,
-                      height: 40,
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
-                        color: NaraColors.agent
-                            .withValues(alpha: context.isNaraDark ? 0.14 : 0.1),
-                        borderRadius: BorderRadius.circular(10),
+                        color: NaraColors.agentMuted,
+                        borderRadius:
+                            BorderRadius.circular(NaraColors.radiusSm),
                       ),
                       child: const Icon(
-                        Icons.smart_toy_outlined,
-                        size: 22,
+                        Icons.chat_outlined,
+                        size: 18,
                         color: NaraColors.agent,
                       ),
                     ),
@@ -329,23 +253,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
                         children: [
                           NaraAgentChip(state: widget.state),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
                           Text(
                             widget.state.whatsappContact != null
-                                ? (isId
-                                    ? 'Terhubung sebagai ${widget.state.whatsappContact!.value}'
-                                    : 'Connected as ${widget.state.whatsappContact!.value}')
+                                ? widget.state.whatsappContact!.value
                                 : (isId
-                                    ? 'Hubungkan WhatsApp untuk memakai Nara Bot'
-                                    : 'Connect your WhatsApp to use Nara Bot'),
-                            style: TextStyle(
+                                    ? 'Hubungkan nomor WhatsApp kamu'
+                                    : 'Link your WhatsApp number'),
+                            style: GoogleFonts.plusJakartaSans(
                               fontSize: 12,
-                              fontWeight: FontWeight.w400,
                               color: context.naraTextSecondary,
-                              height: 1.4,
                             ),
                           ),
                         ],
@@ -354,43 +273,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 if (widget.state.whatsappContact == null && !isGuest) ...[
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
-                        child: SizedBox(
-                          height: 40,
-                          child: TextField(
-                            controller: _whatsappController,
-                            keyboardType: TextInputType.phone,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: context.naraTextPrimary,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: '+62 812-3456-7890',
-                              hintStyle: TextStyle(
-                                fontSize: 13,
-                                color: context.naraTextMuted,
-                              ),
-                              contentPadding:
-                                  const EdgeInsets.symmetric(horizontal: 12),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide:
-                                    BorderSide(color: context.naraBorder),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide:
-                                    BorderSide(color: context.naraBorder),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: const BorderSide(
-                                    color: NaraColors.primary, width: 1.5),
-                              ),
-                            ),
+                        child: TextField(
+                          controller: _whatsappController,
+                          keyboardType: TextInputType.phone,
+                          decoration: const InputDecoration(
+                            hintText: '+62 812-3456-7890',
+                            isDense: true,
                           ),
                         ),
                       ),
@@ -404,7 +296,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         },
                         style: FilledButton.styleFrom(
                           minimumSize: const Size(0, 40),
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
                         ),
                         child: Text(isId ? 'Hubungkan' : 'Link'),
                       ),
@@ -414,39 +306,40 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
 
-          // ── Quick add ──
-          NaraCard.tappable(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            onTap: isGuest
-                ? () => _showGuestDialog(context)
-                : () => widget.onCreateTask(
-                      const NaraTaskDraft(title: ''),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: isGuest
+                  ? () => _showGuestDialog(context)
+                  : () => widget.onCreateTask(const NaraTaskDraft(title: '')),
+              borderRadius: BorderRadius.circular(NaraColors.radiusMd),
+              child: Ink(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(NaraColors.radiusMd),
+                  border: Border.all(
+                    color: context.naraBorder,
+                    style: BorderStyle.solid,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.add, size: 18, color: NaraColors.primary),
+                    const SizedBox(width: 10),
+                    Text(
+                      isId ? 'Tambah tugas' : 'Add task',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: context.naraTextPrimary,
+                      ),
                     ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: NaraColors.primaryMuted,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.add,
-                      size: 18, color: NaraColors.primary),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Text(
-                  isId ? 'Tambah tugas cepat' : 'Quick add task',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: context.naraTextSecondary,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ],
@@ -486,8 +379,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// ── Guest Banner ───────────────────────────────────────────────────────
-
 class _GuestBanner extends StatelessWidget {
   const _GuestBanner({
     required this.isIndonesian,
@@ -500,117 +391,90 @@ class _GuestBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: NaraColors.warning.withValues(
-          alpha: context.isNaraDark ? 0.14 : 0.08,
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: NaraColors.warning.withValues(alpha: 0.2),
-        ),
+        color: NaraColors.warningMuted,
+        borderRadius: BorderRadius.circular(NaraColors.radiusMd),
+        border: Border.all(color: NaraColors.warning.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.info_outline, size: 20, color: NaraColors.warning),
-          const SizedBox(width: 10),
           Expanded(
             child: Text(
               isIndonesian
-                  ? 'Kamu sedang melihat pratinjau. Masuk untuk menyimpan data.'
-                  : 'You\'re in preview mode. Sign in to save your data.',
-              style: TextStyle(
+                  ? 'Mode pratinjau — masuk untuk menyimpan data.'
+                  : 'Preview mode — sign in to save your data.',
+              style: GoogleFonts.plusJakartaSans(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
                 color: context.naraTextPrimary,
-                height: 1.4,
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          TextButton(
-            onPressed: onSignIn,
-            style: TextButton.styleFrom(
-              foregroundColor: NaraColors.warning,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: Text(
-              isIndonesian ? 'Masuk' : 'Sign In',
-              style: TextStyle(fontSize: 13),
-            ),
-          ),
+          TextButton(onPressed: onSignIn, child: Text(isIndonesian ? 'Masuk' : 'Sign In')),
         ],
       ),
     );
   }
 }
 
-// ── Greeting Row ───────────────────────────────────────────────────────
-
-class _GreetingRow extends StatelessWidget {
-  const _GreetingRow({
+class _EditorialHeader extends StatelessWidget {
+  const _EditorialHeader({
     required this.firstName,
     required this.state,
+    required this.displayName,
     this.onRefreshConnection,
     required this.onOpenSettings,
   });
 
   final String firstName;
   final NaraMobileState state;
+  final String displayName;
   final VoidCallback? onRefreshConnection;
   final VoidCallback onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
     final isId = state.languagePreference == NaraLanguagePreference.indonesia;
-    return Column(
+
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _greeting(isId: isId),
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _dayLabel(isId: isId),
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w400,
-                      color: context.naraTextSecondary,
-                    ),
-                  ),
-                ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _dayLabel(isId: isId),
+                style: GoogleFonts.fraunces(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
+                  color: context.naraTextPrimary,
+                  height: 1.15,
+                ),
               ),
-            ),
-            IconButton(
-              onPressed: onOpenSettings,
-              icon: const Icon(Icons.settings_outlined),
-              tooltip: isId ? 'Pengaturan' : 'Settings',
-              visualDensity: VisualDensity.compact,
-              style: IconButton.styleFrom(
-                backgroundColor: context.naraSurfaceRaised,
-                foregroundColor: context.naraTextSecondary,
-                side: BorderSide(color: context.naraBorder),
+              const SizedBox(height: 4),
+              Text(
+                _greeting(isId: isId),
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  color: context.naraTextSecondary,
+                ),
               ),
-            ),
-          ],
-        ),
-        if (!state.isGuest && onRefreshConnection != null) ...[
-          const SizedBox(height: 10),
-          GestureDetector(
-            onTap: onRefreshConnection,
-            child: NaraConnectionChip(state: state),
+              if (!state.isGuest && onRefreshConnection != null) ...[
+                const SizedBox(height: 10),
+                GestureDetector(
+                  onTap: onRefreshConnection,
+                  child: NaraConnectionChip(state: state),
+                ),
+              ],
+            ],
           ),
-        ],
+        ),
+        NaraAvatarButton(
+          displayName: displayName.isNotEmpty ? displayName : (isId ? 'Tamu' : 'Guest'),
+          onTap: onOpenSettings,
+        ),
       ],
     );
   }
@@ -618,85 +482,44 @@ class _GreetingRow extends StatelessWidget {
   String _greeting({required bool isId}) {
     final hour = DateTime.now().hour;
     if (state.isGuest) {
-      if (isId) {
-        if (hour < 11) return 'Selamat pagi';
-        if (hour < 15) return 'Selamat siang';
-        if (hour < 18) return 'Selamat sore';
-        return 'Selamat malam';
-      }
-      if (hour < 11) return 'Good morning';
-      if (hour < 15) return 'Good afternoon';
-      if (hour < 18) return 'Good evening';
-      return 'Good night';
+      return isId ? 'Selamat datang' : 'Welcome';
     }
-    final namePrefix = firstName.isNotEmpty ? ', $firstName' : '';
+    final namePrefix = firstName.isNotEmpty ? firstName : (isId ? 'kamu' : 'there');
     if (isId) {
-      if (hour < 11) return 'Selamat pagi$namePrefix';
-      if (hour < 15) return 'Selamat siang$namePrefix';
-      if (hour < 18) return 'Selamat sore$namePrefix';
-      return 'Selamat malam$namePrefix';
+      if (hour < 11) return 'Selamat pagi, $namePrefix';
+      if (hour < 15) return 'Selamat siang, $namePrefix';
+      if (hour < 18) return 'Selamat sore, $namePrefix';
+      return 'Selamat malam, $namePrefix';
     }
-    if (hour < 11) return 'Good morning$namePrefix';
-    if (hour < 15) return 'Good afternoon$namePrefix';
-    if (hour < 18) return 'Good evening$namePrefix';
-    return 'Good night$namePrefix';
+    if (hour < 11) return 'Good morning, $namePrefix';
+    if (hour < 15) return 'Good afternoon, $namePrefix';
+    if (hour < 18) return 'Good evening, $namePrefix';
+    return 'Good night, $namePrefix';
   }
 
   String _dayLabel({required bool isId}) {
     final now = DateTime.now();
     const daysEn = [
-      'Sunday',
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday'
+      'Sunday', 'Monday', 'Tuesday', 'Wednesday',
+      'Thursday', 'Friday', 'Saturday',
     ];
     const daysId = [
-      'Minggu',
-      'Senin',
-      'Selasa',
-      'Rabu',
-      'Kamis',
-      'Jumat',
-      'Sabtu'
+      'Minggu', 'Senin', 'Selasa', 'Rabu',
+      'Kamis', 'Jumat', 'Sabtu',
     ];
     const monthsEn = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
     ];
     const monthsId = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'Mei',
-      'Jun',
-      'Jul',
-      'Agu',
-      'Sep',
-      'Okt',
-      'Nov',
-      'Des',
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
     ];
     final days = isId ? daysId : daysEn;
     final months = isId ? monthsId : monthsEn;
     return '${days[now.weekday % 7]}, ${now.day} ${months[now.month - 1]}';
   }
 }
-
-// ── Activity Row ───────────────────────────────────────────────────────
 
 class _ActivityRow extends StatelessWidget {
   const _ActivityRow({
@@ -709,35 +532,26 @@ class _ActivityRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (IconData icon, Color color) = _activityVisual(activity.type);
-
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: color),
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: _activityColor(activity.type),
+              shape: BoxShape.circle,
+            ),
+          ),
           const SizedBox(width: 10),
           Expanded(
-            child: RichText(
-              text: TextSpan(
-                style: TextStyle(
-                  fontSize: 13,
-                  color: context.naraTextPrimary,
-                  height: 1.4,
-                ),
-                children: [
-                  TextSpan(
-                    text: activity.title,
-                    style: const TextStyle(fontWeight: FontWeight.w500),
-                  ),
-                  TextSpan(
-                    text: ' - ${_timeAgo(activity.timestamp)}',
-                    style: TextStyle(
-                      color: context.naraTextMuted,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                ],
+            child: Text(
+              '${activity.title} · ${_timeAgo(activity.timestamp)}',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                color: context.naraTextPrimary,
+                height: 1.4,
               ),
             ),
           ),
@@ -746,33 +560,26 @@ class _ActivityRow extends StatelessWidget {
     );
   }
 
-  (IconData, Color) _activityVisual(String type) {
+  Color _activityColor(String type) {
     return switch (type) {
-      'task_created' => (Icons.add_circle_outline, NaraColors.primary),
-      'task_completed' => (Icons.check_circle_outline, NaraColors.agent),
-      'reminder_triggered' => (
-          Icons.notifications_active_outlined,
-          NaraColors.warning
-        ),
-      'approval_pending' => (Icons.assignment_outlined, NaraColors.warning),
-      'bot_action' => (Icons.smart_toy_outlined, NaraColors.agent),
-      _ => (Icons.circle, NaraColors.textMuted),
+      'task_created' => NaraColors.primary,
+      'task_completed' => NaraColors.agent,
+      'reminder_triggered' => NaraColors.warning,
+      'approval_pending' => NaraColors.warning,
+      'bot_action' => NaraColors.agent,
+      _ => NaraColors.textMuted,
     };
   }
 
   String _timeAgo(DateTime dt) {
     final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 1) {
-      return isIndonesian ? 'baru saja' : 'just now';
-    }
+    if (diff.inMinutes < 1) return isIndonesian ? 'baru saja' : 'just now';
     if (diff.inMinutes < 60) {
-      return isIndonesian
-          ? '${diff.inMinutes} menit lalu'
-          : '${diff.inMinutes}m ago';
+      return isIndonesian ? '${diff.inMinutes}m' : '${diff.inMinutes}m';
     }
     if (diff.inHours < 24) {
-      return isIndonesian ? '${diff.inHours} jam lalu' : '${diff.inHours}h ago';
+      return isIndonesian ? '${diff.inHours}j' : '${diff.inHours}h';
     }
-    return isIndonesian ? '${diff.inDays} hari lalu' : '${diff.inDays}d ago';
+    return isIndonesian ? '${diff.inDays}h' : '${diff.inDays}d';
   }
 }

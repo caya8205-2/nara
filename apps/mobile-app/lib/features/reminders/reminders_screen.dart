@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/state/nara_mobile_state.dart';
+import '../../core/theme/nara_theme.dart';
 import '../../core/widgets/nara_card.dart';
 import '../../core/widgets/nara_empty_state.dart';
 import '../../core/widgets/nara_section_header.dart';
@@ -30,6 +31,7 @@ class RemindersScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return RefreshIndicator(
+      color: NaraColors.primary,
       onRefresh: () => onRefresh(silent: true),
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -69,7 +71,6 @@ class RemindersScreen extends StatelessWidget {
             )
           else if (state.upcomingReminders.isEmpty)
             NaraEmptyState(
-              icon: Icons.notifications_outlined,
               title: _isIndonesian
                   ? 'Belum ada pengingat'
                   : 'No upcoming reminders',
@@ -95,7 +96,6 @@ class RemindersScreen extends StatelessWidget {
           ),
           if (state.recurringReminders.isEmpty)
             NaraEmptyState(
-              icon: Icons.repeat_outlined,
               title: _isIndonesian
                   ? 'Belum ada pengingat berulang'
                   : 'No recurring reminders',
@@ -119,7 +119,6 @@ class RemindersScreen extends StatelessWidget {
           ),
           if (state.pausedReminders.isEmpty)
             NaraEmptyState(
-              icon: Icons.pause_circle_outline,
               title: _isIndonesian ? 'Tidak ada yang dijeda' : 'Nothing paused',
               body: _isIndonesian
                   ? 'Pengingat yang dijeda akan muncul di sini.'
@@ -175,7 +174,7 @@ class _ReminderGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return NaraCard(
+    return NaraPanel(
       padding: EdgeInsets.zero,
       child: Column(
         children: [

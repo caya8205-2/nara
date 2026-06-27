@@ -132,6 +132,7 @@ class _TasksScreenState extends State<TasksScreen> {
               label: Text(isId ? 'Tugas' : 'Task'),
             ),
       body: RefreshIndicator(
+        color: NaraColors.primary,
         onRefresh: _isGuest ? () async {} : widget.onRefresh,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -243,40 +244,16 @@ class _TasksScreenState extends State<TasksScreen> {
               const SizedBox(height: 16),
             ],
 
-            // ── Metric row ──
+            // ── Today band ──
             if (!_isSearching) ...[
-              Row(
-                children: [
-                  Expanded(
-                    child: NaraMetricTile(
-                      label: isId ? 'Hari ini' : 'Today',
-                      value: widget.state.todayTasks.length.toString(),
-                      icon: Icons.today_outlined,
-                      color: NaraColors.warning,
-                      bgColor: NaraColors.warningMuted,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: NaraMetricTile(
-                      label: isId ? 'Terbuka' : 'Open',
-                      value: widget.state.openTasks.length.toString(),
-                      icon: Icons.radio_button_unchecked,
-                      color: NaraColors.primary,
-                      bgColor: NaraColors.primaryMuted,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: NaraMetricTile(
-                      label: isId ? 'Selesai' : 'Done',
-                      value: widget.state.completedTaskCount.toString(),
-                      icon: Icons.check_circle_outline,
-                      color: NaraColors.agent,
-                      bgColor: NaraColors.agentMuted,
-                    ),
-                  ),
-                ],
+              NaraTodayBand(
+                todayCount: widget.state.todayTasks.length,
+                openCount: widget.state.openTasks.length,
+                nextReminderLabel: formatNextReminderLabel(
+                  widget.state.reminders,
+                  isId,
+                ),
+                isIndonesian: isId,
               ),
               const SizedBox(height: 18),
               if (showFocusPanel) ...[
@@ -346,7 +323,6 @@ class _TasksScreenState extends State<TasksScreen> {
             // ── Task list ──
             if (tasks.isEmpty && _isSearching)
               NaraEmptyState(
-                icon: Icons.search_off,
                 title: isId
                     ? 'Tidak ada tugas yang cocok.'
                     : 'No tasks match your search.',
@@ -356,9 +332,6 @@ class _TasksScreenState extends State<TasksScreen> {
               )
             else if (tasks.isEmpty)
               NaraEmptyState(
-                icon: _filter == _TaskFilter.done
-                    ? Icons.check_circle_outline
-                    : Icons.inbox_outlined,
                 title: _emptyTitle(isId: isId),
                 body: _emptyBody(isId: isId),
                 actionLabel: _filter == _TaskFilter.done
